@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>P2P Work Connect</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>P2P Work Connection Platform</h1>
+  
+  <div id="forms">
+    <h2>Register as Worker</h2>
+    <form id="workerForm">
+      Name: <input name="name" required>
+      Skill: <input name="skill" required>
+      <button type="submit">Register</button>
+    </form>
+    
+    <h2>Post a Work Request</h2>
+    <form id="requestForm">
+      Your Name: <input name="name" required>
+      Needed Skill: <input name="skill" required>
+      <button type="submit">Post Request</button>
+    </form>
+  </div>
+  
+  <div id="lists">
+    <h2>Available Workers</h2>
+    <ul id="workerList"></ul>
+    <h2>Work Requests</h2>
+    <ul id="requestList"></ul>
+  </div>
+  
+  <div id="connectSection">
+    <h2>Connect Worker & Request</h2>
+    <form id="connectForm">
+      Worker ID: <input name="workerId" required>
+      Request ID: <input name="requestId" required>
+      <button type="submit">Connect</button>
+    </form>
+    <div id="connectResult"></div>
+  </div>
+  
+  <script src="app.js"></script>
+</body>
+</html>

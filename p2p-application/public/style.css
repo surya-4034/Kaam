@@ -1,0 +1,5 @@
+body { font-family: sans-serif; margin: 2em;}
+h1 { color: #0077aa; }
+form { margin-bottom: 1em; }
+#lists ul { list-style: none; padding: 0; }
+#lists li { background: #f0f0f0; margin: 3px 0; padding: 4px 8px; }
