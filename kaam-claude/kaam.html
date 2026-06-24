@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kaam — Find Local Workers</title>
+<style>
+  :root{
+    --primary:#FF6B35;--primary-dark:#e85a24;--secondary:#1A1A2E;
+    --accent:#16213E;--success:#27AE60;--warning:#F39C12;--danger:#E74C3C;
+    --light:#F8F9FA;--gray:#6C757D;--border:#DEE2E6;--white:#fff;
+    --shadow:0 4px 20px rgba(0,0,0,0.1);--radius:12px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;color:#333;}
+  .hidden{display:none!important;}
+  /* NAV */
+  .top-nav{background:var(--secondary);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+  .top-nav .logo{font-size:1.6rem;font-weight:800;color:var(--primary);}
+  .top-nav .logo span{color:#fff;font-size:.85rem;margin-left:6px;opacity:.7;}
+  .nav-btns{display:flex;gap:8px;}
+  .btn{padding:9px 18px;border:none;border-radius:8px;cursor:pointer;font-size:.9rem;font-weight:600;transition:all .2s;}
+  .btn-primary{background:var(--primary);color:#fff;}
+  .btn-primary:hover{background:var(--primary-dark);}
+  .btn-outline{background:transparent;border:2px solid var(--primary);color:var(--primary);}
+  .btn-outline:hover{background:var(--primary);color:#fff;}
+  .btn-secondary{background:var(--secondary);color:#fff;}
+  .btn-secondary:hover{background:var(--accent);}
+  .btn-success{background:var(--success);color:#fff;}
+  .btn-danger{background:var(--danger);color:#fff;}
+  .btn-warning{background:var(--warning);color:#fff;}
+  .btn-sm{padding:6px 12px;font-size:.8rem;}
+  .btn-lg{padding:13px 28px;font-size:1rem;}
+  .btn-block{width:100%;}
+  /* PAGES */
+  .page{display:none;min-height:100vh;}
+  .page.active{display:block;}
+  /* LANDING */
+  .hero{background:linear-gradient(135deg,var(--secondary) 0%,var(--accent) 100%);color:#fff;padding:80px 24px;text-align:center;}
+  .hero h1{font-size:2.8rem;font-weight:900;margin-bottom:16px;}
+  .hero h1 span{color:var(--primary);}
+  .hero p{font-size:1.15rem;opacity:.85;max-width:560px;margin:0 auto 36px;}
+  .hero-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+  .portal-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;padding:48px 24px;max-width:1000px;margin:0 auto;}
+  .portal-card{background:#fff;border-radius:var(--radius);padding:32px 24px;text-align:center;box-shadow:var(--shadow);cursor:pointer;transition:transform .2s,box-shadow .2s;border-top:4px solid var(--primary);}
+  .portal-card:hover{transform:translateY(-6px);box-shadow:0 12px 32px rgba(0,0,0,.15);}
+  .portal-card .icon{font-size:2.8rem;margin-bottom:14px;}
+  .portal-card h3{font-size:1.2rem;font-weight:700;margin-bottom:8px;}
+  .portal-card p{color:var(--gray);font-size:.9rem;}
+  .stats-bar{background:var(--primary);color:#fff;padding:20px;display:flex;justify-content:center;gap:48px;flex-wrap:wrap;}
+  .stat{text-align:center;}
+  .stat .num{font-size:1.6rem;font-weight:800;}
+  .stat .lbl{font-size:.8rem;opacity:.85;}
+  /* AUTH */
+  .auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--secondary),var(--accent));padding:20px;}
+  .auth-box{background:#fff;border-radius:16px;padding:40px 36px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .auth-box .logo{font-size:2rem;font-weight:900;color:var(--primary);text-align:center;margin-bottom:4px;}
+  .auth-box .sub{text-align:center;color:var(--gray);font-size:.9rem;margin-bottom:28px;}
+  .form-group{margin-bottom:18px;}
+  .form-group label{display:block;font-size:.85rem;font-weight:600;color:#555;margin-bottom:6px;}
+  .form-control{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:.95rem;transition:border .2s;}
+  .form-control:focus{outline:none;border-color:var(--primary);}
+  .otp-row{display:flex;gap:8px;}
+  .otp-row .form-control{flex:1;}
+  .otp-row .btn{white-space:nowrap;}
+  .auth-switch{text-align:center;margin-top:18px;font-size:.9rem;color:var(--gray);}
+  .auth-switch a{color:var(--primary);cursor:pointer;font-weight:600;}
+  /* DASHBOARD SHELL */
+  .dash-shell{display:flex;min-height:100vh;}
+  .sidebar{width:240px;background:var(--secondary);color:#fff;padding:24px 0;flex-shrink:0;position:fixed;top:0;left:0;height:100%;overflow-y:auto;z-index:90;}
+  .sidebar .s-logo{font-size:1.4rem;font-weight:900;color:var(--primary);padding:0 20px 24px;border-bottom:1px solid rgba(255,255,255,.1);}
+  .sidebar .s-logo small{display:block;color:rgba(255,255,255,.5);font-size:.7rem;font-weight:400;}
+  .s-menu{list-style:none;padding:16px 0;}
+  .s-menu li a{display:flex;align-items:center;gap:10px;padding:12px 20px;color:rgba(255,255,255,.75);text-decoration:none;font-size:.9rem;transition:all .2s;cursor:pointer;}
+  .s-menu li a:hover,.s-menu li a.active{background:rgba(255,107,53,.15);color:var(--primary);border-left:3px solid var(--primary);}
+  .s-menu li a .icon{font-size:1.1rem;}
+  .dash-main{margin-left:240px;flex:1;padding:28px;background:#f0f2f5;}
+  .dash-header{background:#fff;border-radius:var(--radius);padding:18px 24px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow);}
+  .dash-header h2{font-size:1.3rem;font-weight:700;}
+  /* CARDS */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;margin-bottom:24px;}
+  .stat-card{background:#fff;border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);border-left:4px solid var(--primary);}
+  .stat-card .val{font-size:1.8rem;font-weight:800;color:var(--secondary);}
+  .stat-card .key{font-size:.82rem;color:var(--gray);margin-top:4px;}
+  .card{background:#fff;border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);margin-bottom:24px;}
+  .card h3{font-size:1.05rem;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #f0f2f5;}
+  /* TABLE */
+  table{width:100%;border-collapse:collapse;font-size:.88rem;}
+  th{background:#f8f9fa;padding:10px 12px;text-align:left;font-weight:700;color:#555;border-bottom:2px solid var(--border);}
+  td{padding:10px 12px;border-bottom:1px solid #f0f2f5;}
+  tr:hover td{background:#fafafa;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:700;}
+  .badge-success{background:#d4edda;color:#155724;}
+  .badge-warning{background:#fff3cd;color:#856404;}
+  .badge-danger{background:#f8d7da;color:#721c24;}
+  .badge-info{background:#cce5ff;color:#004085;}
+  .badge-secondary{background:#e2e3e5;color:#383d41;}
+  /* WORKER SETUP */
+  .setup-steps{display:flex;gap:8px;margin-bottom:28px;flex-wrap:wrap;}
+  .step-dot{width:32px;height:32px;border-radius:50%;background:#e0e0e0;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#999;}
+  .step-dot.active{background:var(--primary);color:#fff;}
+  .step-dot.done{background:var(--success);color:#fff;}
+  /* CATEGORIES GRID */
+  .cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:14px;}
+  .cat-item{background:#fff;border:2px solid var(--border);border-radius:var(--radius);padding:18px 12px;text-align:center;cursor:pointer;transition:all .2s;}
+  .cat-item:hover,.cat-item.selected{border-color:var(--primary);background:#fff5f2;}
+  .cat-item .ci{font-size:2rem;margin-bottom:8px;}
+  .cat-item p{font-size:.8rem;font-weight:600;color:#444;}
+  /* WORKER LIST */
+  .worker-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;}
+  .worker-card{background:#fff;border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);cursor:pointer;transition:transform .2s;}
+  .worker-card:hover{transform:translateY(-4px);}
+  .worker-card .wc-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+  .avatar{width:50px;height:50px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#fff;font-weight:700;flex-shrink:0;}
+  .wc-info h4{font-size:.95rem;font-weight:700;}
+  .wc-info small{color:var(--gray);font-size:.8rem;}
+  .wc-meta{display:flex;flex-wrap:wrap;gap:8px;font-size:.8rem;}
+  .meta-tag{background:#f0f2f5;padding:4px 10px;border-radius:20px;color:#555;}
+  .rating{color:#F39C12;font-weight:700;}
+  /* MODAL */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .modal{background:#fff;border-radius:16px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;}
+  .modal-head{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+  .modal-head h3{font-size:1.1rem;font-weight:700;}
+  .modal-close{background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--gray);}
+  .modal-body{padding:24px;}
+  .modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;}
+  /* PAYMENT */
+  .pay-option{border:2px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:14px;}
+  .pay-option:hover,.pay-option.selected{border-color:var(--primary);background:#fff5f2;}
+  .pay-option .po-icon{font-size:1.8rem;}
+  .pay-option h4{font-size:.95rem;font-weight:700;}
+  .pay-option p{font-size:.8rem;color:var(--gray);}
+  /* ALERT */
+  .alert{padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:.9rem;}
+  .alert-info{background:#cce5ff;color:#004085;}
+  .alert-warning{background:#fff3cd;color:#856404;}
+  .alert-success{background:#d4edda;color:#155724;}
+  .alert-danger{background:#f8d7da;color:#721c24;}
+  /* PROFILE */
+  .profile-header{background:linear-gradient(135deg,var(--secondary),var(--accent));color:#fff;border-radius:var(--radius);padding:28px;margin-bottom:20px;display:flex;align-items:center;gap:20px;}
+  .profile-header .avatar-lg{width:72px;height:72px;font-size:2rem;}
+  .profile-header h2{font-size:1.3rem;font-weight:800;}
+  .profile-header p{opacity:.8;font-size:.9rem;}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .info-item label{font-size:.78rem;color:var(--gray);display:block;margin-bottom:2px;}
+  .info-item p{font-size:.92rem;font-weight:600;}
+  .section-divider{margin:20px 0;border:none;border-top:2px solid #f0f2f5;}
+  /* TOAST */
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--secondary);color:#fff;padding:14px 20px;border-radius:10px;font-size:.9rem;z-index:300;transform:translateY(80px);opacity:0;transition:all .3s;box-shadow:0 8px 24px rgba(0,0,0,.3);}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast.success{background:var(--success);}
+  .toast.error{background:var(--danger);}
+  /* TABS */
+  .tabs{display:flex;gap:4px;background:#f0f2f5;padding:4px;border-radius:10px;margin-bottom:20px;}
+  .tab-btn{flex:1;padding:9px;background:transparent;border:none;border-radius:8px;cursor:pointer;font-size:.87rem;font-weight:600;color:var(--gray);transition:all .2s;}
+  .tab-btn.active{background:#fff;color:var(--primary);box-shadow:0 2px 8px rgba(0,0,0,.1);}
+  .tab-content{display:none;}
+  .tab-content.active{display:block;}
+  /* BREADCRUMB */
+  .breadcrumb{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--gray);margin-bottom:20px;}
+  .breadcrumb a{color:var(--primary);cursor:pointer;}
+  /* BACK BTN */
+  .back-btn{background:none;border:none;color:var(--primary);cursor:pointer;font-size:.9rem;font-weight:600;display:flex;align-items:center;gap:4px;margin-bottom:16px;}
+  /* OTP BOX */
+  .otp-display{background:var(--secondary);color:#fff;border-radius:10px;padding:18px;text-align:center;margin:16px 0;}
+  .otp-display .otp-num{font-size:2.5rem;font-weight:900;letter-spacing:8px;color:var(--primary);}
+  .otp-display small{opacity:.7;font-size:.8rem;}
+  /* BANNED BANNER */
+  .banned-banner{background:var(--danger);color:#fff;border-radius:var(--radius);padding:20px;margin-bottom:20px;text-align:center;}
+  /* RESPONSIVE */
+  @media(max-width:768px){
+    .sidebar{width:100%;height:auto;position:relative;}
+    .dash-main{margin-left:0;}
+    .dash-shell{flex-direction:column;}
+    .hero h1{font-size:2rem;}
+    .info-grid{grid-template-columns:1fr;}
+    .stats-bar{gap:24px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- ==================== LANDING PAGE ==================== -->
+<div class="page active" id="page-landing">
+  <nav class="top-nav">
+    <div class="logo">Kaam <span>Mumbai's Work Network</span></div>
+    <div class="nav-btns">
+      <button class="btn btn-outline btn-sm" onclick="showPage('page-customer-login')">Customer</button>
+      <button class="btn btn-primary btn-sm" onclick="showPage('page-worker-login')">Worker</button>
+      <button class="btn btn-secondary btn-sm" onclick="showPage('page-admin-login')">Admin</button>
+    </div>
+  </nav>
+  <div class="hero">
+    <h1>India ka <span>Kaam</span> Network</h1>
+    <p>Connect with skilled local workers instantly. Plumbers, electricians, carpenters and 17 more trades — all verified, all nearby.</p>
+    <div class="hero-btns">
+      <button class="btn btn-primary btn-lg" onclick="showPage('page-customer-login')">🔍 Find a Worker</button>
+      <button class="btn btn-outline btn-lg" onclick="showPage('page-worker-login')">💼 Join as Worker</button>
+    </div>
+  </div>
+  <div class="stats-bar">
+    <div class="stat"><div class="num">500+</div><div class="lbl">Workers Available</div></div>
+    <div class="stat"><div class="num">20</div><div class="lbl">Job Categories</div></div>
+    <div class="stat"><div class="num">5km</div><div class="lbl">Nearby Matching</div></div>
+    <div class="stat"><div class="num">14.5%</div><div class="lbl">Low Platform Fee</div></div>
+  </div>
+  <div class="portal-cards">
+    <div class="portal-card" onclick="showPage('page-customer-login')">
+      <div class="icon">🏠</div>
+      <h3>For Customers</h3>
+      <p>Find trusted local workers for any job. Compare, book and pay — all in one place.</p>
+      <br/><button class="btn btn-primary btn-sm">Get Started →</button>
+    </div>
+    <div class="portal-card" onclick="showPage('page-worker-login')">
+      <div class="icon">🔧</div>
+      <h3>For Workers</h3>
+      <p>Grow your business. Get job leads in your area and receive payments directly.</p>
+      <br/><button class="btn btn-primary btn-sm">Register Now →</button>
+    </div>
+    <div class="portal-card" onclick="showPage('page-admin-login')">
+      <div class="icon">📊</div>
+      <h3>Admin Dashboard</h3>
+      <p>Full control over workers, customers, payments and platform operations.</p>
+      <br/><button class="btn btn-secondary btn-sm">Admin Login →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== WORKER AUTH ==================== -->
+<div class="page" id="page-worker-login">
+  <div class="auth-wrap">
+    <div class="auth-box">
+      <div class="logo">Kaam</div>
+      <div class="sub">Worker Portal — Sign In</div>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('worker-auth','login')">Login</button>
+        <button class="tab-btn" onclick="switchTab('worker-auth','signup')">Sign Up</button>
+      </div>
+      <div id="worker-auth-login" class="tab-content active">
+        <div class="form-group">
+          <label>Mobile Number</label>
+          <input class="form-control" id="wl-mobile" placeholder="Enter 10-digit mobile" type="tel" maxlength="10"/>
+        </div>
+        <div class="form-group">
+          <label>OTP</label>
+          <div class="otp-row">
+            <input class="form-control" id="wl-otp" placeholder="Enter OTP" type="text" maxlength="6"/>
+            <button class="btn btn-outline btn-sm" onclick="sendOTP('wl-mobile','wl-otp-code')">Send OTP</button>
+          </div>
+          <small id="wl-otp-code" style="color:var(--success);font-weight:700;margin-top:4px;display:block;"></small>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="workerLogin()">Login →</button>
+        <div class="auth-switch">Back to <a onclick="showPage('page-landing')">Home</a></div>
+      </div>
+      <div id="worker-auth-signup" class="tab-content">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input class="form-control" id="ws-name" placeholder="Your full name"/>
+        </div>
+        <div class="form-group">
+          <label>Mobile Number</label>
+          <input class="form-control" id="ws-mobile" placeholder="Enter 10-digit mobile" type="tel" maxlength="10"/>
+        </div>
+        <div class="form-group">
+          <label>OTP</label>
+          <div class="otp-row">
+            <input class="form-control" id="ws-otp" placeholder="Enter OTP" type="text"/>
+            <button class="btn btn-outline btn-sm" onclick="sendOTP('ws-mobile','ws-otp-code')">Send OTP</button>
+          </div>
+          <small id="ws-otp-code" style="color:var(--success);font-weight:700;margin-top:4px;display:block;"></small>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="workerSignup()">Create Account →</button>
+        <div class="auth-switch">Back to <a onclick="showPage('page-landing')">Home</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== WORKER SETUP ==================== -->
+<div class="page" id="page-worker-setup">
+  <div style="max-width:620px;margin:0 auto;padding:32px 20px;">
+    <div class="logo" style="font-size:1.8rem;font-weight:900;color:var(--primary);text-align:center;margin-bottom:6px;">Kaam</div>
+    <p style="text-align:center;color:var(--gray);margin-bottom:28px;">Complete your worker profile to start getting jobs</p>
+    <div class="setup-steps" id="setup-steps-dots">
+      <div class="step-dot active" id="step1">1</div>
+      <div style="flex:1;height:2px;background:#e0e0e0;margin-top:15px;border-radius:2px;"></div>
+      <div class="step-dot" id="step2">2</div>
+      <div style="flex:1;height:2px;background:#e0e0e0;margin-top:15px;border-radius:2px;"></div>
+      <div class="step-dot" id="step3">3</div>
+      <div style="flex:1;height:2px;background:#e0e0e0;margin-top:15px;border-radius:2px;"></div>
+      <div class="step-dot" id="step4">4</div>
+    </div>
+    <!-- Step 1 -->
+    <div class="card" id="setup-step-1">
+      <h3>📋 Basic Information</h3>
+      <div class="form-group"><label>Full Name</label><input class="form-control" id="setup-name" placeholder="Full name"/></div>
+      <div class="form-group"><label>Address / Area (Mumbai)</label><input class="form-control" id="setup-address" placeholder="e.g. Andheri West, Mumbai"/></div>
+      <div class="form-group"><label>Years of Experience</label><input class="form-control" id="setup-exp" placeholder="e.g. 5" type="number" min="0"/></div>
+      <div class="form-group"><label>About Yourself</label><textarea class="form-control" id="setup-about" rows="3" placeholder="Brief description of your skills and experience..."></textarea></div>
+      <button class="btn btn-primary btn-block" onclick="setupNext(1)">Next →</button>
+    </div>
+    <!-- Step 2 -->
+    <div class="card hidden" id="setup-step-2">
+      <h3>🔧 Work Type & Charges</h3>
+      <div class="form-group">
+        <label>Select Your Work Category</label>
+        <select class="form-control" id="setup-category">
+          <option value="">-- Select Category --</option>
+          <option>Plumber</option><option>Electrician</option><option>Carpenter</option>
+          <option>Painter</option><option>Mason / Trowel</option><option>Cleaner</option>
+          <option>AC Technician</option><option>Appliance Repair</option><option>Welder</option>
+          <option>Gardener</option><option>Pest Control</option><option>Security Guard</option>
+          <option>Driver</option><option>Delivery Person</option><option>Tailor</option>
+          <option>Cook / Chef</option><option>Tutor</option><option>Beautician / Barber</option>
+          <option>Movers & Packers</option><option>CCTV Technician</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Minimum Charge per Job (₹)</label><input class="form-control" id="setup-min-charge" placeholder="e.g. 300" type="number"/></div>
+      <div class="form-group"><label>Maximum Charge per Job (₹)</label><input class="form-control" id="setup-max-charge" placeholder="e.g. 2000" type="number"/></div>
+      <div class="alert alert-info">ℹ️ Platform fee of <strong>14.5%</strong> will be deducted from each job payment.</div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-outline" onclick="setupBack(2)">← Back</button>
+        <button class="btn btn-primary" style="flex:1" onclick="setupNext(2)">Next →</button>
+      </div>
+    </div>
+    <!-- Step 3 -->
+    <div class="card hidden" id="setup-step-3">
+      <h3>💳 Payment Details</h3>
+      <div class="form-group"><label>UPI ID</label><input class="form-control" id="setup-upi" placeholder="yourname@upi"/></div>
+      <div class="form-group"><label>UPI Linked Mobile Number</label><input class="form-control" id="setup-upi-mobile" placeholder="10-digit number" type="tel" maxlength="10"/></div>
+      <div class="alert alert-warning">⚠️ For cash payments: platform fee (14.5%) must be paid within <strong>2 days</strong> or your account will be suspended.</div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-outline" onclick="setupBack(3)">← Back</button>
+        <button class="btn btn-primary" style="flex:1" onclick="setupNext(3)">Next →</button>
+      </div>
+    </div>
+    <!-- Step 4 -->
+    <div class="card hidden" id="setup-step-4">
+      <h3>📸 Past Work Photos (Optional)</h3>
+      <p style="color:var(--gray);font-size:.9rem;margin-bottom:16px;">Upload photos of your previous work to build trust with customers.</p>
+      <div class="form-group">
+        <label>Upload Work Photos</label>
+        <input type="file" class="form-control" id="setup-photos" multiple accept="image/*"/>
+      </div>
+      <div id="photo-preview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"></div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn btn-outline" onclick="setupBack(4)">← Back</button>
+        <button class="btn btn-success" style="flex:1" onclick="completeSetup()">🎉 Complete Setup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== WORKER DASHBOARD ==================== -->
+<div class="page" id="page-worker-dash">
+  <div class="dash-shell">
+    <aside class="sidebar">
+      <div class="s-logo">Kaam <small>Worker Portal</small></div>
+      <ul class="s-menu">
+        <li><a onclick="workerTab('overview')" class="active" id="wt-overview"><span class="icon">🏠</span>Overview</a></li>
+        <li><a onclick="workerTab('jobs')" id="wt-jobs"><span class="icon">📋</span>My Jobs</a></li>
+        <li><a onclick="workerTab('payments')" id="wt-payments"><span class="icon">💰</span>Payments</a></li>
+        <li><a onclick="workerTab('profile')" id="wt-profile"><span class="icon">👤</span>My Profile</a></li>
+        <li><a onclick="showPage('page-landing')"><span class="icon">🚪</span>Logout</a></li>
+      </ul>
+    </aside>
+    <main class="dash-main">
+      <div class="dash-header">
+        <div>
+          <h2 id="worker-dash-greeting">Welcome back! 👋</h2>
+          <small style="color:var(--gray)" id="worker-dash-sub">Here's your work summary</small>
+        </div>
+        <div id="worker-ban-badge"></div>
+      </div>
+      <!-- BANNED BANNER -->
+      <div class="banned-banner hidden" id="worker-banned-banner">
+        🚫 Your account is <strong>suspended</strong>. Please pay your pending platform fees to resume receiving jobs.
+        <br/><button class="btn btn-warning btn-sm" style="margin-top:10px;" onclick="payPendingFee()">Pay Platform Fee Now</button>
+      </div>
+      <!-- OVERVIEW TAB -->
+      <div id="wtab-overview">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="val" id="w-stat-pending">0</div><div class="key">Pending Jobs</div></div>
+          <div class="stat-card" style="border-color:var(--success)"><div class="val" id="w-stat-done">0</div><div class="key">Completed Jobs</div></div>
+          <div class="stat-card" style="border-color:var(--warning)"><div class="val" id="w-stat-earned">₹0</div><div class="key">Total Earned</div></div>
+          <div class="stat-card" style="border-color:var(--danger)"><div class="val" id="w-stat-due">₹0</div><div class="key">Platform Fee Due</div></div>
+        </div>
+        <!-- ASSIGNED JOB -->
+        <div class="card" id="w-active-job-card">
+          <h3>🔔 Active Job Assignment</h3>
+          <div id="w-active-job-content">
+            <p style="color:var(--gray);text-align:center;padding:20px;">No active job assigned yet. When a customer books you, details will appear here.</p>
+          </div>
+        </div>
+        <!-- COMPLETE JOB OTP -->
+        <div class="card" id="w-complete-otp-card" style="display:none;">
+          <h3>✅ Mark Job as Complete</h3>
+          <p style="color:var(--gray);font-size:.9rem;margin-bottom:16px;">Ask the customer for the completion OTP and enter it below to confirm job completion.</p>
+          <div class="otp-row">
+            <input class="form-control" id="w-completion-otp" placeholder="Enter 6-digit OTP from customer"/>
+            <button class="btn btn-success" onclick="completeJob()">Confirm</button>
+          </div>
+        </div>
+      </div>
+      <!-- JOBS TAB -->
+      <div id="wtab-jobs" class="hidden">
+        <div class="card">
+          <h3>📋 Job History</h3>
+          <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('wjobs','pending')">Pending</button>
+            <button class="tab-btn" onclick="switchTab('wjobs','completed')">Completed</button>
+          </div>
+          <div id="wjobs-pending" class="tab-content active">
+            <table><thead><tr><th>Job ID</th><th>Customer</th><th>Work</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody id="w-pending-jobs-table"><tr><td colspan="5" style="text-align:center;color:var(--gray);padding:20px;">No pending jobs</td></tr></tbody></table>
+          </div>
+          <div id="wjobs-completed" class="tab-content">
+            <table><thead><tr><th>Job ID</th><th>Customer</th><th>Work</th><th>Amount</th><th>Payment</th></tr></thead>
+            <tbody id="w-completed-jobs-table"><tr><td colspan="5" style="text-align:center;color:var(--gray);padding:20px;">No completed jobs yet</td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+      <!-- PAYMENTS TAB -->
+      <div id="wtab-payments" class="hidden">
+        <div class="card">
+          <h3>💰 Payment Summary</h3>
+          <div class="alert alert-warning" id="w-fee-alert" style="display:none;">
+            ⚠️ You have a pending platform fee. Pay within 2 days to avoid suspension.
+            <button class="btn btn-warning btn-sm" style="margin-left:10px;" onclick="payPendingFee()">Pay Now</button>
+          </div>
+          <table><thead><tr><th>Date</th><th>Job ID</th><th>Gross</th><th>Platform Fee (14.5%)</th><th>Your Earning</th><th>Status</th></tr></thead>
+          <tbody id="w-payments-table"><tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No payment records</td></tr></tbody></table>
+        </div>
+      </div>
+      <!-- PROFILE TAB -->
+      <div id="wtab-profile" class="hidden">
+        <div class="profile-header">
+          <div class="avatar avatar-lg" style="width:72px;height:72px;font-size:2rem;" id="w-profile-avatar">W</div>
+          <div>
+            <h2 id="w-profile-name">Worker Name</h2>
+            <p id="w-profile-cat">Category | Mumbai</p>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Profile Details</h3>
+          <div class="info-grid">
+            <div class="info-item"><label>Mobile</label><p id="w-profile-mobile">—</p></div>
+            <div class="info-item"><label>Category</label><p id="w-profile-category">—</p></div>
+            <div class="info-item"><label>Address</label><p id="w-profile-address">—</p></div>
+            <div class="info-item"><label>Experience</label><p id="w-profile-exp">—</p></div>
+            <div class="info-item"><label>Charge Range</label><p id="w-profile-charges">—</p></div>
+            <div class="info-item"><label>UPI ID</label><p id="w-profile-upi">—</p></div>
+          </div>
+          <hr class="section-divider"/>
+          <h3>About</h3>
+          <p id="w-profile-about" style="color:#555;font-size:.9rem;">—</p>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ==================== CUSTOMER AUTH ==================== -->
+<div class="page" id="page-customer-login">
+  <div class="auth-wrap">
+    <div class="auth-box">
+      <div class="logo">Kaam</div>
+      <div class="sub">Customer Portal — Find Workers</div>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('cust-auth','login')">Login</button>
+        <button class="tab-btn" onclick="switchTab('cust-auth','signup')">Sign Up</button>
+      </div>
+      <div id="cust-auth-login" class="tab-content active">
+        <div class="form-group">
+          <label>Mobile Number</label>
+          <input class="form-control" id="cl-mobile" placeholder="Enter 10-digit mobile" type="tel" maxlength="10"/>
+        </div>
+        <div class="form-group">
+          <label>OTP</label>
+          <div class="otp-row">
+            <input class="form-control" id="cl-otp" placeholder="Enter OTP"/>
+            <button class="btn btn-outline btn-sm" onclick="sendOTP('cl-mobile','cl-otp-code')">Send OTP</button>
+          </div>
+          <small id="cl-otp-code" style="color:var(--success);font-weight:700;margin-top:4px;display:block;"></small>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="customerLogin()">Login →</button>
+        <div class="auth-switch">Back to <a onclick="showPage('page-landing')">Home</a></div>
+      </div>
+      <div id="cust-auth-signup" class="tab-content">
+        <div class="form-group"><label>Full Name</label><input class="form-control" id="cs-name" placeholder="Your name"/></div>
+        <div class="form-group"><label>Mobile Number</label><input class="form-control" id="cs-mobile" placeholder="10-digit mobile" type="tel" maxlength="10"/></div>
+        <div class="form-group"><label>Your Address / Area</label><input class="form-control" id="cs-address" placeholder="e.g. Bandra West, Mumbai"/></div>
+        <div class="form-group">
+          <label>OTP</label>
+          <div class="otp-row">
+            <input class="form-control" id="cs-otp" placeholder="Enter OTP"/>
+            <button class="btn btn-outline btn-sm" onclick="sendOTP('cs-mobile','cs-otp-code')">Send OTP</button>
+          </div>
+          <small id="cs-otp-code" style="color:var(--success);font-weight:700;margin-top:4px;display:block;"></small>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="customerSignup()">Create Account →</button>
+        <div class="auth-switch">Back to <a onclick="showPage('page-landing')">Home</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== CUSTOMER DASHBOARD ==================== -->
+<div class="page" id="page-customer-dash">
+  <div class="dash-shell">
+    <aside class="sidebar">
+      <div class="s-logo">Kaam <small>Customer Portal</small></div>
+      <ul class="s-menu">
+        <li><a onclick="custTab('home')" class="active" id="ct-home"><span class="icon">🏠</span>Find Workers</a></li>
+        <li><a onclick="custTab('myjobs')" id="ct-myjobs"><span class="icon">📋</span>My Jobs</a></li>
+        <li><a onclick="custTab('profile')" id="ct-profile"><span class="icon">👤</span>Profile</a></li>
+        <li><a href="mailto:support@kaam.in"><span class="icon">📧</span>Support</a></li>
+        <li><a onclick="showPage('page-landing')"><span class="icon">🚪</span>Logout</a></li>
+      </ul>
+    </aside>
+    <main class="dash-main">
+      <div class="dash-header">
+        <div>
+          <h2 id="cust-dash-greeting">Find the right worker 🔍</h2>
+          <small style="color:var(--gray)">Mumbai — Within 5km of your location</small>
+        </div>
+      </div>
+      <!-- HOME TAB -->
+      <div id="ctab-home">
+        <!-- CATEGORY VIEW -->
+        <div id="cv-categories">
+          <div class="card">
+            <h3>🛠️ What kind of worker do you need?</h3>
+            <div class="cat-grid" id="cat-grid-items"></div>
+          </div>
+        </div>
+        <!-- WORKERS LIST VIEW -->
+        <div id="cv-workers" class="hidden">
+          <button class="back-btn" onclick="showCatView()">← Back to Categories</button>
+          <div class="card">
+            <h3 id="workers-list-title">Available Workers</h3>
+            <p style="color:var(--gray);font-size:.85rem;margin-bottom:16px;">Showing workers within 5km of your area</p>
+            <div class="worker-list" id="workers-list-grid"></div>
+          </div>
+        </div>
+        <!-- WORKER PROFILE VIEW -->
+        <div id="cv-worker-profile" class="hidden">
+          <button class="back-btn" onclick="showWorkersView()">← Back to Workers</button>
+          <div class="profile-header">
+            <div class="avatar avatar-lg" style="width:72px;height:72px;font-size:2rem;" id="wp-avatar">W</div>
+            <div>
+              <h2 id="wp-name">Worker Name</h2>
+              <p id="wp-cat">Category | Mumbai</p>
+              <span class="badge badge-success" id="wp-status-badge">Available</span>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Worker Details</h3>
+            <div class="info-grid">
+              <div class="info-item"><label>Category</label><p id="wp-category">—</p></div>
+              <div class="info-item"><label>Experience</label><p id="wp-exp">—</p></div>
+              <div class="info-item"><label>Address</label><p id="wp-address">—</p></div>
+              <div class="info-item"><label>Charge Range</label><p id="wp-charges">—</p></div>
+              <div class="info-item"><label>Mobile</label><p id="wp-mobile">—</p></div>
+              <div class="info-item"><label>Distance</label><p id="wp-distance">~2.3 km</p></div>
+            </div>
+            <hr class="section-divider"/>
+            <h3>About</h3>
+            <p id="wp-about" style="color:#555;font-size:.9rem;">—</p>
+            <br/>
+            <button class="btn btn-primary btn-block btn-lg" onclick="openPaymentModal()">Book This Worker →</button>
+          </div>
+        </div>
+      </div>
+      <!-- MY JOBS TAB -->
+      <div id="ctab-myjobs" class="hidden">
+        <div class="card">
+          <h3>📋 My Job Requests</h3>
+          <table><thead><tr><th>Job ID</th><th>Worker</th><th>Work Type</th><th>Amount</th><th>Payment</th><th>Status</th><th>OTP</th></tr></thead>
+          <tbody id="cust-jobs-table"><tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No jobs yet. Book a worker to get started!</td></tr></tbody></table>
+        </div>
+      </div>
+      <!-- PROFILE TAB -->
+      <div id="ctab-profile" class="hidden">
+        <div class="profile-header">
+          <div class="avatar" style="width:72px;height:72px;font-size:2rem;" id="c-profile-avatar">C</div>
+          <div>
+            <h2 id="c-profile-name">Customer Name</h2>
+            <p id="c-profile-address-display">Mumbai</p>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Profile Details</h3>
+          <div class="info-grid">
+            <div class="info-item"><label>Mobile</label><p id="c-profile-mobile">—</p></div>
+            <div class="info-item"><label>Address</label><p id="c-profile-addr">—</p></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ==================== PAYMENT MODAL ==================== -->
+<div class="modal-overlay hidden" id="payment-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>💳 Choose Payment Method</h3>
+      <button class="modal-close" onclick="closeModal('payment-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-info">
+        Worker: <strong id="pay-worker-name">—</strong> | Charge: <strong id="pay-amount">—</strong>
+      </div>
+      <div class="pay-option" onclick="selectPayment('upi')" id="po-upi">
+        <div class="po-icon">📲</div>
+        <div><h4>Pay via UPI</h4><p>Transfer directly to worker's UPI ID</p></div>
+      </div>
+      <div class="pay-option" onclick="selectPayment('qr')" id="po-qr">
+        <div class="po-icon">📷</div>
+        <div><h4>Pay via QR Code</h4><p>Scan QR code to pay platform</p></div>
+      </div>
+      <div class="pay-option" onclick="selectPayment('cash')" id="po-cash">
+        <div class="po-icon">💵</div>
+        <div><h4>Pay After Work (Cash)</h4><p>Pay worker in cash after job is done. Worker pays 14.5% to platform.</p></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('payment-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmBooking()">Confirm Booking →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ADMIN AUTH ==================== -->
+<div class="page" id="page-admin-login">
+  <div class="auth-wrap">
+    <div class="auth-box">
+      <div class="logo">Kaam</div>
+      <div class="sub">Admin / Developer Dashboard</div>
+      <div class="form-group"><label>Username</label><input class="form-control" id="al-user" placeholder="admin username"/></div>
+      <div class="form-group"><label>Password</label><input class="form-control" id="al-pass" placeholder="password" type="password"/></div>
+      <button class="btn btn-primary btn-block" onclick="adminLogin()">Login to Dashboard →</button>
+      <div class="auth-switch">Back to <a onclick="showPage('page-landing')">Home</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ADMIN DASHBOARD ==================== -->
+<div class="page" id="page-admin-dash">
+  <div class="dash-shell">
+    <aside class="sidebar">
+      <div class="s-logo">Kaam <small>Admin Dashboard</small></div>
+      <ul class="s-menu">
+        <li><a onclick="adminTab('overview')" class="active" id="at-overview"><span class="icon">📊</span>Overview</a></li>
+        <li><a onclick="adminTab('workers')" id="at-workers"><span class="icon">🔧</span>Workers</a></li>
+        <li><a onclick="adminTab('customers')" id="at-customers"><span class="icon">👥</span>Customers</a></li>
+        <li><a onclick="adminTab('jobs')" id="at-jobs"><span class="icon">📋</span>All Jobs</a></li>
+        <li><a onclick="adminTab('payments')" id="at-payments"><span class="icon">💰</span>Payments</a></li>
+        <li><a onclick="showPage('page-landing')"><span class="icon">🚪</span>Logout</a></li>
+      </ul>
+    </aside>
+    <main class="dash-main">
+      <div class="dash-header">
+        <div><h2>Admin Dashboard 🛡️</h2><small style="color:var(--gray)">Kaam Platform Control Center — Mumbai</small></div>
+        <span class="badge badge-success">● Live</span>
+      </div>
+      <!-- OVERVIEW -->
+      <div id="atab-overview">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="val" id="a-stat-workers">0</div><div class="key">Total Workers</div></div>
+          <div class="stat-card" style="border-color:var(--success)"><div class="val" id="a-stat-customers">0</div><div class="key">Total Customers</div></div>
+          <div class="stat-card" style="border-color:var(--warning)"><div class="val" id="a-stat-jobs">0</div><div class="key">Total Jobs</div></div>
+          <div class="stat-card" style="border-color:var(--danger)"><div class="val" id="a-stat-pending-fees">₹0</div><div class="key">Pending Fees</div></div>
+          <div class="stat-card" style="border-color:#9b59b6"><div class="val" id="a-stat-revenue">₹0</div><div class="key">Total Revenue</div></div>
+          <div class="stat-card" style="border-color:#1abc9c"><div class="val" id="a-stat-banned">0</div><div class="key">Banned Workers</div></div>
+        </div>
+        <div class="card">
+          <h3>📋 Recent Jobs</h3>
+          <table><thead><tr><th>Job ID</th><th>Customer</th><th>Worker</th><th>Category</th><th>Amount</th><th>Payment</th><th>Status</th></tr></thead>
+          <tbody id="admin-recent-jobs"><tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No jobs yet</td></tr></tbody></table>
+        </div>
+      </div>
+      <!-- WORKERS -->
+      <div id="atab-workers" class="hidden">
+        <div class="card">
+          <h3>🔧 All Workers</h3>
+          <table><thead><tr><th>Name</th><th>Mobile</th><th>Category</th><th>Address</th><th>Jobs Done</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody id="admin-workers-table"><tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No workers registered</td></tr></tbody></table>
+        </div>
+      </div>
+      <!-- CUSTOMERS -->
+      <div id="atab-customers" class="hidden">
+        <div class="card">
+          <h3>👥 All Customers</h3>
+          <table><thead><tr><th>Name</th><th>Mobile</th><th>Address</th><th>Jobs Booked</th></tr></thead>
+          <tbody id="admin-customers-table"><tr><td colspan="4" style="text-align:center;color:var(--gray);padding:20px;">No customers registered</td></tr></tbody></table>
+        </div>
+      </div>
+      <!-- JOBS -->
+      <div id="atab-jobs" class="hidden">
+        <div class="card">
+          <h3>📋 All Jobs</h3>
+          <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('ajobs','pending')">Pending</button>
+            <button class="tab-btn" onclick="switchTab('ajobs','completed')">Completed</button>
+          </div>
+          <div id="ajobs-pending" class="tab-content active">
+            <table><thead><tr><th>Job ID</th><th>Customer</th><th>Worker</th><th>Category</th><th>Amount</th><th>Payment</th><th>Date</th></tr></thead>
+            <tbody id="admin-pending-table"><tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No pending jobs</td></tr></tbody></table>
+          </div>
+          <div id="ajobs-completed" class="tab-content">
+            <table><thead><tr><th>Job ID</th><th>Customer</th><th>Worker</th><th>Category</th><th>Amount</th><th>Platform Fee</th><th>Date</th></tr></thead>
+            <tbody id="admin-completed-table"><tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No completed jobs</td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+      <!-- PAYMENTS -->
+      <div id="atab-payments" class="hidden">
+        <div class="card">
+          <h3>💰 Payment Records</h3>
+          <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('apay','received')">Received</button>
+            <button class="tab-btn" onclick="switchTab('apay','pending')">Pending (Cash)</button>
+          </div>
+          <div id="apay-received" class="tab-content active">
+            <table><thead><tr><th>Date</th><th>Job ID</th><th>Worker</th><th>Gross</th><th>Fee (14.5%)</th><th>Method</th></tr></thead>
+            <tbody id="admin-pay-received"><tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No payments received</td></tr></tbody></table>
+          </div>
+          <div id="apay-pending" class="tab-content">
+            <table><thead><tr><th>Job ID</th><th>Worker</th><th>Mobile</th><th>Fee Due</th><th>Days Left</th><th>Action</th></tr></thead>
+            <tbody id="admin-pay-pending"><tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No pending cash fee dues</td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+// ============ STATE ============
+const state = {
+  workers: [],
+  customers: [],
+  jobs: [],
+  currentWorker: null,
+  currentCustomer: null,
+  selectedWorker: null,
+  selectedPayment: null,
+  otpStore: {},
+  setupData: {}
+};
+
+// ============ CATEGORIES ============
+const CATEGORIES = [
+  {name:'Plumber',icon:'🔧'},{name:'Electrician',icon:'⚡'},
+  {name:'Carpenter',icon:'🪵'},{name:'Painter',icon:'🎨'},
+  {name:'Mason / Trowel',icon:'🏗️'},{name:'Cleaner',icon:'🧹'},
+  {name:'AC Technician',icon:'❄️'},{name:'Appliance Repair',icon:'🔌'},
+  {name:'Welder',icon:'🔩'},{name:'Gardener',icon:'🌱'},
+  {name:'Pest Control',icon:'🐛'},{name:'Security Guard',icon:'🛡️'},
+  {name:'Driver',icon:'🚗'},{name:'Delivery Person',icon:'📦'},
+  {name:'Tailor',icon:'🧵'},{name:'Cook / Chef',icon:'👨‍🍳'},
+  {name:'Tutor',icon:'📚'},{name:'Beautician / Barber',icon:'✂️'},
+  {name:'Movers & Packers',icon:'📦'},{name:'CCTV Technician',icon:'📹'}
+];
+
+// SEED DEMO WORKERS
+function seedWorkers(){
+  if(state.workers.length>0) return;
+  const demos=[
+    {id:'W001',name:'Ramesh Patil',mobile:'9876543210',category:'Plumber',address:'Andheri West, Mumbai',exp:'8',about:'Expert in pipe fitting, bathroom repairs and leak fixing.',minCharge:400,maxCharge:2500,upi:'ramesh@paytm',upiMobile:'9876543210',status:'active',jobsDone:24,earnings:48000},
+    {id:'W002',name:'Suresh Kumar',mobile:'9876543211',category:'Electrician',address:'Bandra East, Mumbai',exp:'12',about:'Certified electrician. Wiring, panel upgrades, inverter installation.',minCharge:500,maxCharge:3000,upi:'suresh@gpay',upiMobile:'9876543211',status:'active',jobsDone:31,earnings:62000},
+    {id:'W003',name:'Mahesh Sharma',mobile:'9876543212',category:'Carpenter',address:'Kurla West, Mumbai',exp:'10',about:'Custom furniture, door fitting, modular kitchen work.',minCharge:600,maxCharge:5000,upi:'mahesh@phonepe',upiMobile:'9876543212',status:'active',jobsDone:18,earnings:90000},
+    {id:'W004',name:'Ganesh Yadav',mobile:'9876543213',category:'Painter',address:'Malad West, Mumbai',exp:'6',about:'Interior & exterior painting. POP work and waterproofing.',minCharge:300,maxCharge:20000,upi:'ganesh@upi',upiMobile:'9876543213',status:'active',jobsDone:42,earnings:156000},
+    {id:'W005',name:'Anil Tiwari',mobile:'9876543214',category:'AC Technician',address:'Goregaon East, Mumbai',exp:'9',about:'Split AC installation, servicing, gas refilling.',minCharge:500,maxCharge:4000,upi:'anil@paytm',upiMobile:'9876543214',status:'banned',jobsDone:15,earnings:35000,feeDue:1200},
+  ];
+  state.workers=demos;
+}
+
+// ============ UTILS ============
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+function toast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show '+(type||'');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+function generateOTP(){return Math.floor(100000+Math.random()*900000).toString();}
+function generateJobID(){return 'JOB-'+Date.now().toString().slice(-6);}
+function sendOTP(mobileId,displayId){
+  const mob=document.getElementById(mobileId).value;
+  if(!mob||mob.length!==10){toast('Enter valid 10-digit mobile number','error');return;}
+  const otp=generateOTP();
+  state.otpStore[mob]=otp;
+  document.getElementById(displayId).textContent='OTP: '+otp+' (Demo — sent to '+mob+')';
+  toast('OTP sent to '+mob);
+}
+function switchTab(group,tab){
+  document.querySelectorAll('#'+group+'-'+tab).forEach(()=>{});
+  const allBtns=document.querySelectorAll('[onclick*="switchTab(\''+group+'\'"]');
+  allBtns.forEach(b=>{b.classList.remove('active');if(b.getAttribute('onclick').includes("'"+tab+"'"))b.classList.add('active');});
+  document.querySelectorAll('[id^="'+group+'-"]').forEach(d=>{
+    d.classList.remove('active');
+    d.style.display='';
+  });
+  const target=document.getElementById(group+'-'+tab);
+  if(target){target.classList.add('active');}
+}
+function closeModal(id){document.getElementById(id).classList.add('hidden');}
+
+// ============ WORKER AUTH ============
+function workerLogin(){
+  const mob=document.getElementById('wl-mobile').value;
+  const otp=document.getElementById('wl-otp').value;
+  if(!mob||mob.length!==10){toast('Enter valid mobile','error');return;}
+  if(!otp||otp!==state.otpStore[mob]){toast('Invalid OTP','error');return;}
+  const w=state.workers.find(x=>x.mobile===mob);
+  if(!w){toast('Worker not found. Please sign up.','error');return;}
+  state.currentWorker=w;
+  loadWorkerDash();
+  showPage('page-worker-dash');
+  toast('Welcome back, '+w.name+'!','success');
+}
+function workerSignup(){
+  const name=document.getElementById('ws-name').value.trim();
+  const mob=document.getElementById('ws-mobile').value;
+  const otp=document.getElementById('ws-otp').value;
+  if(!name){toast('Enter your name','error');return;}
+  if(!mob||mob.length!==10){toast('Enter valid mobile','error');return;}
+  if(!otp||otp!==state.otpStore[mob]){toast('Invalid OTP','error');return;}
+  if(state.workers.find(x=>x.mobile===mob)){toast('Mobile already registered. Please login.','error');return;}
+  state.setupData={name,mobile:mob};
+  document.getElementById('setup-name').value=name;
+  showPage('page-worker-setup');
+  toast('Account created! Complete your profile.','success');
+}
+
+// ============ WORKER SETUP ============
+function setupNext(step){
+  if(step===1){
+    const n=document.getElementById('setup-name').value.trim();
+    const a=document.getElementById('setup-address').value.trim();
+    const e=document.getElementById('setup-exp').value;
+    if(!n||!a){toast('Fill name and address','error');return;}
+    state.setupData={...state.setupData,name:n,address:a,exp:e,about:document.getElementById('setup-about').value};
+  } else if(step===2){
+    const cat=document.getElementById('setup-category').value;
+    const mn=document.getElementById('setup-min-charge').value;
+    const mx=document.getElementById('setup-max-charge').value;
+    if(!cat||!mn||!mx){toast('Fill all fields','error');return;}
+    state.setupData={...state.setupData,category:cat,minCharge:mn,maxCharge:mx};
+  } else if(step===3){
+    const upi=document.getElementById('setup-upi').value.trim();
+    const um=document.getElementById('setup-upi-mobile').value;
+    if(!upi||!um){toast('Fill UPI details','error');return;}
+    state.setupData={...state.setupData,upi,upiMobile:um};
+  }
+  document.getElementById('setup-step-'+step).classList.add('hidden');
+  document.getElementById('setup-step-'+(step+1)).classList.remove('hidden');
+  document.getElementById('step'+step).classList.remove('active');
+  document.getElementById('step'+step).classList.add('done');
+  document.getElementById('step'+(step+1)).classList.add('active');
+}
+function setupBack(step){
+  document.getElementById('setup-step-'+step).classList.add('hidden');
+  document.getElementById('setup-step-'+(step-1)).classList.remove('hidden');
+}
+function completeSetup(){
+  const w={
+    id:'W'+String(state.workers.length+1).padStart('3','0'),
+    ...state.setupData,
+    status:'active',jobsDone:0,earnings:0,feeDue:0
+  };
+  state.workers.push(w);
+  state.currentWorker=w;
+  loadWorkerDash();
+  showPage('page-worker-dash');
+  toast('Profile complete! Welcome to Kaam 🎉','success');
+  refreshAdminStats();
+}
+document.getElementById('setup-photos').addEventListener('change',function(){
+  const prev=document.getElementById('photo-preview');
+  prev.innerHTML='';
+  Array.from(this.files).forEach(f=>{
+    const url=URL.createObjectURL(f);
+    prev.innerHTML+=`<img src="${url}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid var(--border)"/>`;
+  });
+});
+
+// ============ WORKER DASH ============
+function loadWorkerDash(){
+  const w=state.currentWorker;
+  document.getElementById('worker-dash-greeting').textContent='Welcome, '+w.name+' 👋';
+  document.getElementById('worker-dash-sub').textContent=w.category+' · '+w.address;
+  document.getElementById('w-profile-avatar').textContent=w.name[0];
+  document.getElementById('w-profile-name').textContent=w.name;
+  document.getElementById('w-profile-cat').textContent=w.category+' | '+w.address;
+  document.getElementById('w-profile-mobile').textContent=w.mobile;
+  document.getElementById('w-profile-category').textContent=w.category;
+  document.getElementById('w-profile-address').textContent=w.address;
+  document.getElementById('w-profile-exp').textContent=(w.exp||'0')+' years';
+  document.getElementById('w-profile-charges').textContent='₹'+w.minCharge+' – ₹'+w.maxCharge;
+  document.getElementById('w-profile-upi').textContent=w.upi||'Not set';
+  document.getElementById('w-profile-about').textContent=w.about||'—';
+  if(w.status==='banned'){
+    document.getElementById('worker-banned-banner').classList.remove('hidden');
+  } else {
+    document.getElementById('worker-banned-banner').classList.add('hidden');
+  }
+  refreshWorkerStats();
+  loadWorkerJobs();
+}
+function workerTab(tab){
+  ['overview','jobs','payments','profile'].forEach(t=>{
+    document.getElementById('wtab-'+t).classList.toggle('hidden',t!==tab);
+    document.getElementById('wt-'+t).classList.toggle('active',t===tab);
+  });
+  if(tab==='payments') loadWorkerPayments();
+}
+function refreshWorkerStats(){
+  const w=state.currentWorker;
+  const myJobs=state.jobs.filter(j=>j.workerId===w.id);
+  const pending=myJobs.filter(j=>j.status==='pending').length;
+  const done=myJobs.filter(j=>j.status==='completed').length;
+  const earned=myJobs.filter(j=>j.status==='completed').reduce((s,j)=>s+(j.amount*(1-0.145)),0);
+  const due=myJobs.filter(j=>j.status==='completed'&&j.paymentMethod==='cash'&&!j.feePaid).reduce((s,j)=>s+(j.amount*0.145),0);
+  document.getElementById('w-stat-pending').textContent=pending;
+  document.getElementById('w-stat-done').textContent=done;
+  document.getElementById('w-stat-earned').textContent='₹'+Math.round(earned);
+  document.getElementById('w-stat-due').textContent='₹'+Math.round(due);
+  if(due>0) document.getElementById('w-fee-alert').style.display='block';
+  // Active job
+  const activeJob=myJobs.find(j=>j.status==='pending');
+  const activeCard=document.getElementById('w-active-job-content');
+  const otpCard=document.getElementById('w-complete-otp-card');
+  if(activeJob){
+    const cust=state.customers.find(c=>c.id===activeJob.customerId);
+    activeCard.innerHTML=`
+      <div class="alert alert-success">New job assigned!</div>
+      <div class="info-grid">
+        <div class="info-item"><label>Job ID</label><p>${activeJob.id}</p></div>
+        <div class="info-item"><label>Work Type</label><p>${activeJob.category}</p></div>
+        <div class="info-item"><label>Customer Name</label><p>${cust?cust.name:'—'}</p></div>
+        <div class="info-item"><label>Customer Mobile</label><p>${cust?cust.mobile:'—'}</p></div>
+        <div class="info-item"><label>Customer Address</label><p>${cust?cust.address:'—'}</p></div>
+        <div class="info-item"><label>Amount</label><p>₹${activeJob.amount}</p></div>
+        <div class="info-item"><label>Payment Method</label><p>${activeJob.paymentMethod.toUpperCase()}</p></div>
+        <div class="info-item"><label>Platform Fee (14.5%)</label><p>₹${Math.round(activeJob.amount*0.145)}</p></div>
+      </div>`;
+    otpCard.style.display='block';
+  } else {
+    activeCard.innerHTML='<p style="color:var(--gray);text-align:center;padding:20px;">No active job assigned yet. When a customer books you, details will appear here.</p>';
+    otpCard.style.display='none';
+  }
+}
+function loadWorkerJobs(){
+  const w=state.currentWorker;
+  const myJobs=state.jobs.filter(j=>j.workerId===w.id);
+  const ptBody=document.getElementById('w-pending-jobs-table');
+  const ctBody=document.getElementById('w-completed-jobs-table');
+  const pending=myJobs.filter(j=>j.status==='pending');
+  const completed=myJobs.filter(j=>j.status==='completed');
+  ptBody.innerHTML=pending.length?pending.map(j=>{
+    const c=state.customers.find(x=>x.id===j.customerId);
+    return `<tr><td>${j.id}</td><td>${c?c.name:'—'}</td><td>${j.category}</td><td>₹${j.amount}</td><td><span class="badge badge-warning">Pending</span></td></tr>`;
+  }).join(''):'<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:20px;">No pending jobs</td></tr>';
+  ctBody.innerHTML=completed.length?completed.map(j=>{
+    const c=state.customers.find(x=>x.id===j.customerId);
+    return `<tr><td>${j.id}</td><td>${c?c.name:'—'}</td><td>${j.category}</td><td>₹${j.amount}</td><td><span class="badge badge-info">${j.paymentMethod.toUpperCase()}</span></td></tr>`;
+  }).join(''):'<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:20px;">No completed jobs</td></tr>';
+}
+function loadWorkerPayments(){
+  const w=state.currentWorker;
+  const myJobs=state.jobs.filter(j=>j.workerId===w.id&&j.status==='completed');
+  const tbody=document.getElementById('w-payments-table');
+  tbody.innerHTML=myJobs.length?myJobs.map(j=>`
+    <tr>
+      <td>${new Date(j.date).toLocaleDateString('en-IN')}</td>
+      <td>${j.id}</td>
+      <td>₹${j.amount}</td>
+      <td>₹${Math.round(j.amount*0.145)}</td>
+      <td>₹${Math.round(j.amount*0.855)}</td>
+      <td><span class="badge ${j.feePaid?'badge-success':'badge-warning'}">${j.feePaid?'Paid':'Pending'}</span></td>
+    </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No payment records</td></tr>';
+}
+function completeJob(){
+  const otp=document.getElementById('w-completion-otp').value;
+  const w=state.currentWorker;
+  const job=state.jobs.find(j=>j.workerId===w.id&&j.status==='pending');
+  if(!job){toast('No active job found','error');return;}
+  if(otp!==job.completionOTP){toast('Invalid OTP. Ask the customer for the correct OTP.','error');return;}
+  job.status='completed';
+  job.feePaid=job.paymentMethod!=='cash';
+  w.jobsDone=(w.jobsDone||0)+1;
+  document.getElementById('w-completion-otp').value='';
+  refreshWorkerStats();
+  loadWorkerJobs();
+  refreshAdminData();
+  toast('Job '+job.id+' marked as completed! 🎉','success');
+}
+function payPendingFee(){
+  const w=state.currentWorker;
+  const cashJobs=state.jobs.filter(j=>j.workerId===w.id&&j.status==='completed'&&!j.feePaid);
+  cashJobs.forEach(j=>j.feePaid=true);
+  if(w.status==='banned'){w.status='active';document.getElementById('worker-banned-banner').classList.add('hidden');}
+  refreshWorkerStats();
+  refreshAdminData();
+  toast('Platform fee paid! Account restored.','success');
+}
+
+// ============ CUSTOMER AUTH ============
+function customerLogin(){
+  const mob=document.getElementById('cl-mobile').value;
+  const otp=document.getElementById('cl-otp').value;
+  if(!mob||mob.length!==10){toast('Enter valid mobile','error');return;}
+  if(!otp||otp!==state.otpStore[mob]){toast('Invalid OTP','error');return;}
+  const c=state.customers.find(x=>x.mobile===mob);
+  if(!c){toast('Customer not found. Please sign up.','error');return;}
+  state.currentCustomer=c;
+  loadCustomerDash();
+  showPage('page-customer-dash');
+  toast('Welcome back, '+c.name+'!','success');
+}
+function customerSignup(){
+  const name=document.getElementById('cs-name').value.trim();
+  const mob=document.getElementById('cs-mobile').value;
+  const addr=document.getElementById('cs-address').value.trim();
+  const otp=document.getElementById('cs-otp').value;
+  if(!name||!mob||!addr){toast('Fill all fields','error');return;}
+  if(mob.length!==10){toast('Enter valid mobile','error');return;}
+  if(!otp||otp!==state.otpStore[mob]){toast('Invalid OTP','error');return;}
+  if(state.customers.find(x=>x.mobile===mob)){toast('Mobile already registered. Please login.','error');return;}
+  const c={id:'C'+String(state.customers.length+1).padStart('3','0'),name,mobile:mob,address:addr,jobsBooked:0};
+  state.customers.push(c);
+  state.currentCustomer=c;
+  loadCustomerDash();
+  showPage('page-customer-dash');
+  toast('Welcome to Kaam, '+name+'! 🎉','success');
+  refreshAdminStats();
+}
+
+// ============ CUSTOMER DASH ============
+function loadCustomerDash(){
+  const c=state.currentCustomer;
+  document.getElementById('cust-dash-greeting').textContent='Hello, '+c.name+' 👋';
+  document.getElementById('c-profile-avatar').textContent=c.name[0];
+  document.getElementById('c-profile-name').textContent=c.name;
+  document.getElementById('c-profile-address-display').textContent=c.address;
+  document.getElementById('c-profile-mobile').textContent=c.mobile;
+  document.getElementById('c-profile-addr').textContent=c.address;
+  renderCategories();
+  loadCustomerJobs();
+}
+function custTab(tab){
+  ['home','myjobs','profile'].forEach(t=>{
+    document.getElementById('ctab-'+t).classList.toggle('hidden',t!==tab);
+    document.getElementById('ct-'+t).classList.toggle('active',t===tab);
+  });
+}
+function renderCategories(){
+  const grid=document.getElementById('cat-grid-items');
+  grid.innerHTML=CATEGORIES.map(c=>`
+    <div class="cat-item" onclick="selectCategory('${c.name}')">
+      <div class="ci">${c.icon}</div>
+      <p>${c.name}</p>
+    </div>`).join('');
+}
+function selectCategory(name){
+  document.getElementById('cv-categories').classList.add('hidden');
+  document.getElementById('cv-workers').classList.remove('hidden');
+  document.getElementById('workers-list-title').textContent='Available '+name+'s Near You';
+  const available=state.workers.filter(w=>w.category===name&&w.status!=='banned');
+  const grid=document.getElementById('workers-list-grid');
+  grid.innerHTML=available.length?available.map(w=>`
+    <div class="worker-card" onclick="viewWorkerProfile('${w.id}')">
+      <div class="wc-head">
+        <div class="avatar">${w.name[0]}</div>
+        <div class="wc-info">
+          <h4>${w.name}</h4>
+          <small>${w.category} · ${w.exp||0} yrs exp</small>
+        </div>
+      </div>
+      <div class="wc-meta">
+        <span class="meta-tag">📍 ${w.address}</span>
+        <span class="meta-tag">💰 ₹${w.minCharge}–₹${w.maxCharge}</span>
+        <span class="meta-tag">✅ ${w.jobsDone||0} jobs done</span>
+        <span class="meta-tag">~${(Math.random()*4+0.5).toFixed(1)} km</span>
+      </div>
+    </div>`).join('')
+    :'<p style="color:var(--gray);text-align:center;padding:40px;grid-column:1/-1;">No '+name+' available near you right now.</p>';
+}
+function showCatView(){
+  document.getElementById('cv-categories').classList.remove('hidden');
+  document.getElementById('cv-workers').classList.add('hidden');
+  document.getElementById('cv-worker-profile').classList.add('hidden');
+}
+function showWorkersView(){
+  document.getElementById('cv-workers').classList.remove('hidden');
+  document.getElementById('cv-worker-profile').classList.add('hidden');
+}
+function viewWorkerProfile(id){
+  const w=state.workers.find(x=>x.id===id);
+  if(!w) return;
+  state.selectedWorker=w;
+  document.getElementById('wp-avatar').textContent=w.name[0];
+  document.getElementById('wp-name').textContent=w.name;
+  document.getElementById('wp-cat').textContent=w.category+' | '+w.address;
+  document.getElementById('wp-category').textContent=w.category;
+  document.getElementById('wp-exp').textContent=(w.exp||0)+' years';
+  document.getElementById('wp-address').textContent=w.address;
+  document.getElementById('wp-charges').textContent='₹'+w.minCharge+' – ₹'+w.maxCharge;
+  document.getElementById('wp-mobile').textContent=w.mobile;
+  document.getElementById('wp-about').textContent=w.about||'—';
+  document.getElementById('wp-distance').textContent='~'+(Math.random()*4+0.5).toFixed(1)+' km';
+  document.getElementById('cv-workers').classList.add('hidden');
+  document.getElementById('cv-worker-profile').classList.remove('hidden');
+}
+function openPaymentModal(){
+  const w=state.selectedWorker;
+  document.getElementById('pay-worker-name').textContent=w.name;
+  document.getElementById('pay-amount').textContent='₹'+w.minCharge+' – ₹'+w.maxCharge;
+  state.selectedPayment=null;
+  ['upi','qr','cash'].forEach(p=>{document.getElementById('po-'+p).classList.remove('selected');});
+  document.getElementById('payment-modal').classList.remove('hidden');
+}
+function selectPayment(type){
+  state.selectedPayment=type;
+  ['upi','qr','cash'].forEach(p=>{document.getElementById('po-'+p).classList.toggle('selected',p===type);});
+}
+function confirmBooking(){
+  if(!state.selectedPayment){toast('Select a payment method','error');return;}
+  const w=state.selectedWorker;
+  const c=state.currentCustomer;
+  const amount=w.minCharge+Math.floor(Math.random()*(w.maxCharge-w.minCharge));
+  const otp=generateOTP();
+  const job={
+    id:generateJobID(),
+    workerId:w.id,customerId:c.id,
+    category:w.category,
+    amount,paymentMethod:state.selectedPayment,
+    status:'pending',
+    completionOTP:otp,
+    date:Date.now(),
+    feePaid:state.selectedPayment!=='cash'
+  };
+  state.jobs.push(job);
+  c.jobsBooked=(c.jobsBooked||0)+1;
+  closeModal('payment-modal');
+  // Show OTP to customer
+  setTimeout(()=>{
+    alert(`Booking Confirmed! 🎉\n\nJob ID: ${job.id}\nWorker: ${w.name}\nAmount: ₹${amount}\n\n🔑 Completion OTP: ${otp}\n\nShare this OTP with the worker ONLY after the job is done.`);
+  },300);
+  loadCustomerJobs();
+  refreshAdminData();
+  // If worker is logged in, refresh their dash
+  if(state.currentWorker&&state.currentWorker.id===w.id) refreshWorkerStats();
+  toast('Worker booked! Job ID: '+job.id,'success');
+}
+function loadCustomerJobs(){
+  const c=state.currentCustomer;
+  const myJobs=state.jobs.filter(j=>j.customerId===c.id);
+  const tbody=document.getElementById('cust-jobs-table');
+  tbody.innerHTML=myJobs.length?myJobs.map(j=>{
+    const w=state.workers.find(x=>x.id===j.workerId);
+    const statusBadge=j.status==='completed'?'badge-success':'badge-warning';
+    return `<tr>
+      <td>${j.id}</td>
+      <td>${w?w.name:'—'}</td>
+      <td>${j.category}</td>
+      <td>₹${j.amount}</td>
+      <td><span class="badge badge-info">${j.paymentMethod.toUpperCase()}</span></td>
+      <td><span class="badge ${statusBadge}">${j.status.charAt(0).toUpperCase()+j.status.slice(1)}</span></td>
+      <td>${j.status==='pending'?`<span style="font-size:.85rem;font-weight:700;color:var(--primary)">🔑 ${j.completionOTP}</span>`:'✅ Done'}</td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No jobs yet. Book a worker to get started!</td></tr>';
+}
+
+// ============ ADMIN ============
+function adminLogin(){
+  const u=document.getElementById('al-user').value;
+  const p=document.getElementById('al-pass').value;
+  if(u==='sujal957'&&p==='Sujal957#'){
+    showPage('page-admin-dash');
+    refreshAdminData();
+    toast('Welcome, Admin Sujal! 🛡️','success');
+  } else {
+    toast('Invalid credentials','error');
+  }
+}
+function adminTab(tab){
+  ['overview','workers','customers','jobs','payments'].forEach(t=>{
+    document.getElementById('atab-'+t).classList.toggle('hidden',t!==tab);
+    document.getElementById('at-'+t).classList.toggle('active',t===tab);
+  });
+  if(tab==='workers') refreshAdminWorkers();
+  if(tab==='customers') refreshAdminCustomers();
+  if(tab==='jobs') refreshAdminJobs();
+  if(tab==='payments') refreshAdminPayments();
+}
+function refreshAdminStats(){
+  document.getElementById('a-stat-workers').textContent=state.workers.length;
+  document.getElementById('a-stat-customers').textContent=state.customers.length;
+  document.getElementById('a-stat-jobs').textContent=state.jobs.length;
+  const pendingFees=state.jobs.filter(j=>j.paymentMethod==='cash'&&j.status==='completed'&&!j.feePaid).reduce((s,j)=>s+(j.amount*0.145),0);
+  const revenue=state.jobs.filter(j=>j.status==='completed'&&j.feePaid).reduce((s,j)=>s+(j.amount*0.145),0);
+  const banned=state.workers.filter(w=>w.status==='banned').length;
+  document.getElementById('a-stat-pending-fees').textContent='₹'+Math.round(pendingFees);
+  document.getElementById('a-stat-revenue').textContent='₹'+Math.round(revenue);
+  document.getElementById('a-stat-banned').textContent=banned;
+  // recent jobs
+  const tbody=document.getElementById('admin-recent-jobs');
+  const recent=[...state.jobs].reverse().slice(0,10);
+  tbody.innerHTML=recent.length?recent.map(j=>{
+    const c=state.customers.find(x=>x.id===j.customerId);
+    const w=state.workers.find(x=>x.id===j.workerId);
+    const s=j.status==='completed'?'badge-success':'badge-warning';
+    return `<tr><td>${j.id}</td><td>${c?c.name:'—'}</td><td>${w?w.name:'—'}</td><td>${j.category}</td><td>₹${j.amount}</td><td>${j.paymentMethod.toUpperCase()}</td><td><span class="badge ${s}">${j.status}</span></td></tr>`;
+  }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No jobs yet</td></tr>';
+}
+function refreshAdminWorkers(){
+  const tbody=document.getElementById('admin-workers-table');
+  tbody.innerHTML=state.workers.length?state.workers.map(w=>`
+    <tr>
+      <td><strong>${w.name}</strong></td>
+      <td>${w.mobile}</td>
+      <td>${w.category}</td>
+      <td>${w.address}</td>
+      <td>${w.jobsDone||0}</td>
+      <td><span class="badge ${w.status==='banned'?'badge-danger':'badge-success'}">${w.status}</span></td>
+      <td>
+        ${w.status==='banned'
+          ?`<button class="btn btn-success btn-sm" onclick="toggleBan('${w.id}')">Unban</button>`
+          :`<button class="btn btn-danger btn-sm" onclick="toggleBan('${w.id}')">Ban</button>`}
+      </td>
+    </tr>`).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No workers</td></tr>';
+}
+function refreshAdminCustomers(){
+  const tbody=document.getElementById('admin-customers-table');
+  tbody.innerHTML=state.customers.length?state.customers.map(c=>`
+    <tr><td>${c.name}</td><td>${c.mobile}</td><td>${c.address}</td><td>${c.jobsBooked||0}</td></tr>`).join('')
+    :'<tr><td colspan="4" style="text-align:center;color:var(--gray);padding:20px;">No customers</td></tr>';
+}
+function refreshAdminJobs(){
+  const pending=state.jobs.filter(j=>j.status==='pending');
+  const completed=state.jobs.filter(j=>j.status==='completed');
+  document.getElementById('admin-pending-table').innerHTML=pending.length?pending.map(j=>{
+    const c=state.customers.find(x=>x.id===j.customerId);
+    const w=state.workers.find(x=>x.id===j.workerId);
+    return `<tr><td>${j.id}</td><td>${c?c.name:'—'}</td><td>${w?w.name:'—'}</td><td>${j.category}</td><td>₹${j.amount}</td><td>${j.paymentMethod}</td><td>${new Date(j.date).toLocaleDateString('en-IN')}</td></tr>`;
+  }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No pending jobs</td></tr>';
+  document.getElementById('admin-completed-table').innerHTML=completed.length?completed.map(j=>{
+    const c=state.customers.find(x=>x.id===j.customerId);
+    const w=state.workers.find(x=>x.id===j.workerId);
+    return `<tr><td>${j.id}</td><td>${c?c.name:'—'}</td><td>${w?w.name:'—'}</td><td>${j.category}</td><td>₹${j.amount}</td><td>₹${Math.round(j.amount*0.145)}</td><td>${new Date(j.date).toLocaleDateString('en-IN')}</td></tr>`;
+  }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No completed jobs</td></tr>';
+}
+function refreshAdminPayments(){
+  const received=state.jobs.filter(j=>j.status==='completed'&&j.feePaid);
+  const pending=state.jobs.filter(j=>j.status==='completed'&&!j.feePaid&&j.paymentMethod==='cash');
+  document.getElementById('admin-pay-received').innerHTML=received.length?received.map(j=>{
+    const w=state.workers.find(x=>x.id===j.workerId);
+    return `<tr><td>${new Date(j.date).toLocaleDateString('en-IN')}</td><td>${j.id}</td><td>${w?w.name:'—'}</td><td>₹${j.amount}</td><td>₹${Math.round(j.amount*0.145)}</td><td>${j.paymentMethod.toUpperCase()}</td></tr>`;
+  }).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No payments received</td></tr>';
+  document.getElementById('admin-pay-pending').innerHTML=pending.length?pending.map(j=>{
+    const w=state.workers.find(x=>x.id===j.workerId);
+    const daysPast=Math.floor((Date.now()-j.date)/(1000*60*60*24));
+    const daysLeft=Math.max(0,2-daysPast);
+    return `<tr><td>${j.id}</td><td>${w?w.name:'—'}</td><td>${w?w.mobile:'—'}</td><td>₹${Math.round(j.amount*0.145)}</td><td><span class="badge ${daysLeft===0?'badge-danger':'badge-warning'}">${daysLeft} days</span></td><td><button class="btn btn-danger btn-sm" onclick="adminBanWorker('${w?w.id:''}')">Ban</button></td></tr>`;
+  }).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No pending cash fee dues</td></tr>';
+}
+function refreshAdminData(){refreshAdminStats();refreshAdminWorkers();refreshAdminCustomers();refreshAdminJobs();refreshAdminPayments();}
+function toggleBan(id){
+  const w=state.workers.find(x=>x.id===id);
+  if(!w) return;
+  w.status=w.status==='banned'?'active':'banned';
+  refreshAdminWorkers();
+  refreshAdminStats();
+  toast(w.name+(w.status==='banned'?' banned.':" unbanned."));
+}
+function adminBanWorker(id){
+  if(!id) return;
+  const w=state.workers.find(x=>x.id===id);
+  if(w){w.status='banned';refreshAdminData();toast(w.name+' banned for unpaid fees.','error');}
+}
+
+// ============ INIT ============
+seedWorkers();
+renderCategories();
+</script>
+</body>
+</html>
