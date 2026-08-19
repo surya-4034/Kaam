@@ -57,20 +57,40 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
 
   emailOtpStore.set(cleanEmail, { otpCode: generatedOtp, expiresAt });
 
-  // Format Subject Line & Body Text as per Exact Context
-  let subjectText = `${generatedOtp} is your kaam verification code`;
-  let bodyText = `Your kaam verification code is: ${generatedOtp}\n\nUse this code to complete your kaam account verification. This code expires in 10 minutes.`;
+  // Format Clean Subject Line (NO CODE IN TITLE) & Rich HTML Body Text as per Exact Context
+  let subjectText = "KAAM Account Verification Code";
+  let contextTitle = "Account Verification";
+  let contextSubtitle = "Use the verification code below to complete your KAAM account verification:";
 
   if (context === 'SIGNUP') {
-    subjectText = `Verify your email to create your kaam account: ${generatedOtp}`;
-    bodyText = `Welcome to kaam!\n\nUse verification code ${generatedOtp} to verify that your email address is legitimate and complete creating your new kaam account.\n\nThis code expires in 10 minutes.`;
+    subjectText = "Verify your email address to create your KAAM account";
+    contextTitle = "Verify Your Email Address";
+    contextSubtitle = "Welcome to KAAM! Use the verification code below to verify your email address and complete creating your account:";
   } else if (context === 'RESET_PASSWORD') {
-    subjectText = `To reset the password of Kaam account confirmation code is ${generatedOtp}`;
-    bodyText = `To reset the password of your kaam account, use the confirmation code: ${generatedOtp}\n\nIf you did not request a password reset, please ignore this email safely. Code expires in 10 minutes.`;
+    subjectText = "KAAM Account Password Reset Verification";
+    contextTitle = "Reset Your Account Password";
+    contextSubtitle = "We received a request to reset the password for your KAAM account. Use the confirmation code below:";
   } else if (context === 'LOGIN') {
-    subjectText = `kaam login verification code: ${generatedOtp}`;
-    bodyText = `Your kaam login verification code is: ${generatedOtp}\n\nUse this code to sign in to your kaam account. Code expires in 10 minutes.`;
+    subjectText = "KAAM Account Login Verification Code";
+    contextTitle = "Sign In to Your Account";
+    contextSubtitle = "Use the 6-digit verification code below to sign in to your KAAM account:";
   }
+
+  const plainTextBody = `${contextTitle}\n\n${contextSubtitle}\n\nVERIFICATION CODE: ${generatedOtp}\n\nThis code expires in 10 minutes. If you did not request this code, please ignore this email safely.`;
+
+  const htmlBody = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #09111e; color: #f8fafc; padding: 28px; border-radius: 20px; max-width: 500px; margin: 0 auto; border: 1px solid #1e293b;">
+      <h3 style="color: #38bdf8; margin-top: 0; font-size: 20px; font-weight: 800;">${contextTitle}</h3>
+      <p style="font-size: 13.5px; color: #94a3b8; line-height: 1.5; margin-bottom: 20px;">${contextSubtitle}</p>
+      
+      <div style="background-color: #0f172a; padding: 22px; border-radius: 14px; font-size: 28px; font-family: 'Courier New', monospace; color: #38bdf8; font-weight: bold; text-align: center; letter-spacing: 8px; border: 1px solid #0284c7;">
+        ${generatedOtp}
+      </div>
+
+      <p style="font-size: 12px; color: #cbd5e1; margin-top: 20px; text-align: center;">This verification code expires in <strong style="color: #f59e0b;">10 minutes</strong>.</p>
+      <p style="font-size: 11px; color: #64748b; margin-top: 12px; text-align: center;">If you did not request this email, you can safely ignore it.</p>
+    </div>
+  `;
 
   console.log(`\n======================================================`);
   console.log(`✉️  [DISPATCHING ${context} EMAIL TO: ${cleanEmail}]`);
@@ -80,35 +100,37 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
 
   const transporter = getTransporter();
 
-  // PRIORITIZED PATH 1: Official Gmail SMTP
+  // PRIORITIZED PATH 1: Official Hostinger / SMTP Transporter
   if (transporter) {
     try {
       const info = await transporter.sendMail({
-        from: `"kaam Verification" <${process.env.EMAIL_USER}>`,
+        from: `"KAAM Verification" <${process.env.EMAIL_USER}>`,
         replyTo: process.env.EMAIL_USER,
         to: cleanEmail,
         subject: subjectText,
-        text: bodyText,
+        text: plainTextBody,
+        html: htmlBody,
       });
 
-      console.log(`✅ [GMAIL SMTP SUCCESS] Real email delivered with context "${context}" to ${cleanEmail}! Message ID: ${info.messageId}`);
+      console.log(`✅ [SMTP SUCCESS] Real email delivered with context "${context}" to ${cleanEmail}! Message ID: ${info.messageId}`);
       return {
         success: true,
         email: cleanEmail,
         message: `6-Digit Verification Code sent to ${cleanEmail}! Please check your email inbox.`
       };
     } catch (smtpErr) {
-      console.error('❌ [GMAIL SMTP DISPATCH ERROR]:', smtpErr.message);
+      console.error('❌ [SMTP DISPATCH ERROR]:', smtpErr.message);
     }
   }
 
   // FALLBACK PATH 2: Resend API
   try {
     const resendResponse = await resend.emails.send({
-      from: 'kaam Verification <onboarding@resend.dev>',
+      from: 'KAAM Verification <onboarding@resend.dev>',
       to: [cleanEmail],
       subject: subjectText,
-      text: bodyText,
+      text: plainTextBody,
+      html: htmlBody,
     });
 
     if (resendResponse.error) {
@@ -137,7 +159,7 @@ export const sendAdminForgotOtpEmail = async () => {
 
   emailOtpStore.set(targetEmail, { otpCode: generatedOtp, expiresAt });
 
-  const subjectText = `🔒 KAAM Admin Security Alert: Master Admin Password Reset Secret Code ${generatedOtp}`;
+  const subjectText = `KAAM Master Admin Password Reset Verification`;
   const plainTextBody = `KAAM Master Admin Password Reset Request
 
 Hello Admin,
