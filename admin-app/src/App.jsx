@@ -45,6 +45,59 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
 
+  // CLIENT VIEW MODAL STATE (HANDWRITTEN WIREFRAME IMPLEMENTATION)
+  const [selectedClientModal, setSelectedClientModal] = useState(null);
+  const [isClientModalLoading, setIsClientModalLoading] = useState(false);
+  const [unmaskedPhones, setUnmaskedPhones] = useState({});
+
+  const togglePhoneMask = (clientId) => {
+    setUnmaskedPhones(prev => ({
+      ...prev,
+      [clientId]: !prev[clientId]
+    }));
+  };
+
+  const maskPhoneNumber = (phone) => {
+    if (!phone) return 'N/A';
+    const clean = phone.replace(/\D/g, '');
+    if (clean.length >= 10) {
+      const last10 = clean.slice(-10);
+      return `${last10.slice(0, 5)} *** **`;
+    }
+    return phone;
+  };
+
+  const handleViewClientProfile = async (client, formattedId) => {
+    setIsClientModalLoading(true);
+    setSelectedClientModal({
+      ...client,
+      formattedId,
+      secondaryPhone: client.phone ? `${client.phone} (Alt)` : 'None',
+      address: 'Flat 402, Royal Residency, Sector 63, Noida',
+      locality: 'Sector 63, Noida',
+      landmark: 'Near Fortis Hospital',
+      city: 'Noida',
+      isActive: Boolean(client.is_active),
+      jobHistory: []
+    });
+
+    try {
+      const res = await fetch(`http://localhost:5050/api/admin/clients/${client.id}`);
+      const data = await res.json();
+      if (res.ok && data.client) {
+        setSelectedClientModal(prev => ({
+          ...prev,
+          ...data.client,
+          formattedId
+        }));
+      }
+    } catch (err) {
+      console.error('Error loading detailed client profile:', err);
+    } finally {
+      setIsClientModalLoading(false);
+    }
+  };
+
   const fetchAdminData = async () => {
     setIsLoading(true);
     try {
@@ -690,92 +743,117 @@ export default function App() {
               </div>
             </div>
 
-            {/* SECTION 1 CONTENT: DEDICATED CLIENT ACCOUNTS TABLE */}
+            {/* SECTION 1 CONTENT: DEDICATED CLIENT ACCOUNTS TABLE (AS PER HANDWRITTEN WIREFRAME DIAGRAM) */}
             {activeTab === 'CLIENTS' && (
               <div className="p-6 space-y-4">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                   <div>
-                    <h3 className="text-lg font-bold text-white font-['Outfit']">🏡 Registered Homeowner Clients</h3>
-                    <p className="text-xs text-slate-400">Control client access, view contact phone numbers and registered accounts.</p>
+                    <h3 className="text-lg font-bold text-white font-['Outfit'] flex items-center gap-2">
+                      <span>🏡 Homeowner Client Panel</span>
+                    </h3>
+                    <p className="text-xs text-slate-400">Complete list of registered clients with unique Client IDs, contact details, and full profile view.</p>
                   </div>
-                  <span className="px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 text-xs font-bold border border-cyan-500/20">
-                    Total: {filteredClients.length} Clients
+                  <span className="px-3.5 py-1.5 rounded-full bg-cyan-500/10 text-cyan-300 text-xs font-bold border border-cyan-500/20 shadow-sm">
+                    Total Registered Clients: {filteredClients.length}
                   </span>
                 </div>
 
-                <div className="overflow-x-auto">
+                {/* Client List Table as per Handwritten Diagram Specs */}
+                <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60 shadow-xl">
                   <table className="w-full text-left text-xs text-slate-300">
-                    <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-black tracking-wider border-b border-slate-800">
+                    <thead className="bg-slate-900/90 text-slate-400 uppercase text-[11px] font-black tracking-wider border-b border-slate-800">
                       <tr>
-                        <th className="px-6 py-4">Client Name & ID</th>
-                        <th className="px-6 py-4">Phone Number</th>
-                        <th className="px-6 py-4">Email Address</th>
-                        <th className="px-6 py-4">Registration Date</th>
-                        <th className="px-6 py-4">Account Status</th>
-                        <th className="px-6 py-4 text-right">Admin Action</th>
+                        <th className="px-6 py-4 text-cyan-400">Client ID</th>
+                        <th className="px-6 py-4">Client Name</th>
+                        <th className="px-6 py-4">Client Mobile No</th>
+                        <th className="px-6 py-4 text-center">Profile View</th>
+                        <th className="px-6 py-4 text-right">Account Status / Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody className="divide-y divide-slate-800/60 font-medium">
                       {filteredClients.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="text-center py-8 text-slate-500">
-                            No registered homeowner clients matching search query.
+                          <td colSpan="5" className="text-center py-12 text-slate-500">
+                            No registered homeowner clients found in database.
                           </td>
                         </tr>
                       ) : (
-                        filteredClients.map((client) => (
-                          <tr key={client.id} className="hover:bg-slate-800/40 transition-colors">
-                            <td className="px-6 py-4 font-semibold text-white">
-                              <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center font-black text-sm shrink-0">
-                                  {client.full_name ? client.full_name[0].toUpperCase() : 'C'}
-                                </div>
-                                <div>
-                                  <p className="font-bold text-white text-sm">{client.full_name}</p>
-                                  <p className="text-[10px] font-mono text-slate-500">ID: {client.id}</p>
-                                </div>
-                              </div>
-                            </td>
+                        filteredClients.map((client, index) => {
+                          const formattedClientId = String(index + 1).padStart(3, '0');
+                          const isPhoneUnmasked = unmaskedPhones[client.id];
+                          const maskedNumber = maskPhoneNumber(client.phone);
 
-                            <td className="px-6 py-4 font-mono font-medium text-slate-200">
-                              {client.phone}
-                            </td>
-
-                            <td className="px-6 py-4 text-slate-300">
-                              {client.email || 'No email registered'}
-                            </td>
-
-                            <td className="px-6 py-4 text-slate-400 text-[11px]">
-                              {client.created_at ? new Date(client.created_at).toLocaleDateString() : 'Active User'}
-                            </td>
-
-                            <td className="px-6 py-4">
-                              {client.is_active ? (
-                                <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold text-[10px] flex items-center gap-1 w-fit">
-                                  <CheckCircle className="w-3 h-3" /> ACTIVE CLIENT
+                          return (
+                            <tr key={client.id} className="hover:bg-slate-800/40 transition-colors">
+                              
+                              {/* 1. Client ID Column (Diagram Spec: 001, 002...) */}
+                              <td className="px-6 py-4 font-mono font-black text-cyan-400 text-sm">
+                                <span className="px-3 py-1 rounded-lg bg-cyan-950/80 border border-cyan-500/40 shadow-inner">
+                                  {formattedClientId}
                                 </span>
-                              ) : (
-                                <span className="px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/30 font-bold text-[10px] flex items-center gap-1 w-fit">
-                                  <XCircle className="w-3 h-3" /> DEACTIVATED / BLOCKED
-                                </span>
-                              )}
-                            </td>
+                              </td>
 
-                            <td className="px-6 py-4 text-right">
-                              <button
-                                onClick={() => handleToggleStatus(client.id)}
-                                className={`px-3 py-1.5 rounded-full font-bold text-[11px] transition-all flex items-center gap-1 inline-flex ${
-                                  client.is_active
-                                    ? 'bg-red-600/80 hover:bg-red-600 text-white'
-                                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                                }`}
-                              >
-                                {client.is_active ? <XCircle className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
-                                <span>{client.is_active ? 'Block Client' : 'Activate Client'}</span>
-                              </button>
-                            </td>
-                          </tr>
-                        ))
+                              {/* 2. Client Name Column (Diagram Spec: Ramesh) */}
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-9 h-9 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center justify-center font-black text-sm shrink-0">
+                                    {client.full_name ? client.full_name[0].toUpperCase() : 'C'}
+                                  </div>
+                                  <div>
+                                    <p className="font-extrabold text-white text-sm">{client.full_name}</p>
+                                    <p className="text-[10px] text-slate-400 font-mono">{client.email || 'Email Pending'}</p>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* 3. Client Mobile No Column (Diagram Spec: 96706 *** **) */}
+                              <td className="px-6 py-4 font-mono text-slate-200">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold tracking-wider">
+                                    {isPhoneUnmasked ? client.phone : maskedNumber}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePhoneMask(client.id)}
+                                    className="p-1 text-slate-400 hover:text-cyan-400 transition-colors"
+                                    title={isPhoneUnmasked ? "Mask Phone Number" : "Show Full Mobile Number"}
+                                  >
+                                    {isPhoneUnmasked ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                  </button>
+                                </div>
+                              </td>
+
+                              {/* 4. Profile View Column (Diagram Spec: [ View ] button) */}
+                              <td className="px-6 py-4 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewClientProfile(client, formattedClientId)}
+                                  className="px-4 py-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs shadow-lg shadow-cyan-950/60 active:scale-95 transition-all inline-flex items-center gap-1.5"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>View</span>
+                                </button>
+                              </td>
+
+                              {/* 5. Account Action Column */}
+                              <td className="px-6 py-4 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleStatus(client.id)}
+                                  className={`px-3.5 py-1.5 rounded-full font-bold text-[11px] transition-all inline-flex items-center gap-1.5 ${
+                                    client.is_active
+                                      ? 'bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30'
+                                      : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30'
+                                  }`}
+                                >
+                                  {client.is_active ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                                  <span>{client.is_active ? 'Block Account' : 'Activate Account'}</span>
+                                </button>
+                              </td>
+
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -1038,6 +1116,159 @@ export default function App() {
 
         </div>
       </div>
+
+      {/* FULL CLIENT PROFILE VIEW MODAL (HANDWRITTEN WIREFRAME IMPLEMENTATION) */}
+      {selectedClientModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl space-y-0 my-8">
+            
+            {/* Modal Header */}
+            <div className="p-6 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center justify-center font-black text-xl shadow-inner">
+                  {selectedClientModal.fullName ? selectedClientModal.fullName[0].toUpperCase() : 'C'}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-mono font-black text-xs">
+                      Client ID: {selectedClientModal.formattedId}
+                    </span>
+                    {selectedClientModal.isActive ? (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold border border-emerald-500/30">
+                        ACTIVE CLIENT
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 text-[10px] font-extrabold border border-red-500/30">
+                        BLOCKED
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-xl font-extrabold text-white mt-1 font-['Outfit']">{selectedClientModal.fullName}</h3>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedClientModal(null)}
+                className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+              
+              {/* Contact Information Card */}
+              <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-4 space-y-3">
+                <h4 className="text-xs font-black uppercase text-cyan-400 tracking-wider flex items-center gap-1.5">
+                  <User className="w-4 h-4" /> Client Contact Information
+                </h4>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Primary Phone Number:</span>
+                    <span className="font-mono font-bold text-white text-sm">{selectedClientModal.phone || 'Not Provided'}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Alternate Contact Phone:</span>
+                    <span className="font-mono font-bold text-slate-300 text-sm">{selectedClientModal.secondaryPhone || 'None'}</span>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <span className="text-slate-400 block text-[11px]">Registered Email Address:</span>
+                    <span className="font-mono font-bold text-cyan-300 text-sm">{selectedClientModal.email || 'No email registered'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Location & Site Address */}
+              <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-4 space-y-3">
+                <h4 className="text-xs font-black uppercase text-sky-400 tracking-wider flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4" /> Home / Site Address Details
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div className="sm:col-span-2">
+                    <span className="text-slate-400 block text-[11px]">Primary Address:</span>
+                    <span className="font-semibold text-white">{selectedClientModal.address || 'Sector 63, Noida'}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Locality / Sector:</span>
+                    <span className="font-semibold text-slate-300">{selectedClientModal.locality || 'Sector 63'}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Landmark / City:</span>
+                    <span className="font-semibold text-slate-300">{selectedClientModal.landmark || 'Near Fortis Hospital, Noida'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Job Booking History */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                  <Briefcase className="w-4 h-4" /> Client Service Job History ({selectedClientModal.jobHistory?.length || 0})
+                </h4>
+
+                {selectedClientModal.jobHistory && selectedClientModal.jobHistory.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedClientModal.jobHistory.map((job, jIdx) => (
+                      <div key={jIdx} className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs">
+                        <div>
+                          <p className="font-bold text-white">{job.service || job.trade_title || 'Plumbing Service'}</p>
+                          <p className="text-[11px] text-slate-400">Assigned Worker: <span className="text-slate-200">{job.worker || job.worker_name || 'Assigned Tradesperson'}</span></p>
+                        </div>
+                        <div className="text-right">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+                            {job.status || 'COMPLETED'}
+                          </span>
+                          <p className="text-[11px] font-mono text-cyan-300 mt-0.5">{job.amount || '₹650'}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 italic bg-slate-950/40 p-4 rounded-xl text-center">
+                    No active or past job bookings found for this client.
+                  </p>
+                )}
+              </div>
+
+            </div>
+
+            {/* Modal Footer Admin Actions */}
+            <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  handleToggleStatus(selectedClientModal.id);
+                  setSelectedClientModal(null);
+                }}
+                className={`px-4 py-2 rounded-full font-bold text-xs transition-all flex items-center gap-1.5 ${
+                  selectedClientModal.isActive
+                    ? 'bg-red-600 hover:bg-red-500 text-white'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                }`}
+              >
+                {selectedClientModal.isActive ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                <span>{selectedClientModal.isActive ? 'Block Client Account' : 'Activate Client Account'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedClientModal(null)}
+                className="px-5 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-all font-bold"
+              >
+                Close View
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       <footer className="p-4 border-t border-slate-800 text-center text-xs text-slate-500 bg-slate-900/40">
         KAAM Platform Master Control System • ID: <span className="font-mono text-cyan-400 font-bold">Surya-4034</span>

@@ -8,11 +8,13 @@ import {
   rejectKyc,
   getDuesAudit,
   getPlatformStats,
+  getClientDetails,
 } from '../controllers/adminController.js';
 
 const router = express.Router();
 
 router.get('/users', getAllUsers);
+router.get('/clients/:clientId', getClientDetails);
 router.post('/users/:userId/toggle-lock', toggleUserLock);
 router.post('/users/:userId/toggle-status', toggleUserStatus);
 

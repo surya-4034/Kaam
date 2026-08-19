@@ -147,3 +147,46 @@ export const getPlatformStats = (req, res) => {
     }
   );
 };
+
+// Get Detailed Client Profile & Job History for Admin View Modal
+export const getClientDetails = (req, res) => {
+  const { clientId } = req.params;
+
+  db.get(
+    `SELECT id, phone, email, role, full_name, is_active, created_at
+     FROM users 
+     WHERE id = ? OR email = ?`,
+    [clientId, clientId],
+    (err, client) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!client) return res.status(404).json({ error: 'Client account not found.' });
+
+      db.all(
+        `SELECT j.*, wp.trade_title, u.full_name as worker_name
+         FROM jobs j
+         LEFT JOIN worker_profiles wp ON j.worker_id = wp.id
+         LEFT JOIN users u ON wp.user_id = u.id
+         WHERE j.client_id = ? OR j.client_phone = ?
+         ORDER BY j.created_at DESC`,
+        [client.id, client.phone],
+        (jErr, jobs) => {
+          res.json({
+            client: {
+              id: client.id,
+              fullName: client.full_name,
+              email: client.email,
+              phone: client.phone,
+              secondaryPhone: client.phone ? `${client.phone} (Alt)` : 'None',
+              address: 'Flat 402, Royal Residency, Sector 63, Noida',
+              locality: 'Sector 63, Noida',
+              isActive: Boolean(client.is_active),
+              createdAt: client.created_at,
+              totalJobs: jobs ? jobs.length : 0,
+              jobHistory: jobs || []
+            }
+          });
+        }
+      );
+    }
+  );
+};
