@@ -2,6 +2,8 @@ import db from '../config/database.js';
 import bcrypt from 'bcryptjs';
 import { generateToken } from '../middleware/auth.js';
 import { sendEmailOtp, verifyEmailOtp, sendAdminLoginAlertEmail, sendPasswordResetSuccessEmail, sendAdminForgotOtpEmail, sendAdminPasswordChangeConfirmationEmail } from '../services/emailOtpService.js';
+import User from '../models/User.js';
+import WorkerProfile from '../models/WorkerProfile.js';
 
 export const register = (req, res) => {
   const { phone, email, password, role, fullName, tradeCategory, tradeTitle, dailyRate, hourlyRate, locality, bio } = req.body;
@@ -38,6 +40,21 @@ export const register = (req, res) => {
           return res.status(500).json({ error: err.message });
         }
 
+        // Dual-sync user creation to MongoDB Atlas
+        User.findOneAndUpdate(
+          { id: userId },
+          {
+            id: userId,
+            phone: userPhone,
+            email: cleanEmail,
+            password_hash: passwordHash,
+            role: normalizedRole,
+            full_name: fullName,
+            is_active: true
+          },
+          { upsert: true, returnDocument: 'after' }
+        ).catch(mErr => console.warn('[Mongo Sync Note]', mErr.message));
+
         if (normalizedRole === 'WORKER') {
           const workerId = `w-${Date.now()}`;
           db.run(
@@ -54,6 +71,22 @@ export const register = (req, res) => {
               bio || 'Skilled local worker available for hire on kaam.'
             ]
           );
+
+          WorkerProfile.findOneAndUpdate(
+            { id: workerId },
+            {
+              id: workerId,
+              user_id: userId,
+              trade_category: tradeCategory || 'plumber',
+              trade_title: tradeTitle || 'Skilled Trade Specialist',
+              daily_rate: Number(dailyRate || 650),
+              hourly_rate: Number(hourlyRate || 120),
+              locality: locality || 'Local City Area',
+              bio: bio || 'Skilled local worker available for hire on kaam.',
+              kyc_status: 'VERIFIED'
+            },
+            { upsert: true, returnDocument: 'after' }
+          ).catch(wErr => console.warn('[Mongo Worker Sync Note]', wErr.message));
         }
 
         const token = generateToken({ id: userId, phone: userPhone, email: cleanEmail, role: normalizedRole, fullName });
