@@ -57,62 +57,34 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
 
   emailOtpStore.set(cleanEmail, { otpCode: generatedOtp, expiresAt });
 
-  // Format Clean Subject Line (NO CODE IN TITLE) & Rich HTML Body Text as per Exact Context
-  let subjectText = "KAAM Account Verification Code";
-  let contextTitle = "Account Verification";
-  let contextSubtitle = "Use the verification code below to complete your KAAM account verification:";
-
+  // Format Clean Subject Line (NO CODE IN TITLE) & High-Deliverability Body Text
+  let subjectText = "KAAM Account Verification";
   if (context === 'SIGNUP') {
-    subjectText = "Verify your email address to create your KAAM account";
-    contextTitle = "Verify Your Email Address";
-    contextSubtitle = "Welcome to KAAM! Use the verification code below to verify your email address and complete creating your account:";
+    subjectText = "Verify your email for your KAAM account";
   } else if (context === 'RESET_PASSWORD') {
-    subjectText = "KAAM Account Password Reset Verification";
-    contextTitle = "Reset Your Account Password";
-    contextSubtitle = "We received a request to reset the password for your KAAM account. Use the confirmation code below:";
+    subjectText = "KAAM Password Reset Code";
   } else if (context === 'LOGIN') {
-    subjectText = "KAAM Account Login Verification Code";
-    contextTitle = "Sign In to Your Account";
-    contextSubtitle = "Use the 6-digit verification code below to sign in to your KAAM account:";
+    subjectText = "KAAM Sign-in Verification Code";
   }
 
-  const plainTextBody = `KAAM Platform - ${contextTitle}\n\n${contextSubtitle}\n\nVERIFICATION CODE: ${generatedOtp}\n\nThis verification code expires in 10 minutes. Please do not share this code with anyone.\nIf you did not request this email, please ignore it.`;
+  const plainTextBody = `Hello,\n\nYour 6-digit KAAM verification code is:\n\n${generatedOtp}\n\nThis code expires in 10 minutes. Please do not share this code with anyone.\n\nRegards,\nKAAM Support Team\nkaam@yors.online`;
 
   const htmlBody = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
-    <body style="margin: 0; padding: 0; background-color: #f4f6f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f6f9; padding: 30px 10px;">
-        <tr>
-          <td align="center">
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 480px; background-color: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
-              <tr>
-                <td>
-                  <div style="font-size: 20px; font-weight: 800; color: #0284c7; margin-bottom: 6px; letter-spacing: -0.5px;">KAAM Platform</div>
-                  <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin-top: 0; margin-bottom: 12px;">${contextTitle}</h2>
-                  <p style="font-size: 14px; color: #475569; line-height: 1.5; margin-bottom: 24px;">${contextSubtitle}</p>
-                  
-                  <div style="background-color: #f8fafc; border: 1.5px dashed #0284c7; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px;">
-                    <span style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0284c7; display: inline-block;">${generatedOtp}</span>
-                  </div>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; color: #1e293b; max-width: 480px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+      <p style="font-size: 16px; font-weight: bold; color: #0284c7; margin-top: 0;">KAAM Platform Verification</p>
+      <p style="margin-bottom: 16px;">Hello,</p>
+      <p style="margin-bottom: 16px;">Your 6-digit verification code is:</p>
+      
+      <div style="background-color: #f1f5f9; padding: 16px; text-align: center; font-size: 30px; font-family: monospace; font-weight: bold; color: #0284c7; letter-spacing: 6px; border-radius: 8px; margin-bottom: 20px;">
+        ${generatedOtp}
+      </div>
 
-                  <p style="font-size: 12.5px; color: #64748b; margin-bottom: 8px;">This verification code is valid for <strong>10 minutes</strong>. Do not share this code with anyone.</p>
-                  <p style="font-size: 11.5px; color: #94a3b8; margin: 0;">If you did not request this code, please ignore this email safely.</p>
-                </td>
-              </tr>
-            </table>
-            <div style="margin-top: 20px; text-align: center; font-size: 11px; color: #94a3b8;">
-              © KAAM Marketplace Platform • Official Security Service
-            </div>
-          </td>
-        </tr>
-      </table>
-    </body>
-    </html>
+      <p style="font-size: 13px; color: #64748b; margin-bottom: 16px;">This verification code is valid for <strong>10 minutes</strong>. Please do not share it with anyone.</p>
+      
+      <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+      
+      <p style="font-size: 12px; color: #94a3b8; margin: 0;">If you did not request this verification code, you can safely ignore this email.</p>
+    </div>
   `;
 
   console.log(`\n======================================================`);
@@ -127,7 +99,7 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
   if (transporter) {
     try {
       const info = await transporter.sendMail({
-        from: `"KAAM Verification" <${process.env.EMAIL_USER}>`,
+        from: `"KAAM Support" <${process.env.EMAIL_USER}>`,
         replyTo: process.env.EMAIL_USER,
         to: cleanEmail,
         subject: subjectText,
