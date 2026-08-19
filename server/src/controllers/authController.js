@@ -10,49 +10,62 @@ export const register = (req, res) => {
     return res.status(400).json({ error: 'Email, password, role, and full name are required.' });
   }
 
-  const userId = `u-${Date.now()}`;
-  const passwordHash = bcrypt.hashSync(password, 10);
-  const normalizedRole = role.toUpperCase();
-  const userPhone = phone || `+91 ${Math.floor(6000000000 + Math.random() * 3999999999)}`;
+  const cleanEmail = email.toLowerCase().trim();
 
-  db.run(
-    `INSERT INTO users (id, phone, email, password_hash, role, full_name) VALUES (?, ?, ?, ?, ?, ?)`,
-    [userId, userPhone, email.toLowerCase().trim(), passwordHash, normalizedRole, fullName],
-    function (err) {
-      if (err) {
-        if (err.message.includes('UNIQUE') || err.message.includes('users.email')) {
-          return res.status(409).json({ error: 'Account with this email address already exists.' });
-        }
-        return res.status(500).json({ error: err.message });
-      }
+  // Strict Unique Email Check
+  db.get(`SELECT id, email FROM users WHERE email = ?`, [cleanEmail], (checkErr, existingUser) => {
+    if (checkErr) return res.status(500).json({ error: checkErr.message });
 
-      if (normalizedRole === 'WORKER') {
-        const workerId = `w-${Date.now()}`;
-        db.run(
-          `INSERT INTO worker_profiles (id, user_id, trade_category, trade_title, daily_rate, hourly_rate, locality, bio, kyc_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'VERIFIED')`,
-          [
-            workerId,
-            userId,
-            tradeCategory || 'plumber',
-            tradeTitle || 'Skilled Trade Specialist',
-            Number(dailyRate || 650),
-            Number(hourlyRate || 120),
-            locality || 'Local City Area',
-            bio || 'Skilled local worker available for hire on kaam.'
-          ]
-        );
-      }
-
-      const token = generateToken({ id: userId, phone: userPhone, email, role: normalizedRole, fullName });
-
-      res.status(201).json({
-        message: 'Account created successfully.',
-        token,
-        user: { id: userId, phone: userPhone, email, role: normalizedRole, fullName }
+    if (existingUser) {
+      return res.status(409).json({
+        error: `An account already exists with ${cleanEmail}. Please log in instead of creating a new account.`
       });
     }
-  );
+
+    const userId = `u-${Date.now()}`;
+    const passwordHash = bcrypt.hashSync(password, 10);
+    const normalizedRole = role.toUpperCase();
+    const userPhone = phone || `+91 ${Math.floor(6000000000 + Math.random() * 3999999999)}`;
+
+    db.run(
+      `INSERT INTO users (id, phone, email, password_hash, role, full_name) VALUES (?, ?, ?, ?, ?, ?)`,
+      [userId, userPhone, cleanEmail, passwordHash, normalizedRole, fullName],
+      function (err) {
+        if (err) {
+          if (err.message.includes('UNIQUE') || err.message.includes('users.email')) {
+            return res.status(409).json({ error: `An account already exists with ${cleanEmail}. Please log in instead.` });
+          }
+          return res.status(500).json({ error: err.message });
+        }
+
+        if (normalizedRole === 'WORKER') {
+          const workerId = `w-${Date.now()}`;
+          db.run(
+            `INSERT INTO worker_profiles (id, user_id, trade_category, trade_title, daily_rate, hourly_rate, locality, bio, kyc_status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'VERIFIED')`,
+            [
+              workerId,
+              userId,
+              tradeCategory || 'plumber',
+              tradeTitle || 'Skilled Trade Specialist',
+              Number(dailyRate || 650),
+              Number(hourlyRate || 120),
+              locality || 'Local City Area',
+              bio || 'Skilled local worker available for hire on kaam.'
+            ]
+          );
+        }
+
+        const token = generateToken({ id: userId, phone: userPhone, email: cleanEmail, role: normalizedRole, fullName });
+
+        res.status(201).json({
+          message: 'Account created successfully.',
+          token,
+          user: { id: userId, phone: userPhone, email: cleanEmail, role: normalizedRole, fullName }
+        });
+      }
+    );
+  });
 };
 
 export const login = (req, res) => {
@@ -274,13 +287,32 @@ export const googleSync = (req, res) => {
 // Send 6-Digit Email Verification Code with Context
 export const requestEmailOtp = async (req, res) => {
   const { email, context } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email address is required.' });
+  if (!email || !email.includes('@')) return res.status(400).json({ error: 'Please enter a valid email address.' });
 
-  try {
-    const result = await sendEmailOtp(email, context || 'SIGNUP');
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+  const cleanEmail = email.toLowerCase().trim();
+  const emailContext = context || 'SIGNUP';
+
+  if (emailContext === 'SIGNUP') {
+    db.get(`SELECT id FROM users WHERE email = ?`, [cleanEmail], async (err, existingUser) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (existingUser) {
+        return res.status(409).json({ error: `An account with ${cleanEmail} already exists. Please log in instead.` });
+      }
+
+      try {
+        const result = await sendEmailOtp(cleanEmail, emailContext);
+        res.json(result);
+      } catch (sendErr) {
+        res.status(400).json({ error: sendErr.message });
+      }
+    });
+  } else {
+    try {
+      const result = await sendEmailOtp(cleanEmail, emailContext);
+      res.json(result);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
   }
 };
 
