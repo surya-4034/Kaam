@@ -100,9 +100,7 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
 
   const transporter = getTransporter();
 
-  // DUAL DISPATCH: Try Hostinger SMTP & Resend API for 100% Instant Delivery Guarantee
-  let emailSentStatus = false;
-
+  // PRIMARY PATH: Hostinger Domain SMTP (Sends to ANY email address in the world)
   if (transporter) {
     try {
       const info = await transporter.sendMail({
@@ -113,14 +111,19 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
         text: plainTextBody,
         html: htmlBody,
       });
+
       console.log(`✅ [HOSTINGER SMTP SUCCESS] Delivered with context "${context}" to ${cleanEmail}! Message ID: ${info.messageId}`);
-      emailSentStatus = true;
+      return {
+        success: true,
+        email: cleanEmail,
+        message: `6-Digit Verification Code sent to ${cleanEmail}! Please check your email inbox.`
+      };
     } catch (smtpErr) {
-      console.error('❌ [HOSTINGER SMTP ERROR]:', smtpErr.message);
+      console.error('❌ [HOSTINGER SMTP DISPATCH ERROR]:', smtpErr.message);
     }
   }
 
-  // Backup / Parallel Dispatch via Resend API (Delivers in <1 sec)
+  // FALLBACK PATH: Resend API (Used if SMTP server is unavailable)
   try {
     const resendResponse = await resend.emails.send({
       from: 'KAAM Verification <onboarding@resend.dev>',
@@ -132,7 +135,6 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
 
     if (!resendResponse.error) {
       console.log(`✅ [RESEND API SUCCESS] Delivered with context "${context}" to ${cleanEmail}! Message ID: ${resendResponse.data?.id}`);
-      emailSentStatus = true;
     } else {
       console.warn(`⚠️ [RESEND RESTRICTION]:`, resendResponse.error.message);
     }
