@@ -306,6 +306,20 @@ export const requestEmailOtp = async (req, res) => {
         res.status(400).json({ error: sendErr.message });
       }
     });
+  } else if (emailContext === 'RESET_PASSWORD') {
+    db.get(`SELECT id FROM users WHERE email = ?`, [cleanEmail], async (err, existingUser) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!existingUser) {
+        return res.status(404).json({ error: `No kaam account found with ${cleanEmail}. Please create a new account first.` });
+      }
+
+      try {
+        const result = await sendEmailOtp(cleanEmail, emailContext);
+        res.json(result);
+      } catch (sendErr) {
+        res.status(400).json({ error: sendErr.message });
+      }
+    });
   } else {
     try {
       const result = await sendEmailOtp(cleanEmail, emailContext);
@@ -337,7 +351,7 @@ export const verifyEmailOtpHandler = (req, res) => {
   });
 };
 
-// Forgot Password: Send Reset OTP Code to User Email
+// Forgot Password: Send Reset OTP Code to User Email (Only if Account Exists)
 export const forgotPasswordRequest = async (req, res) => {
   const { email } = req.body;
   if (!email || !email.includes('@')) {
@@ -346,19 +360,30 @@ export const forgotPasswordRequest = async (req, res) => {
 
   const cleanEmail = email.toLowerCase().trim();
 
-  try {
-    const result = await sendEmailOtp(cleanEmail, 'RESET_PASSWORD');
-    res.json({
-      success: true,
-      message: `Password reset confirmation code sent to ${cleanEmail}.`
-    });
-  } catch (sendErr) {
-    console.error('Forgot password send email error:', sendErr);
-    res.status(500).json({ error: sendErr.message || 'Failed to dispatch verification email.' });
-  }
+  // Strict Account Existence Check
+  db.get(`SELECT id, full_name FROM users WHERE email = ?`, [cleanEmail], async (err, existingUser) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    if (!existingUser) {
+      return res.status(404).json({
+        error: `No kaam account found with email address ${cleanEmail}. Please create a new account instead.`
+      });
+    }
+
+    try {
+      const result = await sendEmailOtp(cleanEmail, 'RESET_PASSWORD');
+      res.json({
+        success: true,
+        message: `Password reset confirmation code sent to ${cleanEmail}.`
+      });
+    } catch (sendErr) {
+      console.error('Forgot password send email error:', sendErr);
+      res.status(500).json({ error: sendErr.message || 'Failed to dispatch verification email.' });
+    }
+  });
 };
 
-// Reset Password: Confirm OTP Code & Update Password
+// Reset Password: Confirm OTP Code & Update Password (Only for Existing User)
 export const resetPasswordHandler = (req, res) => {
   const { email, otpCode, newPassword } = req.body;
 
@@ -368,35 +393,35 @@ export const resetPasswordHandler = (req, res) => {
 
   const cleanEmail = email.toLowerCase().trim();
 
-  if (otpCode) {
-    const verification = verifyEmailOtp(cleanEmail, otpCode);
-    if (!verification.valid && !verification.error?.includes('No verification request found')) {
-      return res.status(400).json({ error: verification.error });
-    }
-  }
+  // Strict Account Existence Check
+  db.get(`SELECT id FROM users WHERE email = ?`, [cleanEmail], (userErr, existingUser) => {
+    if (userErr) return res.status(500).json({ error: userErr.message });
 
-  const passwordHash = bcrypt.hashSync(newPassword, 10);
-
-  db.run(`UPDATE users SET password_hash = ? WHERE email = ?`, [passwordHash, cleanEmail], function (err) {
-    if (err) return res.status(500).json({ error: err.message });
-
-    if (this.changes === 0) {
-      // If user does not exist in DB yet, create user record
-      const newId = `u-${Date.now()}`;
-      const defaultName = cleanEmail.split('@')[0];
-      const randomPhone = `+91 ${Math.floor(6000000000 + Math.random() * 3999999999)}`;
-      db.run(
-        `INSERT INTO users (id, phone, email, password_hash, role, full_name) VALUES (?, ?, ?, ?, 'CLIENT', ?)`,
-        [newId, randomPhone, cleanEmail, passwordHash, defaultName]
-      );
+    if (!existingUser) {
+      return res.status(404).json({
+        error: `No kaam account found with email address ${cleanEmail}. Please create a new account instead.`
+      });
     }
 
-    // Send Automated Password Reset Confirmation Email to User
-    sendPasswordResetSuccessEmail(cleanEmail).catch((e) => console.error('Failed to send reset confirmation email:', e));
+    if (otpCode) {
+      const verification = verifyEmailOtp(cleanEmail, otpCode);
+      if (!verification.valid && !verification.error?.includes('No verification request found')) {
+        return res.status(400).json({ error: verification.error });
+      }
+    }
 
-    return res.json({
-      success: true,
-      message: 'Password updated successfully! Redirecting to login page...'
+    const passwordHash = bcrypt.hashSync(newPassword, 10);
+
+    db.run(`UPDATE users SET password_hash = ? WHERE email = ?`, [passwordHash, cleanEmail], function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+
+      // Send Automated Password Reset Confirmation Email to User
+      sendPasswordResetSuccessEmail(cleanEmail).catch((e) => console.error('Failed to send reset confirmation email:', e));
+
+      return res.json({
+        success: true,
+        message: 'Password updated successfully! Redirecting to login page...'
+      });
     });
   });
 };
