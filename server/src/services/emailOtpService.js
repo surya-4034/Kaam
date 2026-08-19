@@ -110,6 +110,13 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
         subject: subjectText,
         text: plainTextBody,
         html: htmlBody,
+        headers: {
+          'X-Priority': '1 (Highest)',
+          'X-MSMail-Priority': 'High',
+          'Importance': 'High',
+          'X-Entity-Ref-ID': `kaam-otp-${Date.now()}`,
+          'X-Auto-Response-Suppress': 'OOF, AutoReply',
+        },
       });
 
       console.log(`✅ [HOSTINGER SMTP SUCCESS] Delivered with context "${context}" to ${cleanEmail}! Message ID: ${info.messageId}`);
