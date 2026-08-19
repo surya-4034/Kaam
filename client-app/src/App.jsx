@@ -95,21 +95,58 @@ export default function App() {
     }
   }, [user]);
 
-  const handleOpenProfileModal = () => {
-    if (user) {
-      setProfileForm({
-        fullName: user.fullName || user.full_name || '',
-        phone: user.phone || '',
-        secondaryPhone: user.secondaryPhone || user.secondary_phone || '',
-        locality: user.locality || '',
-        landmark: user.landmark || '',
-        state: user.state || 'Uttar Pradesh',
-        pincode: user.pincode || '',
-        address: user.address || ''
-      });
-    }
+  const handleOpenProfileModal = async () => {
     setProfileMessage('');
     setShowEditProfileModal(true);
+
+    if (user?.id) {
+      try {
+        const res = await fetch(`http://localhost:5050/api/admin/clients/${user.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.client) {
+            const freshUser = {
+              ...user,
+              fullName: data.client.fullName || user.fullName,
+              phone: data.client.phone || user.phone,
+              secondaryPhone: data.client.secondaryPhone === 'None' ? '' : (data.client.secondaryPhone || ''),
+              locality: data.client.locality || '',
+              landmark: data.client.landmark || '',
+              state: data.client.state || 'Uttar Pradesh',
+              pincode: data.client.pincode || '',
+              address: data.client.address || '',
+              onboardingCompleted: Boolean(data.client.onboardingCompleted)
+            };
+            setUser(freshUser);
+            localStorage.setItem('kaam_client_user', JSON.stringify(freshUser));
+            setProfileForm({
+              fullName: freshUser.fullName,
+              phone: freshUser.phone,
+              secondaryPhone: freshUser.secondaryPhone,
+              locality: freshUser.locality,
+              landmark: freshUser.landmark,
+              state: freshUser.state,
+              pincode: freshUser.pincode,
+              address: freshUser.address
+            });
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch fresh client data:', e);
+      }
+    }
+
+    setProfileForm({
+      fullName: user?.fullName || user?.full_name || '',
+      phone: user?.phone || '',
+      secondaryPhone: user?.secondaryPhone || user?.secondary_phone || '',
+      locality: user?.locality || '',
+      landmark: user?.landmark || '',
+      state: user?.state || 'Uttar Pradesh',
+      pincode: user?.pincode || '',
+      address: user?.address || ''
+    });
   };
 
   // Delete Account Modal State

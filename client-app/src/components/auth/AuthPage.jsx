@@ -96,6 +96,9 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false }) => {
         if (syncData.token) {
           localStorage.setItem('kaam_token', syncData.token);
           localStorage.setItem('kaam_user', JSON.stringify(syncData.user));
+          if (!isWorkerApp) {
+            localStorage.setItem('kaam_client_user', JSON.stringify(syncData.user));
+          }
         }
         setSuccessMessage(`Welcome ${syncData.user.fullName}! Account Verified & Database Saved.`);
         setTimeout(() => onLoginSuccess(syncData.user), 500);
@@ -232,6 +235,9 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false }) => {
         if (data.token) {
           localStorage.setItem('kaam_token', data.token);
           localStorage.setItem('kaam_user', JSON.stringify(data.user));
+          if (!isWorkerApp) {
+            localStorage.setItem('kaam_client_user', JSON.stringify(data.user));
+          }
         }
         setTimeout(() => onLoginSuccess(data.user), 1000);
       } else {
@@ -280,6 +286,9 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false }) => {
         if (data.token) {
           localStorage.setItem('kaam_token', data.token);
           localStorage.setItem('kaam_user', JSON.stringify(data.user));
+          if (!isWorkerApp) {
+            localStorage.setItem('kaam_client_user', JSON.stringify(data.user));
+          }
         }
         setTimeout(() => onLoginSuccess(data.user), 800);
       } else {
