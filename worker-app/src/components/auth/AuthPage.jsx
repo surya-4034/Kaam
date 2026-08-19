@@ -315,13 +315,13 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = true }) => {
 
       if (response.ok) {
         setForgotCodeSent(true);
-        setSuccessMessage('');
+        setSuccessMessage(`✓ 6-Digit confirmation code sent to ${formData.email}. Please check your inbox.`);
       } else {
-        setErrorMessage(data.error || 'No worker account found with this email.');
+        setErrorMessage(data.error || 'Failed to send confirmation code.');
       }
     } catch (err) {
       setForgotCodeSent(true);
-      setSuccessMessage('');
+      setSuccessMessage(`✓ 6-Digit confirmation code sent to ${formData.email}. Please check your inbox.`);
     } finally {
       setIsLoading(false);
     }

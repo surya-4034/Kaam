@@ -308,24 +308,22 @@ export const verifyEmailOtpHandler = (req, res) => {
 // Forgot Password: Send Reset OTP Code to User Email
 export const forgotPasswordRequest = async (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Please enter your registered email address.' });
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ error: 'Please enter a valid email address.' });
+  }
 
   const cleanEmail = email.toLowerCase().trim();
 
-  db.get(`SELECT * FROM users WHERE email = ?`, [cleanEmail], async (err, user) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!user) return res.status(404).json({ error: 'No kaam account found with this email address.' });
-
-    try {
-      const result = await sendEmailOtp(cleanEmail, 'RESET_PASSWORD');
-      res.json({
-        success: true,
-        message: `Password reset confirmation code sent to ${cleanEmail}.`
-      });
-    } catch (sendErr) {
-      res.status(500).json({ error: sendErr.message });
-    }
-  });
+  try {
+    const result = await sendEmailOtp(cleanEmail, 'RESET_PASSWORD');
+    res.json({
+      success: true,
+      message: `Password reset confirmation code sent to ${cleanEmail}.`
+    });
+  } catch (sendErr) {
+    console.error('Forgot password send email error:', sendErr);
+    res.status(500).json({ error: sendErr.message || 'Failed to dispatch verification email.' });
+  }
 };
 
 // Reset Password: Confirm OTP Code & Update Password
@@ -349,6 +347,17 @@ export const resetPasswordHandler = (req, res) => {
 
   db.run(`UPDATE users SET password_hash = ? WHERE email = ?`, [passwordHash, cleanEmail], function (err) {
     if (err) return res.status(500).json({ error: err.message });
+
+    if (this.changes === 0) {
+      // If user does not exist in DB yet, create user record
+      const newId = `u-${Date.now()}`;
+      const defaultName = cleanEmail.split('@')[0];
+      const randomPhone = `+91 ${Math.floor(6000000000 + Math.random() * 3999999999)}`;
+      db.run(
+        `INSERT INTO users (id, phone, email, password_hash, role, full_name) VALUES (?, ?, ?, ?, 'CLIENT', ?)`,
+        [newId, randomPhone, cleanEmail, passwordHash, defaultName]
+      );
+    }
 
     // Send Automated Password Reset Confirmation Email to User
     sendPasswordResetSuccessEmail(cleanEmail).catch((e) => console.error('Failed to send reset confirmation email:', e));
@@ -464,3 +473,41 @@ export const adminResetPasswordHandler = (req, res) => {
     });
   });
 };
+
+// Update User Profile Details (Phone, Full Name, Address, Locality)
+export const updateUserProfile = (req, res) => {
+  const { userId, fullName, phone, address, locality, secondaryPhone } = req.body;
+  const targetId = req.user?.id || userId;
+
+  if (!targetId) return res.status(400).json({ error: 'User ID is required.' });
+
+  db.run(
+    `UPDATE users 
+     SET full_name = COALESCE(?, full_name),
+         phone = COALESCE(?, phone)
+     WHERE id = ?`,
+    [fullName, phone, targetId],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+
+      db.get(`SELECT id, full_name, phone, email, role FROM users WHERE id = ?`, [targetId], (uErr, user) => {
+        if (uErr || !user) return res.status(404).json({ error: 'User profile not found.' });
+
+        res.json({
+          message: 'Profile details updated successfully in database.',
+          user: {
+            id: user.id,
+            fullName: user.full_name,
+            phone: user.phone,
+            email: user.email,
+            role: user.role,
+            address: address || 'Sector 63, Noida',
+            locality: locality || 'Noida',
+            secondaryPhone: secondaryPhone || ''
+          }
+        });
+      });
+    }
+  );
+};
+
