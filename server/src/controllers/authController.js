@@ -531,23 +531,32 @@ export const adminResetPasswordHandler = (req, res) => {
   });
 };
 
-// Update User Profile Details (Phone, Full Name, Address, Locality)
+// Update User Profile Details (Phone, Full Name, Secondary Phone, Locality, Landmark, State, Pincode, Address)
 export const updateUserProfile = (req, res) => {
-  const { userId, fullName, phone, address, locality, secondaryPhone } = req.body;
+  const { userId, fullName, phone, secondaryPhone, locality, landmark, state, pincode, address } = req.body;
   const targetId = req.user?.id || userId;
 
   if (!targetId) return res.status(400).json({ error: 'User ID is required.' });
 
+  const fullAddr = address || `${locality || ''}, near ${landmark || ''}, ${state || ''} - ${pincode || ''}`;
+
   db.run(
     `UPDATE users 
      SET full_name = COALESCE(?, full_name),
-         phone = COALESCE(?, phone)
+         phone = COALESCE(?, phone),
+         secondary_phone = COALESCE(?, secondary_phone),
+         locality = COALESCE(?, locality),
+         landmark = COALESCE(?, landmark),
+         state = COALESCE(?, state),
+         pincode = COALESCE(?, pincode),
+         address = COALESCE(?, address),
+         onboarding_completed = 1
      WHERE id = ?`,
-    [fullName, phone, targetId],
+    [fullName, phone, secondaryPhone, locality, landmark, state, pincode, fullAddr, targetId],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
 
-      db.get(`SELECT id, full_name, phone, email, role FROM users WHERE id = ?`, [targetId], (uErr, user) => {
+      db.get(`SELECT id, full_name, phone, secondary_phone, email, role, locality, landmark, state, pincode, address, onboarding_completed FROM users WHERE id = ?`, [targetId], (uErr, user) => {
         if (uErr || !user) return res.status(404).json({ error: 'User profile not found.' });
 
         res.json({
@@ -556,11 +565,15 @@ export const updateUserProfile = (req, res) => {
             id: user.id,
             fullName: user.full_name,
             phone: user.phone,
+            secondaryPhone: user.secondary_phone,
             email: user.email,
             role: user.role,
-            address: address || 'Sector 63, Noida',
-            locality: locality || 'Noida',
-            secondaryPhone: secondaryPhone || ''
+            locality: user.locality,
+            landmark: user.landmark,
+            state: user.state,
+            pincode: user.pincode,
+            address: user.address,
+            onboardingCompleted: Boolean(user.onboarding_completed)
           }
         });
       });

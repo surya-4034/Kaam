@@ -21,10 +21,26 @@ export const initDb = () => {
           password_hash TEXT NOT NULL,
           role TEXT CHECK(role IN ('CLIENT', 'WORKER', 'ADMIN')) NOT NULL,
           full_name TEXT NOT NULL,
+          secondary_phone TEXT,
+          locality TEXT,
+          landmark TEXT,
+          state TEXT,
+          pincode TEXT,
+          address TEXT,
+          onboarding_completed INTEGER DEFAULT 0,
           is_active INTEGER DEFAULT 1,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `);
+
+      // Migration for existing databases: Add columns safely if not present
+      db.run(`ALTER TABLE users ADD COLUMN secondary_phone TEXT`, () => {});
+      db.run(`ALTER TABLE users ADD COLUMN locality TEXT`, () => {});
+      db.run(`ALTER TABLE users ADD COLUMN landmark TEXT`, () => {});
+      db.run(`ALTER TABLE users ADD COLUMN state TEXT`, () => {});
+      db.run(`ALTER TABLE users ADD COLUMN pincode TEXT`, () => {});
+      db.run(`ALTER TABLE users ADD COLUMN address TEXT`, () => {});
+      db.run(`ALTER TABLE users ADD COLUMN onboarding_completed INTEGER DEFAULT 0`, () => {});
 
       // Seed Master Admin User: ID: Surya-4034, Email: kaamadmin@gmail.com, Key: Sujal957#
       const adminPassHash = bcrypt.hashSync('Sujal957#', 10);

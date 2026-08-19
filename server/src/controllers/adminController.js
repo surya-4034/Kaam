@@ -3,8 +3,9 @@ import db from '../config/database.js';
 // Get All Users List (Clients & Workers)
 export const getAllUsers = (req, res) => {
   db.all(
-    `SELECT u.id, u.phone, u.email, u.role, u.full_name, u.is_active, u.created_at,
-            wp.id as worker_profile_id, wp.trade_title, wp.trade_category, wp.daily_rate, wp.locality, wp.kyc_status, wp.is_account_locked
+    `SELECT u.id, u.phone, u.secondary_phone, u.email, u.role, u.full_name, u.is_active, u.created_at,
+            u.locality, u.landmark, u.state, u.pincode, u.address, u.onboarding_completed,
+            wp.id as worker_profile_id, wp.trade_title, wp.trade_category, wp.daily_rate, wp.locality as worker_locality, wp.kyc_status, wp.is_account_locked
      FROM users u
      LEFT JOIN worker_profiles wp ON u.id = wp.user_id
      ORDER BY u.created_at DESC`,
@@ -153,7 +154,8 @@ export const getClientDetails = (req, res) => {
   const { clientId } = req.params;
 
   db.get(
-    `SELECT id, phone, email, role, full_name, is_active, created_at
+    `SELECT id, phone, secondary_phone, email, role, full_name, is_active, created_at,
+            locality, landmark, state, pincode, address, onboarding_completed
      FROM users 
      WHERE id = ? OR email = ?`,
     [clientId, clientId],
@@ -176,9 +178,13 @@ export const getClientDetails = (req, res) => {
               fullName: client.full_name,
               email: client.email,
               phone: client.phone,
-              secondaryPhone: client.phone ? `${client.phone} (Alt)` : 'None',
-              address: 'Flat 402, Royal Residency, Sector 63, Noida',
-              locality: 'Sector 63, Noida',
+              secondaryPhone: client.secondary_phone || 'None',
+              locality: client.locality || 'Sector 63',
+              landmark: client.landmark || 'Noida',
+              state: client.state || 'Uttar Pradesh',
+              pincode: client.pincode || '201301',
+              address: client.address || `${client.locality || 'Sector 63'}, Noida`,
+              onboardingCompleted: Boolean(client.onboarding_completed),
               isActive: Boolean(client.is_active),
               createdAt: client.created_at,
               totalJobs: jobs ? jobs.length : 0,

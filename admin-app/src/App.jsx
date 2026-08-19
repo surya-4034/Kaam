@@ -1220,8 +1220,18 @@ export default function App() {
                   </div>
 
                   <div>
-                    <span className="text-slate-400 block text-[11px]">Landmark / City:</span>
-                    <span className="font-semibold text-slate-300">{selectedClientModal.landmark || 'Near Fortis Hospital, Noida'}</span>
+                    <span className="text-slate-400 block text-[11px]">Landmark:</span>
+                    <span className="font-semibold text-slate-300">{selectedClientModal.landmark || 'Noida'}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">State:</span>
+                    <span className="font-semibold text-cyan-300">{selectedClientModal.state || 'Uttar Pradesh'}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Pincode:</span>
+                    <span className="font-mono text-white font-bold">{selectedClientModal.pincode || '201301'}</span>
                   </div>
                 </div>
               </div>
