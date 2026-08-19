@@ -331,27 +331,35 @@ export default function App() {
     }
   };
 
-  // Separate Clients & Workers Arrays (Case-insensitive role check & sequential sorting)
+  // Separate Clients & Workers Arrays (Stable sequential Client ID: 001, 002, 003...)
   const clientAccounts = users
     .filter(u => u.role && u.role.toUpperCase() === 'CLIENT')
-    .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+    .map((client, index) => ({
+      ...client,
+      formattedClientId: String(index + 1).padStart(3, '0'), // '001', '002', '003'...
+      simpleNumId: String(index + 1) // '1', '2', '3'
+    }));
 
   const workerAccounts = users
     .filter(u => u.role && u.role.toUpperCase() === 'WORKER')
     .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
 
   // Filtered Arrays: STRICTLY search only by Client ID (001, 002...) and Client Name
-  const filteredClients = clientAccounts.filter((c, index) => {
-    if (!searchQuery) return true;
+  const filteredClients = clientAccounts.filter((c) => {
+    if (!searchQuery || !searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
-    const formattedId = String(index + 1).padStart(3, '0').toLowerCase(); // '001', '002', '003'...
-    const numId = String(index + 1); // '1', '2', '3'
+    const cleanNumQuery = q.replace(/^client\s*/i, '').trim();
 
-    return (
-      formattedId.includes(q) ||
-      numId === q ||
-      (c.full_name && c.full_name.toLowerCase().includes(q))
-    );
+    const matchesId = 
+      c.formattedClientId === q || 
+      c.simpleNumId === q || 
+      c.formattedClientId === cleanNumQuery || 
+      c.simpleNumId === cleanNumQuery;
+
+    const matchesName = Boolean(c.full_name && c.full_name.toLowerCase().includes(q));
+
+    return matchesId || matchesName;
   });
 
   const filteredWorkers = workerAccounts.filter(w => {
@@ -799,8 +807,8 @@ export default function App() {
                           </td>
                         </tr>
                       ) : (
-                        filteredClients.map((client, index) => {
-                          const formattedClientId = String(index + 1).padStart(3, '0');
+                        filteredClients.map((client) => {
+                          const formattedClientId = client.formattedClientId || '001';
                           const isPhoneUnmasked = unmaskedPhones[client.id];
                           const maskedNumber = maskPhoneNumber(client.phone);
 
