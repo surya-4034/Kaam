@@ -3,15 +3,19 @@ dotenv.config();
 
 import app from './src/app.js';
 import { initDb } from './src/config/database.js';
+import { connectMongoDB } from './src/config/mongoose.js';
 import { startDuesScheduler } from './src/services/duesScheduler.js';
 
 const PORT = process.env.PORT || 5050;
 
 async function startServer() {
   try {
-    // 1. Initialize SQLite Database Schema
+    // 1. Connect to MongoDB Atlas (Cloud Cluster)
+    await connectMongoDB();
+
+    // 2. Initialize Local SQLite & Schema (Dual-sync engine)
     await initDb();
-    console.log('[kaam Backend] Database schema initialized successfully.');
+    console.log('[kaam Backend] Database engine initialized successfully.');
 
     // 2. Start Automated 36-Hour Dues Monitor Cron Task
     startDuesScheduler();
