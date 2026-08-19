@@ -340,7 +340,7 @@ export default function App() {
     .filter(u => u.role && u.role.toUpperCase() === 'WORKER')
     .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
 
-  // Filtered Arrays based on Search Query (Supports Client ID 001, 002..., Name, Phone, Email, Database Ref)
+  // Filtered Arrays: STRICTLY search only by Client ID (001, 002...) and Client Name
   const filteredClients = clientAccounts.filter((c, index) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase().trim();
@@ -350,10 +350,7 @@ export default function App() {
     return (
       formattedId.includes(q) ||
       numId === q ||
-      (c.full_name && c.full_name.toLowerCase().includes(q)) ||
-      (c.email && c.email.toLowerCase().includes(q)) ||
-      (c.phone && c.phone.includes(q)) ||
-      (c.id && c.id.toLowerCase().includes(q))
+      (c.full_name && c.full_name.toLowerCase().includes(q))
     );
   });
 
@@ -759,7 +756,7 @@ export default function App() {
                 <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3" />
                 <input
                   type="text"
-                  placeholder="Search Client ID (001, 002...), Name, Phone..."
+                  placeholder="Search by Client ID (001, 002...) or Name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-11 pr-4 py-2.5 rounded-full bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500"
