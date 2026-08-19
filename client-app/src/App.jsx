@@ -28,7 +28,12 @@ import {
   Save,
   Building,
   Lock,
-  IdCard
+  IdCard,
+  Eye,
+  Star,
+  Briefcase,
+  Clock,
+  ArrowRight
 } from 'lucide-react';
 
 const INDIAN_STATES = [
@@ -168,6 +173,7 @@ export default function App() {
   const [maxBudget, setMaxBudget] = useState(1000);
   const [onlyVerified, setOnlyVerified] = useState(false);
 
+  const [selectedWorkerProfile, setSelectedWorkerProfile] = useState(null);
   const [bookingWorker, setBookingWorker] = useState(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -698,10 +704,11 @@ export default function App() {
                         <span className="text-xl font-black text-amber-400 font-['Outfit']">₹{w.dailyRate}</span>
                       </div>
                       <button
-                        onClick={() => { setBookingWorker(w); setBookingSuccess(false); }}
-                        className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20"
+                        onClick={() => setSelectedWorkerProfile(w)}
+                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-300 hover:brightness-110 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 flex items-center gap-1.5 active:scale-95 transition-all"
                       >
-                        Hire Now
+                        <Eye className="w-4 h-4" />
+                        <span>View Profile</span>
                       </button>
                     </div>
                   </div>
@@ -711,6 +718,117 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* WORKER DETAILED PROFILE VIEW MODAL */}
+      {selectedWorkerProfile && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn font-['Plus_Jakarta_Sans',sans-serif]">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden text-white my-8">
+            
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-slate-800 pb-5">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-teal-950 font-black text-2xl flex items-center justify-center shadow-lg shadow-amber-500/30 shrink-0">
+                  {selectedWorkerProfile.name.charAt(0)}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xl font-black font-['Outfit'] text-white">{selectedWorkerProfile.name}</h3>
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-black flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3" /> Verified KYC
+                    </span>
+                  </div>
+                  <p className="text-xs font-bold text-amber-400 mt-0.5">{selectedWorkerProfile.tradeTitle}</p>
+                  <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                    <MapPin className="w-3.5 h-3.5 text-teal-400" />
+                    <span>{selectedWorkerProfile.locality || 'Local City Area'}</span>
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedWorkerProfile(null)}
+                className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center font-bold text-sm transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Pricing & Ratings Banner */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-center">
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Daily Wage</span>
+                <span className="text-lg font-black text-amber-400 font-['Outfit']">₹{selectedWorkerProfile.dailyRate}<span className="text-[10px] text-slate-400 font-normal">/day</span></span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Hourly Wage</span>
+                <span className="text-lg font-black text-teal-300 font-['Outfit']">₹{selectedWorkerProfile.hourlyRate || 120}<span className="text-[10px] text-slate-400 font-normal">/hr</span></span>
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Client Rating</span>
+                <span className="text-lg font-black text-yellow-300 flex items-center justify-center gap-1 font-['Outfit']">
+                  <Star className="w-4 h-4 fill-yellow-300" /> {selectedWorkerProfile.rating || '4.9'}
+                </span>
+              </div>
+            </div>
+
+            {/* Bio / Experience Description */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                <Briefcase className="w-4 h-4 text-amber-400" /> About Worker & Experience
+              </h4>
+              <p className="text-xs text-slate-200 leading-relaxed bg-slate-950/50 p-4 rounded-2xl border border-slate-800/80">
+                {selectedWorkerProfile.bio || 'Experienced and background-verified trade specialist ready for on-demand home service bookings on the KAAM platform.'}
+              </p>
+            </div>
+
+            {/* Past Work Portfolio Photos */}
+            {selectedWorkerProfile.portfolioImages && selectedWorkerProfile.portfolioImages.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-teal-400" /> Verified Past Work Gallery
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {selectedWorkerProfile.portfolioImages.map((img) => (
+                    <div key={img.id} className="group relative rounded-2xl overflow-hidden border border-slate-800 h-28 bg-slate-950">
+                      <img src={img.url} alt={img.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent flex items-end p-2.5">
+                        <span className="text-[11px] font-bold text-white truncate">{img.title}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedWorkerProfile(null)}
+                className="px-5 py-3 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all"
+              >
+                Back to List
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const workerToHire = selectedWorkerProfile;
+                  setSelectedWorkerProfile(null);
+                  setBookingWorker(workerToHire);
+                  setBookingSuccess(false);
+                }}
+                className="px-7 py-3.5 rounded-full bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-teal-950 font-black text-xs shadow-xl shadow-amber-500/30 flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all"
+              >
+                <span>Hire This Worker Now</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Booking Modal */}
       {bookingWorker && (
