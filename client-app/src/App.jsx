@@ -464,83 +464,96 @@ export default function App() {
     <div className="min-h-screen bg-gradient-to-br from-[#042522] via-[#083b36] to-[#031d1b] text-slate-100 selection:bg-amber-400 selection:text-teal-950 flex flex-col justify-between">
       
       <div>
-        {/* Header */}
-        <header className="sticky top-0 z-40 bg-[#064e43]/90 backdrop-blur-md border-b border-[#0e7467] px-6 py-4 shadow-2xl">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-400 to-yellow-300 flex items-center justify-center text-teal-950 font-black shadow-lg shadow-amber-500/30 shrink-0">
-                <Wrench className="w-5 h-5 stroke-[2.5]" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl sm:text-2xl font-black text-white font-['Outfit'] tracking-tight">kaam Client</span>
-                  <span className="text-[10px] bg-amber-500/10 text-amber-400 font-bold px-2 py-0.5 rounded-full border border-amber-500/30 hidden sm:inline-block">
-                    Port 5174
-                  </span>
+        {/* Header matching Diagram: Profile on Left, Search Worker in Center, Logout on Right */}
+        <header className="sticky top-0 z-40 bg-[#064e43]/95 backdrop-blur-md border-b border-[#0e7467] px-4 sm:px-8 py-3.5 shadow-2xl">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+            
+            {/* UPPER LEFT: LOGO & PROFILE BUTTON (DIAGRAM SPEC: Profile Button on Left) */}
+            <div className="flex items-center justify-between w-full md:w-auto gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-amber-400 to-yellow-300 flex items-center justify-center text-teal-950 font-black shadow-lg shadow-amber-500/30 shrink-0">
+                  <Wrench className="w-5 h-5 stroke-[2.5]" />
                 </div>
-
-                {/* UPPER LEFT CLIENT PROFILE SECTION BUTTON */}
-                <button
-                  type="button"
-                  onClick={handleOpenProfileModal}
-                  className="mt-0.5 px-3 py-1 rounded-full bg-teal-500/20 hover:bg-teal-500/30 text-amber-300 border border-teal-500/40 text-[11px] font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                  title="Click to edit profile & address details on server"
-                >
-                  <User className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{user?.fullName || user?.full_name || 'My Profile'}</span>
-                  <Edit className="w-3 h-3 text-teal-300 ml-1" />
-                </button>
+                <span className="text-xl font-black text-white font-['Outfit'] tracking-tight">kaam</span>
               </div>
+
+              {/* PROFILE BUTTON (UPPER LEFT AS IN DIAGRAM) */}
+              <button
+                type="button"
+                onClick={handleOpenProfileModal}
+                className="px-3.5 py-1.5 rounded-full bg-teal-500/20 hover:bg-teal-500/30 text-amber-300 border border-teal-500/40 text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                title="Click to view & update profile and Client ID"
+              >
+                <User className="w-3.5 h-3.5 text-amber-400" />
+                <span className="max-w-[120px] truncate">{user?.fullName || user?.full_name || 'My Profile'}</span>
+                <Edit className="w-3 h-3 text-teal-300" />
+              </button>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* CENTER TOP: PROMINENT WORKER SEARCH BAR (DIAGRAM SPEC: "Search Worker 🔍") */}
+            <div className="relative w-full md:max-w-md lg:max-w-xl">
+              <Search className="w-4 h-4 text-teal-300 absolute left-4 top-3.5 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search worker by trade (Plumber, Electrician), name, or locality..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-11 pr-10 py-2.5 rounded-full bg-slate-950/80 border border-teal-500/40 text-white placeholder-slate-400 text-xs focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 shadow-inner"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3.5 top-3 text-slate-400 hover:text-white text-xs font-bold"
+                  title="Clear Search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* UPPER RIGHT: TABS & LOGOUT */}
+            <div className="flex items-center justify-end w-full md:w-auto gap-2.5">
               <button
                 onClick={() => setActiveTab('browse')}
-                className={`text-xs font-bold px-4 py-2 rounded-xl transition-all ${
-                  activeTab === 'browse' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'
+                className={`text-xs font-bold px-3.5 py-2 rounded-xl transition-all ${
+                  activeTab === 'browse' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-300 hover:text-white'
                 }`}
               >
                 Find Workers
               </button>
+              
               <button
                 onClick={() => setActiveTab('my-bookings')}
-                className={`text-xs font-bold px-4 py-2 rounded-xl transition-all ${
-                  activeTab === 'my-bookings' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'
+                className={`text-xs font-bold px-3.5 py-2 rounded-xl transition-all relative ${
+                  activeTab === 'my-bookings' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-300 hover:text-white'
                 }`}
               >
-                My Hire Requests ({jobs.length})
+                Requests ({jobs.length})
               </button>
 
-              {/* User Account Info & Logout */}
-              <div className="flex items-center gap-3 pl-3 border-l border-slate-800">
-                <div className="text-right text-xs hidden sm:block">
-                  <span className="font-bold text-white block">{user.fullName}</span>
-                  <span className="text-[10px] text-amber-400 font-semibold uppercase">Client Account</span>
-                </div>
+              <button
+                onClick={() => setShowDeleteConfirmModal(true)}
+                title="Delete Account"
+                className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
 
-                <button
-                  onClick={() => setShowDeleteConfirmModal(true)}
-                  title="Delete Account"
-                  className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/30 text-xs font-bold transition-all flex items-center gap-1.5"
-                >
-                  <Trash2 className="w-4 h-4 text-red-400" />
-                  <span className="hidden md:inline">Delete Account</span>
-                </button>
-
-                <button
-                  onClick={handleLogout}
-                  title="Sign Out"
-                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                onClick={handleLogout}
+                title="Sign Out"
+                className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
+
           </div>
         </header>
 
         {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-6 py-8">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
           {activeTab === 'my-bookings' ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -603,22 +616,10 @@ export default function App() {
               )}
             </div>
           ) : (
-            <div className="space-y-8">
-              {/* Hero Banner */}
-              <div className="glass-panel p-8 rounded-3xl border border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900/90 to-amber-950/30">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-                  WELCOME {user.fullName?.toUpperCase()} • CLIENT MARKETPLACE
-                </span>
-                <h1 className="text-4xl font-black text-white font-['Outfit'] mt-3">
-                  Find Verified Local <span className="text-amber-400">Plumbers, Electricians</span> & Mistry
-                </h1>
-                <p className="text-xs text-slate-300 mt-2 max-w-xl">
-                  Inspect photo portfolios, daily fee rates, ratings, and submit hire requests directly to local skilled tradespeople.
-                </p>
-              </div>
-
-              {/* Category Pills */}
-              <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none">
+            <div className="space-y-6">
+              
+              {/* CATEGORY FILTER PILLS ROW (DIAGRAM SPEC: All Service, Plumbers, Electricians...) */}
+              <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none">
                 {CATEGORIES.map((cat) => {
                   const IconComp = ICON_MAP[cat.icon] || Wrench;
                   const isSel = selectedCategory === cat.id;
@@ -626,15 +627,52 @@ export default function App() {
                     <button
                       key={cat.id}
                       onClick={() => setSelectedCategory(cat.id)}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-semibold border whitespace-nowrap transition-all ${
-                        isSel ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold' : 'bg-slate-900 text-slate-300 border-slate-800'
+                      className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold border whitespace-nowrap transition-all ${
+                        isSel 
+                          ? 'bg-amber-400 text-teal-950 border-amber-300 shadow-md shadow-amber-500/20' 
+                          : 'bg-slate-900/80 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
                       }`}
                     >
-                      <IconComp className="w-4 h-4" />
+                      <IconComp className="w-3.5 h-3.5" />
                       <span>{cat.name}</span>
                     </button>
                   );
                 })}
+              </div>
+
+              {/* LIST HEADER (DIAGRAM SPEC: Default list before searching vs Specific list after search) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-black text-white font-['Outfit'] flex items-center gap-2">
+                    {searchQuery || selectedCategory !== 'all' ? (
+                      <>
+                        <Search className="w-5 h-5 text-amber-400" />
+                        <span>Search Results for "{searchQuery || selectedCategory}"</span>
+                      </>
+                    ) : (
+                      <>
+                        <HardHat className="w-5 h-5 text-teal-400" />
+                        <span>Default Available Workers List</span>
+                      </>
+                    )}
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    {filteredWorkers.length} {filteredWorkers.length === 1 ? 'tradesperson' : 'tradespeople'} ready for hire in your area.
+                  </p>
+                </div>
+
+                {(searchQuery || selectedCategory !== 'all') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedCategory('all');
+                    }}
+                    className="self-start sm:self-auto px-4 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                  >
+                    <span>✕ Show Default List (Clear Search)</span>
+                  </button>
+                )}
               </div>
 
               {/* Filter Toolbar */}
