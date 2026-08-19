@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CATEGORIES, INITIAL_WORKERS } from './data/mockData';
 import { AuthPage } from './components/auth/AuthPage';
+import { ClientOnboardingWizard } from './components/onboarding/ClientOnboardingWizard';
 import {
   Wrench,
   Droplets,
@@ -19,7 +20,10 @@ import {
   X,
   SlidersHorizontal,
   LogOut,
-  UserCheck
+  UserCheck,
+  User,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 const ICON_MAP = { Wrench, Droplets, Zap, HardHat, Paintbrush, Hammer, Grid, Flame, Sparkles };
@@ -29,6 +33,16 @@ export default function App() {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('kaam_client_user');
     return saved ? JSON.parse(saved) : null;
+  });
+
+  // Delete Account Modal State
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    if (!user) return false;
+    return !user.onboardingCompleted;
   });
 
   const [activeTab, setActiveTab] = useState('browse'); // 'browse' | 'my-bookings'
@@ -47,7 +61,7 @@ export default function App() {
   const [bookingForm, setBookingForm] = useState({
     name: user?.fullName || 'Verma Family (Homeowner)',
     phone: user?.phone || '+91 98111 00223',
-    address: 'Sector 63, Noida',
+    address: user?.address || 'Sector 63, Noida',
     description: 'Fix CPVC pipe fitting & bathroom tap replacement.',
     paymentMode: 'DIRECT_CASH',
   });
@@ -59,6 +73,24 @@ export default function App() {
       localStorage.removeItem('kaam_client_user');
     }
   }, [user]);
+
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
+    if (!userData.onboardingCompleted) {
+      setShowOnboarding(true);
+    }
+  };
+
+  const handleOnboardingComplete = (updatedUser) => {
+    setUser(updatedUser);
+    setShowOnboarding(false);
+    setBookingForm((prev) => ({
+      ...prev,
+      name: updatedUser.fullName,
+      phone: updatedUser.phone,
+      address: updatedUser.address || prev.address,
+    }));
+  };
 
   // Fetch live workers from SQLite database
   const fetchWorkersFromDB = async () => {
@@ -125,8 +157,40 @@ export default function App() {
     setUser(null);
   };
 
+  const handleDeleteAccountSubmit = async () => {
+    setIsDeletingAccount(true);
+    setDeleteError('');
+
+    try {
+      const res = await fetch('http://localhost:5050/api/auth/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        localStorage.removeItem('kaam_client_user');
+        setUser(null);
+        setShowDeleteConfirmModal(false);
+      } else {
+        setDeleteError(data.error || 'Failed to delete account. Please try again.');
+      }
+    } catch (err) {
+      console.error('Account deletion error:', err);
+      setDeleteError('Connection error while deleting account.');
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+
   if (!user) {
-    return <AuthPage onLoginSuccess={(userData) => setUser(userData)} isWorkerApp={false} />;
+    return <AuthPage onLoginSuccess={handleLoginSuccess} isWorkerApp={false} />;
+  }
+
+  if (showOnboarding) {
+    return <ClientOnboardingWizard user={user} onComplete={handleOnboardingComplete} />;
   }
 
   const workerList = dbWorkers.length > 0 ? dbWorkers : INITIAL_WORKERS;
@@ -236,10 +300,20 @@ export default function App() {
                   <span className="font-bold text-white block">{user.fullName}</span>
                   <span className="text-[10px] text-amber-400 font-semibold uppercase">Client Account</span>
                 </div>
+
+                <button
+                  onClick={() => setShowDeleteConfirmModal(true)}
+                  title="Delete Account"
+                  className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/30 text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4 text-red-400" />
+                  <span className="hidden md:inline">Delete Account</span>
+                </button>
+
                 <button
                   onClick={handleLogout}
                   title="Sign Out"
-                  className="p-2 rounded-xl bg-slate-900 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-800 transition-colors"
+                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -499,6 +573,68 @@ export default function App() {
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* PERMANENT ACCOUNT DELETION CONFIRMATION MODAL */}
+      {showDeleteConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-red-500/30 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl relative overflow-hidden">
+            
+            {/* Top Warning Accent Line */}
+            <div className="h-1.5 w-full bg-gradient-to-r from-red-500 via-rose-500 to-amber-500 absolute top-0 left-0"></div>
+
+            <div className="flex items-center gap-3 text-red-400">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/20 border border-red-500/30 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-white font-['Outfit']">Delete Client Account</h3>
+                <p className="text-xs text-red-300 font-medium">Permanent Database Wipe</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-red-950/40 border border-red-500/20 text-xs text-slate-300 space-y-2">
+              <p className="font-semibold text-red-200">
+                Are you sure you want to delete your account <span className="font-mono font-bold text-white">({user.email || user.fullName})</span>?
+              </p>
+              <ul className="list-disc list-inside text-slate-400 space-y-1 text-[11px]">
+                <li>Your profile & contact details will be deleted.</li>
+                <li>Your account will be removed from Admin Panel immediately.</li>
+                <li>This action <strong>cannot be undone</strong>.</li>
+              </ul>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-bold">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirmModal(false);
+                  setDeleteError('');
+                }}
+                className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all"
+              >
+                Cancel / Keep Account
+              </button>
+
+              <button
+                type="button"
+                disabled={isDeletingAccount}
+                onClick={handleDeleteAccountSubmit}
+                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-black shadow-lg shadow-red-950/60 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isDeletingAccount ? 'Deleting...' : 'Yes, Delete Account'}</span>
+              </button>
+            </div>
+
           </div>
         </div>
       )}

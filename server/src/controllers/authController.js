@@ -568,3 +568,30 @@ export const updateUserProfile = (req, res) => {
   );
 };
 
+// Permanent Account Deletion Endpoint
+export const deleteAccount = (req, res) => {
+  const userId = req.user?.id || req.body?.userId;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required to process account deletion.' });
+  }
+
+  db.serialize(() => {
+    // Delete worker profile if worker
+    db.run(`DELETE FROM worker_profiles WHERE user_id = ?`, [userId]);
+    db.run(`DELETE FROM worker_bank_kyc WHERE worker_id IN (SELECT id FROM worker_profiles WHERE user_id = ?)`, [userId]);
+    db.run(`DELETE FROM worker_portfolios WHERE worker_id IN (SELECT id FROM worker_profiles WHERE user_id = ?)`, [userId]);
+
+    // Delete user from users table
+    db.run(`DELETE FROM users WHERE id = ?`, [userId], function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+
+      res.json({
+        success: true,
+        message: 'Your account has been permanently deleted from KAAM platform database.'
+      });
+    });
+  });
+};
+
+

@@ -11,6 +11,8 @@ import {
   adminForgotPasswordRequest,
   adminVerifySecretCode,
   adminResetPasswordHandler,
+  updateUserProfile,
+  deleteAccount,
   getMe,
 } from '../controllers/authController.js';
 import { authRequired } from '../middleware/auth.js';
@@ -20,6 +22,11 @@ const router = express.Router();
 router.post('/register', register);
 router.post('/login', login);
 router.post('/admin-login', adminLogin);
+
+// Profile Update & Delete Account Routes
+router.put('/update-profile', updateUserProfile);
+router.delete('/delete-account', deleteAccount);
+router.post('/delete-account', deleteAccount);
 
 // Google OAuth Persistence Route
 router.post('/google-sync', googleSync);
