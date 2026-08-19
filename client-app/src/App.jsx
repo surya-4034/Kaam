@@ -23,8 +23,36 @@ import {
   UserCheck,
   User,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Edit,
+  Save,
+  Building
 } from 'lucide-react';
+
+const INDIAN_STATES = [
+  "Uttar Pradesh",
+  "Delhi NCR",
+  "Haryana",
+  "Punjab",
+  "Maharashtra",
+  "Karnataka",
+  "Tamil Nadu",
+  "West Bengal",
+  "Rajasthan",
+  "Gujarat",
+  "Bihar",
+  "Madhya Pradesh",
+  "Kerala",
+  "Telangana",
+  "Andhra Pradesh",
+  "Assam",
+  "Odisha",
+  "Jharkhand",
+  "Chhattisgarh",
+  "Himachal Pradesh",
+  "Uttarakhand",
+  "Goa"
+];
 
 const ICON_MAP = { Wrench, Droplets, Zap, HardHat, Paintbrush, Hammer, Grid, Flame, Sparkles };
 const API_URL = 'http://localhost:5050/api/jobs';
@@ -34,6 +62,38 @@ export default function App() {
     const saved = localStorage.getItem('kaam_client_user');
     return saved ? JSON.parse(saved) : null;
   });
+
+  // Edit Profile Modal State
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState('');
+
+  const [profileForm, setProfileForm] = useState({
+    fullName: user?.fullName || '',
+    phone: user?.phone || '',
+    secondaryPhone: user?.secondaryPhone || '',
+    locality: user?.locality || '',
+    landmark: user?.landmark || '',
+    state: user?.state || 'Uttar Pradesh',
+    pincode: user?.pincode || '',
+    address: user?.address || ''
+  });
+
+  // Sync profileForm when user changes
+  useEffect(() => {
+    if (user) {
+      setProfileForm({
+        fullName: user.fullName || '',
+        phone: user.phone || '',
+        secondaryPhone: user.secondaryPhone || '',
+        locality: user.locality || '',
+        landmark: user.landmark || '',
+        state: user.state || 'Uttar Pradesh',
+        pincode: user.pincode || '',
+        address: user.address || ''
+      });
+    }
+  }, [user]);
 
   // Delete Account Modal State
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
@@ -157,6 +217,81 @@ export default function App() {
     setUser(null);
   };
 
+  const handleUpdateProfileSubmit = async (e) => {
+    e.preventDefault();
+    setIsUpdatingProfile(true);
+    setProfileMessage('');
+
+    const fullAddr = `${profileForm.locality || ''}, near ${profileForm.landmark || ''}, ${profileForm.state || ''} - ${profileForm.pincode || ''}`;
+
+    try {
+      const res = await fetch('http://localhost:5050/api/auth/update-profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          fullName: profileForm.fullName,
+          phone: profileForm.phone,
+          secondaryPhone: profileForm.secondaryPhone,
+          locality: profileForm.locality,
+          landmark: profileForm.landmark,
+          state: profileForm.state,
+          pincode: profileForm.pincode,
+          address: fullAddr
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        const updatedUser = {
+          ...user,
+          fullName: profileForm.fullName,
+          phone: profileForm.phone,
+          secondaryPhone: profileForm.secondaryPhone,
+          locality: profileForm.locality,
+          landmark: profileForm.landmark,
+          state: profileForm.state,
+          pincode: profileForm.pincode,
+          address: fullAddr,
+          onboardingCompleted: true
+        };
+        setUser(updatedUser);
+        localStorage.setItem('kaam_client_user', JSON.stringify(updatedUser));
+        setProfileMessage('✓ Profile details saved to server database successfully!');
+        setTimeout(() => {
+          setShowEditProfileModal(false);
+          setProfileMessage('');
+        }, 1200);
+      } else {
+        setProfileMessage(`Error: ${data.error || 'Failed to save profile.'}`);
+      }
+    } catch (err) {
+      console.error('Profile update network note:', err);
+      const updatedUser = {
+        ...user,
+        fullName: profileForm.fullName,
+        phone: profileForm.phone,
+        secondaryPhone: profileForm.secondaryPhone,
+        locality: profileForm.locality,
+        landmark: profileForm.landmark,
+        state: profileForm.state,
+        pincode: profileForm.pincode,
+        address: fullAddr,
+        onboardingCompleted: true
+      };
+      setUser(updatedUser);
+      localStorage.setItem('kaam_client_user', JSON.stringify(updatedUser));
+      setProfileMessage('✓ Profile updated locally!');
+      setTimeout(() => {
+        setShowEditProfileModal(false);
+        setProfileMessage('');
+      }, 1200);
+    } finally {
+      setIsUpdatingProfile(false);
+    }
+  };
+
   const handleDeleteAccountSubmit = async () => {
     setIsDeletingAccount(true);
     setDeleteError('');
@@ -265,14 +400,28 @@ export default function App() {
         <header className="sticky top-0 z-40 bg-[#064e43]/90 backdrop-blur-md border-b border-[#0e7467] px-6 py-4 shadow-2xl">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-400 to-yellow-300 flex items-center justify-center text-teal-950 font-black shadow-lg shadow-amber-500/30">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-400 to-yellow-300 flex items-center justify-center text-teal-950 font-black shadow-lg shadow-amber-500/30 shrink-0">
                 <Wrench className="w-5 h-5 stroke-[2.5]" />
               </div>
               <div>
-                <span className="text-2xl font-black text-white font-['Outfit'] tracking-tight">kaam Client</span>
-                <span className="text-[10px] ml-2 bg-amber-500/10 text-amber-400 font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
-                  Client App (Port 5174)
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl sm:text-2xl font-black text-white font-['Outfit'] tracking-tight">kaam Client</span>
+                  <span className="text-[10px] bg-amber-500/10 text-amber-400 font-bold px-2 py-0.5 rounded-full border border-amber-500/30 hidden sm:inline-block">
+                    Port 5174
+                  </span>
+                </div>
+
+                {/* UPPER LEFT CLIENT PROFILE SECTION BUTTON */}
+                <button
+                  type="button"
+                  onClick={() => setShowEditProfileModal(true)}
+                  className="mt-0.5 px-3 py-1 rounded-full bg-teal-500/20 hover:bg-teal-500/30 text-amber-300 border border-teal-500/40 text-[11px] font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                  title="Click to edit profile & address details on server"
+                >
+                  <User className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{user.fullName || 'My Profile'}</span>
+                  <Edit className="w-3 h-3 text-teal-300 ml-1" />
+                </button>
               </div>
             </div>
 
@@ -573,6 +722,188 @@ export default function App() {
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* UPPER LEFT CLIENT PROFILE EDIT MODAL */}
+      {showEditProfileModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn font-['Plus_Jakarta_Sans',sans-serif]">
+          <div className="bg-slate-900 border border-teal-500/30 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl relative overflow-hidden text-white my-8">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-400 text-teal-950 flex items-center justify-center font-black">
+                  <User className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black font-['Outfit'] text-white">Client Profile & Settings</h3>
+                  <p className="text-xs text-amber-300 font-medium">Update contact & location details on server</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowEditProfileModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {profileMessage && (
+              <div className={`p-3.5 rounded-2xl text-xs font-bold ${
+                profileMessage.startsWith('✓') 
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                  : 'bg-red-500/20 text-red-300 border border-red-500/30'
+              }`}>
+                {profileMessage}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateProfileSubmit} className="space-y-4 text-xs">
+              
+              {/* Full Name */}
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1 ml-2">Full Name *</label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-teal-400 absolute left-4 top-3.5" />
+                  <input
+                    type="text"
+                    name="fullName"
+                    required
+                    placeholder="Enter Full Name"
+                    value={profileForm.fullName}
+                    onChange={handleProfileFormChange}
+                    className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              {/* Primary Phone & Alternate Phone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1 ml-2">Primary Phone *</label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-amber-400 absolute left-4 top-3.5" />
+                    <input
+                      type="text"
+                      name="phone"
+                      required
+                      placeholder="+91 98111 00223"
+                      value={profileForm.phone}
+                      onChange={handleProfileFormChange}
+                      className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950 border border-slate-800 text-white text-xs font-mono focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1 ml-2">Alt Phone (Optional)</label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-slate-500 absolute left-4 top-3.5" />
+                    <input
+                      type="text"
+                      name="secondaryPhone"
+                      placeholder="Alternate phone"
+                      value={profileForm.secondaryPhone}
+                      onChange={handleProfileFormChange}
+                      className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950 border border-slate-800 text-white text-xs font-mono focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Locality & Landmark */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1 ml-2">Locality / Sector *</label>
+                  <div className="relative">
+                    <MapPin className="w-4 h-4 text-teal-400 absolute left-4 top-3.5" />
+                    <input
+                      type="text"
+                      name="locality"
+                      required
+                      placeholder="e.g. Sector 63"
+                      value={profileForm.locality}
+                      onChange={handleProfileFormChange}
+                      className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1 ml-2">Landmark *</label>
+                  <div className="relative">
+                    <Building className="w-4 h-4 text-teal-400 absolute left-4 top-3.5" />
+                    <input
+                      type="text"
+                      name="landmark"
+                      required
+                      placeholder="e.g. Near Metro Station"
+                      value={profileForm.landmark}
+                      onChange={handleProfileFormChange}
+                      className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* State & Pincode */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1 ml-2">State *</label>
+                  <select
+                    name="state"
+                    value={profileForm.state}
+                    onChange={handleProfileFormChange}
+                    className="w-full px-4 py-3 rounded-full bg-slate-950 border border-slate-800 text-white text-xs font-semibold focus:outline-none focus:border-teal-500"
+                  >
+                    {INDIAN_STATES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1 ml-2">Pincode *</label>
+                  <input
+                    type="text"
+                    name="pincode"
+                    required
+                    maxLength={6}
+                    placeholder="e.g. 201301"
+                    value={profileForm.pincode}
+                    onChange={handleProfileFormChange}
+                    className="w-full px-4 py-3 rounded-full bg-slate-950 border border-slate-800 text-white text-xs font-mono focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditProfileModal(false)}
+                  className="px-5 py-3 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isUpdatingProfile}
+                  className="px-6 py-3 rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 text-teal-950 font-black text-xs shadow-lg shadow-amber-500/20 flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isUpdatingProfile ? 'Saving to Server...' : 'Save & Update Profile'}</span>
+                </button>
+              </div>
+
+            </form>
+
           </div>
         </div>
       )}
