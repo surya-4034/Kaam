@@ -126,6 +126,11 @@ export default function App() {
   useEffect(() => {
     if (isAdminAuthenticated) {
       fetchAdminData();
+      // Auto-refresh admin data every 5 seconds for instant real-time synchronization
+      const syncInterval = setInterval(() => {
+        fetchAdminData();
+      }, 5000);
+      return () => clearInterval(syncInterval);
     }
   }, [isAdminAuthenticated]);
 
