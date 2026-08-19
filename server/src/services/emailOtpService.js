@@ -20,6 +20,9 @@ const getTransporter = () => {
           user: smtpUser,
           pass: smtpPass,
         },
+        tls: {
+          rejectUnauthorized: false,
+        },
       });
     }
 
@@ -105,6 +108,11 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
         subject: subjectText,
         text: plainTextBody,
         html: htmlBody,
+        messageId: `<kaam-otp-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}@yors.online>`,
+        envelope: {
+          from: process.env.EMAIL_USER,
+          to: cleanEmail
+        }
       });
 
       console.log(`✅ [HOSTINGER SMTP SUCCESS] Delivered with context "${context}" to ${cleanEmail}! Message ID: ${info.messageId}`);
