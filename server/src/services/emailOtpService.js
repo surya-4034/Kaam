@@ -4,12 +4,26 @@ import { Resend } from 'resend';
 // In-memory Store for Email OTPs: email -> { otpCode, expiresAt }
 const emailOtpStore = new Map();
 
-// Initialize Gmail SMTP Transporter
+// Initialize SMTP Transporter (Supports Hostinger & Gmail SMTP)
 const getTransporter = () => {
   const smtpUser = process.env.EMAIL_USER;
-  const smtpPass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '';
+  const smtpPass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.trim() : '';
 
   if (smtpUser && smtpPass) {
+    // If using custom domain / Hostinger mail (e.g. kaam@yors.online)
+    if (smtpUser.includes('@yors.online') || smtpUser.includes('hostinger') || !smtpUser.endsWith('@gmail.com')) {
+      return nodemailer.createTransport({
+        host: 'smtp.hostinger.com',
+        port: 465,
+        secure: true, // SSL
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+    }
+
+    // Gmail SMTP Setup
     return nodemailer.createTransport({
       service: 'gmail',
       auth: {
