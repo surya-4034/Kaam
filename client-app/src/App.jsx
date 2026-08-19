@@ -26,7 +26,9 @@ import {
   AlertTriangle,
   Edit,
   Save,
-  Building
+  Building,
+  Lock,
+  IdCard
 } from 'lucide-react';
 
 const INDIAN_STATES = [
@@ -107,6 +109,7 @@ export default function App() {
           if (data.client) {
             const freshUser = {
               ...user,
+              formattedClientId: data.client.formattedClientId || '001',
               fullName: data.client.fullName || user.fullName,
               phone: data.client.phone || user.phone,
               secondaryPhone: data.client.secondaryPhone === 'None' ? '' : (data.client.secondaryPhone || ''),
@@ -823,6 +826,32 @@ export default function App() {
 
             <form onSubmit={handleUpdateProfileSubmit} className="space-y-4 text-xs">
               
+              {/* READ-ONLY OFFICIAL CLIENT ID HELPDESK CARD */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-teal-500/30 space-y-2 shadow-inner">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center font-bold">
+                      <IdCard className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider block">Official Client ID (Helpdesk Support)</span>
+                      <span className="font-mono text-amber-400 font-black text-base tracking-wider">
+                        Client ID: {user?.formattedClientId || '001'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-bold flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-amber-400" /> Non-Editable
+                  </span>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                  <span>Database Ref: <span className="font-mono text-slate-300 font-bold">{user?.id || 'u-001'}</span></span>
+                  <span className="text-[10px] text-teal-400 font-medium">✓ Registered on KAAM Server</span>
+                </div>
+              </div>
+
               {/* Full Name */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1 ml-2">Full Name *</label>

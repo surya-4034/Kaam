@@ -163,36 +163,49 @@ export const getClientDetails = (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!client) return res.status(404).json({ error: 'Client account not found.' });
 
-      db.all(
-        `SELECT j.*, wp.trade_title, u.full_name as worker_name
-         FROM jobs j
-         LEFT JOIN worker_profiles wp ON j.worker_id = wp.id
-         LEFT JOIN users u ON wp.user_id = u.id
-         WHERE j.client_id = ? OR j.client_phone = ?
-         ORDER BY j.created_at DESC`,
-        [client.id, client.phone],
-        (jErr, jobs) => {
-          res.json({
-            client: {
-              id: client.id,
-              fullName: client.full_name,
-              email: client.email,
-              phone: client.phone,
-              secondaryPhone: client.secondary_phone || 'None',
-              locality: client.locality || 'Sector 63',
-              landmark: client.landmark || 'Noida',
-              state: client.state || 'Uttar Pradesh',
-              pincode: client.pincode || '201301',
-              address: client.address || `${client.locality || 'Sector 63'}, Noida`,
-              onboardingCompleted: Boolean(client.onboarding_completed),
-              isActive: Boolean(client.is_active),
-              createdAt: client.created_at,
-              totalJobs: jobs ? jobs.length : 0,
-              jobHistory: jobs || []
-            }
-          });
+      db.all(`SELECT id, created_at FROM users WHERE UPPER(role) = 'CLIENT' ORDER BY created_at ASC`, [], (cErr, allClients) => {
+        let formattedClientId = '001';
+        if (allClients && allClients.length > 0) {
+          const clientIndex = allClients.findIndex(c => c.id === client.id);
+          if (clientIndex !== -1) {
+            formattedClientId = String(clientIndex + 1).padStart(3, '0');
+          } else {
+            formattedClientId = String(allClients.length + 1).padStart(3, '0');
+          }
         }
-      );
+
+        db.all(
+          `SELECT j.*, wp.trade_title, u.full_name as worker_name
+           FROM jobs j
+           LEFT JOIN worker_profiles wp ON j.worker_id = wp.id
+           LEFT JOIN users u ON wp.user_id = u.id
+           WHERE j.client_id = ? OR j.client_phone = ?
+           ORDER BY j.created_at DESC`,
+          [client.id, client.phone],
+          (jErr, jobs) => {
+            res.json({
+              client: {
+                id: client.id,
+                formattedClientId,
+                fullName: client.full_name,
+                email: client.email,
+                phone: client.phone,
+                secondaryPhone: client.secondary_phone || 'None',
+                locality: client.locality || 'Sector 63',
+                landmark: client.landmark || 'Noida',
+                state: client.state || 'Uttar Pradesh',
+                pincode: client.pincode || '201301',
+                address: client.address || `${client.locality || 'Sector 63'}, Noida`,
+                onboardingCompleted: Boolean(client.onboarding_completed),
+                isActive: Boolean(client.is_active),
+                createdAt: client.created_at,
+                totalJobs: jobs ? jobs.length : 0,
+                jobHistory: jobs || []
+              }
+            });
+          }
+        );
+      });
     }
   );
 };
