@@ -61,7 +61,20 @@ export const register = (req, res) => {
         res.status(201).json({
           message: 'Account created successfully.',
           token,
-          user: { id: userId, phone: userPhone, email: cleanEmail, role: normalizedRole, fullName }
+          user: {
+            id: userId,
+            phone: userPhone,
+            secondaryPhone: '',
+            email: cleanEmail,
+            role: normalizedRole,
+            fullName,
+            locality: '',
+            landmark: '',
+            state: 'Uttar Pradesh',
+            pincode: '',
+            address: '',
+            onboardingCompleted: false
+          }
         });
       }
     );
@@ -94,6 +107,21 @@ export const login = (req, res) => {
         fullName: user.full_name,
       });
 
+      const formattedUser = {
+        id: user.id,
+        fullName: user.full_name,
+        phone: user.phone,
+        secondaryPhone: user.secondary_phone || '',
+        email: user.email,
+        role: user.role,
+        locality: user.locality || '',
+        landmark: user.landmark || '',
+        state: user.state || 'Uttar Pradesh',
+        pincode: user.pincode || '',
+        address: user.address || '',
+        onboardingCompleted: Boolean(user.onboarding_completed)
+      };
+
       if (user.role === 'WORKER') {
         db.get(
           `SELECT * FROM worker_profiles WHERE user_id = ? OR id = ?`,
@@ -103,7 +131,7 @@ export const login = (req, res) => {
               return res.json({
                 message: 'Login successful.',
                 token,
-                user: { id: user.id, phone: user.phone, email: user.email, role: user.role, fullName: user.full_name }
+                user: formattedUser
               });
             }
 
@@ -148,16 +176,17 @@ export const login = (req, res) => {
                     dues: dues ? {
                       id: dues.id,
                       jobId: dues.job_id,
-                      amount: dues.commission_amount,
+                      commissionAmount: dues.commission_amount,
                       dueDate: dues.due_date,
-                      hoursLeft: Math.max(0, Math.ceil((new Date(dues.due_date) - new Date()) / (1000 * 60 * 60)))
+                      paymentQrUrl: dues.payment_qr_url,
+                      status: dues.status
                     } : null
                   };
 
-                  return res.json({
+                  res.json({
                     message: 'Login successful.',
                     token,
-                    user: { id: user.id, phone: user.phone, email: user.email, role: user.role, fullName: user.full_name },
+                    user: formattedUser,
                     workerProfile: workerObj
                   });
                 });
@@ -169,7 +198,7 @@ export const login = (req, res) => {
         res.json({
           message: 'Login successful.',
           token,
-          user: { id: user.id, phone: user.phone, email: user.email, role: user.role, fullName: user.full_name }
+          user: formattedUser
         });
       }
     }
