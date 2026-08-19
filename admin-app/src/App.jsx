@@ -331,23 +331,37 @@ export default function App() {
     }
   };
 
-  // Separate Clients & Workers Arrays
-  const clientAccounts = users.filter(u => u.role === 'CLIENT');
-  const workerAccounts = users.filter(u => u.role === 'WORKER');
+  // Separate Clients & Workers Arrays (Case-insensitive role check & sequential sorting)
+  const clientAccounts = users
+    .filter(u => u.role && u.role.toUpperCase() === 'CLIENT')
+    .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+
+  const workerAccounts = users
+    .filter(u => u.role && u.role.toUpperCase() === 'WORKER')
+    .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
 
   // Filtered Arrays based on Search Query
-  const filteredClients = clientAccounts.filter(c =>
-    c.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.phone?.includes(searchQuery)
-  );
+  const filteredClients = clientAccounts.filter(c => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (c.full_name && c.full_name.toLowerCase().includes(q)) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.includes(q)) ||
+      (c.id && c.id.toLowerCase().includes(q))
+    );
+  });
 
-  const filteredWorkers = workerAccounts.filter(w =>
-    w.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    w.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    w.phone?.includes(searchQuery) ||
-    w.trade_title?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredWorkers = workerAccounts.filter(w => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (w.full_name && w.full_name.toLowerCase().includes(q)) ||
+      (w.email && w.email.toLowerCase().includes(q)) ||
+      (w.phone && w.phone.includes(q)) ||
+      (w.trade_title && w.trade_title.toLowerCase().includes(q))
+    );
+  });
 
   // VIEW 1: MASTER ADMIN AUTHENTICATION (BLUE STREET CYAN THEME)
   if (!isAdminAuthenticated) {
