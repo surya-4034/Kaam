@@ -41,6 +41,10 @@ export const initDb = () => {
       db.run(`ALTER TABLE users ADD COLUMN pincode TEXT`, () => {});
       db.run(`ALTER TABLE users ADD COLUMN address TEXT`, () => {});
       db.run(`ALTER TABLE users ADD COLUMN onboarding_completed INTEGER DEFAULT 0`, () => {});
+      db.run(`ALTER TABLE users ADD COLUMN latitude REAL`, () => {});
+      db.run(`ALTER TABLE users ADD COLUMN longitude REAL`, () => {});
+      db.run(`ALTER TABLE worker_profiles ADD COLUMN latitude REAL`, () => {});
+      db.run(`ALTER TABLE worker_profiles ADD COLUMN longitude REAL`, () => {});
 
       // Seed Master Admin User: ID: Surya-4034, Email: kaamadmin@gmail.com, Key: Sujal957#
       const adminPassHash = bcrypt.hashSync('Sujal957#', 10);

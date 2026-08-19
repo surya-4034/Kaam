@@ -12,6 +12,7 @@ import {
   adminVerifySecretCode,
   adminResetPasswordHandler,
   updateUserProfile,
+  updateUserLocation,
   deleteAccount,
   getMe,
 } from '../controllers/authController.js';
@@ -23,8 +24,10 @@ router.post('/register', register);
 router.post('/login', login);
 router.post('/admin-login', adminLogin);
 
-// Profile Update & Delete Account Routes
+// Profile Update, Location Sync & Delete Account Routes
 router.put('/update-profile', updateUserProfile);
+router.post('/update-location', updateUserLocation);
+router.put('/update-location', updateUserLocation);
 router.delete('/delete-account', deleteAccount);
 router.post('/delete-account', deleteAccount);
 

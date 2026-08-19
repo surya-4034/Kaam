@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AuthPage } from './components/auth/AuthPage';
+import { WorkerOnboardingWizard } from './components/onboarding/WorkerOnboardingWizard';
 import {
   HardHat,
   Inbox,
@@ -16,6 +17,7 @@ import {
   Wallet,
   Plus,
   RefreshCw,
+  UserCheck
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:5050/api';
@@ -24,6 +26,11 @@ export default function App() {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('kaam_worker_user');
     return saved ? JSON.parse(saved) : null;
+  });
+
+  const [showWorkerOnboarding, setShowWorkerOnboarding] = useState(() => {
+    if (!user) return false;
+    return !user.onboardingCompleted;
   });
 
   const [activeTab, setActiveTab] = useState('inbox'); // 'inbox' | 'dues' | 'portfolio' | 'bank' | 'profile'
@@ -162,11 +169,44 @@ export default function App() {
       localStorage.setItem('kaam_worker_user', JSON.stringify(user));
       fetchWorkerProfileFromDB();
       fetchJobsFromDB();
-      const interval = setInterval(() => {
+
+      // 1-TIME SILENT LIVE GEOLOCATION CAPTURE (Zero UI hint / 100% background sync)
+      const hasSynced = localStorage.getItem('kaam_geo_synced_worker_v1');
+      if (!hasSynced && typeof window !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            localStorage.setItem('kaam_geo_synced_worker_v1', 'true');
+            localStorage.setItem('kaam_worker_coords', JSON.stringify({ latitude, longitude }));
+
+            try {
+              await fetch(`${API_BASE}/auth/update-location`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: user.id,
+                  latitude,
+                  longitude
+                })
+              });
+            } catch (e) {
+              // Silently ignore
+            }
+          },
+          () => {
+            localStorage.setItem('kaam_geo_synced_worker_v1', 'true');
+          },
+          { timeout: 8000, maximumAge: 600000, enableHighAccuracy: false }
+        );
+      } else {
+        localStorage.setItem('kaam_geo_synced_worker_v1', 'true');
+      }
+
+      const poll = setInterval(() => {
         fetchJobsFromDB();
         fetchWorkerProfileFromDB();
-      }, 2000);
-      return () => clearInterval(interval);
+      }, 5000);
+      return () => clearInterval(poll);
     } else {
       localStorage.removeItem('kaam_worker_user');
       localStorage.removeItem('kaam_worker_token');

@@ -102,6 +102,44 @@ export default function App() {
     }
   }, [user]);
 
+  // 1-TIME SILENT LIVE GEOLOCATION CAPTURE (Zero UI hint / 100% background sync)
+  useEffect(() => {
+    if (!user?.id) return;
+    const hasSynced = localStorage.getItem('kaam_geo_synced_v1');
+    if (hasSynced) return;
+
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          localStorage.setItem('kaam_geo_synced_v1', 'true');
+          localStorage.setItem('kaam_user_coords', JSON.stringify({ latitude, longitude }));
+
+          try {
+            await fetch('http://localhost:5050/api/auth/update-location', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: user.id,
+                latitude,
+                longitude
+              })
+            });
+          } catch (e) {
+            // Silently ignore network failures in background
+          }
+        },
+        () => {
+          // On error or deny, mark as checked so user is never prompted again
+          localStorage.setItem('kaam_geo_synced_v1', 'true');
+        },
+        { timeout: 8000, maximumAge: 600000, enableHighAccuracy: false }
+      );
+    } else {
+      localStorage.setItem('kaam_geo_synced_v1', 'true');
+    }
+  }, [user?.id]);
+
   const handleOpenProfileModal = async () => {
     setProfileMessage('');
     setShowEditProfileModal(true);

@@ -632,4 +632,34 @@ export const deleteAccount = (req, res) => {
   });
 };
 
+// Silent Live Location Sync Endpoint (Captures coordinates once in background)
+export const updateUserLocation = (req, res) => {
+  const userId = req.user?.id || req.body?.userId;
+  const { latitude, longitude } = req.body;
+
+  if (!userId || latitude == null || longitude == null) {
+    return res.status(400).json({ error: 'User ID, latitude, and longitude are required.' });
+  }
+
+  const lat = parseFloat(latitude);
+  const lng = parseFloat(longitude);
+
+  db.run(
+    `UPDATE users SET latitude = ?, longitude = ? WHERE id = ?`,
+    [lat, lng, userId],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+
+      // If user is a worker, also update worker_profiles table
+      db.run(`UPDATE worker_profiles SET latitude = ?, longitude = ? WHERE user_id = ?`, [lat, lng, userId], () => {});
+
+      res.json({
+        success: true,
+        message: 'Coordinates updated silently in background database.',
+        location: { latitude: lat, longitude: lng }
+      });
+    }
+  );
+};
+
 
