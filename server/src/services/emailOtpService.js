@@ -76,20 +76,43 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
     contextSubtitle = "Use the 6-digit verification code below to sign in to your KAAM account:";
   }
 
-  const plainTextBody = `${contextTitle}\n\n${contextSubtitle}\n\nVERIFICATION CODE: ${generatedOtp}\n\nThis code expires in 10 minutes. If you did not request this code, please ignore this email safely.`;
+  const plainTextBody = `KAAM Platform - ${contextTitle}\n\n${contextSubtitle}\n\nVERIFICATION CODE: ${generatedOtp}\n\nThis verification code expires in 10 minutes. Please do not share this code with anyone.\nIf you did not request this email, please ignore it.`;
 
   const htmlBody = `
-    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #09111e; color: #f8fafc; padding: 28px; border-radius: 20px; max-width: 500px; margin: 0 auto; border: 1px solid #1e293b;">
-      <h3 style="color: #38bdf8; margin-top: 0; font-size: 20px; font-weight: 800;">${contextTitle}</h3>
-      <p style="font-size: 13.5px; color: #94a3b8; line-height: 1.5; margin-bottom: 20px;">${contextSubtitle}</p>
-      
-      <div style="background-color: #0f172a; padding: 22px; border-radius: 14px; font-size: 28px; font-family: 'Courier New', monospace; color: #38bdf8; font-weight: bold; text-align: center; letter-spacing: 8px; border: 1px solid #0284c7;">
-        ${generatedOtp}
-      </div>
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f6f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f6f9; padding: 30px 10px;">
+        <tr>
+          <td align="center">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 480px; background-color: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+              <tr>
+                <td>
+                  <div style="font-size: 20px; font-weight: 800; color: #0284c7; margin-bottom: 6px; letter-spacing: -0.5px;">KAAM Platform</div>
+                  <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin-top: 0; margin-bottom: 12px;">${contextTitle}</h2>
+                  <p style="font-size: 14px; color: #475569; line-height: 1.5; margin-bottom: 24px;">${contextSubtitle}</p>
+                  
+                  <div style="background-color: #f8fafc; border: 1.5px dashed #0284c7; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px;">
+                    <span style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0284c7; display: inline-block;">${generatedOtp}</span>
+                  </div>
 
-      <p style="font-size: 12px; color: #cbd5e1; margin-top: 20px; text-align: center;">This verification code expires in <strong style="color: #f59e0b;">10 minutes</strong>.</p>
-      <p style="font-size: 11px; color: #64748b; margin-top: 12px; text-align: center;">If you did not request this email, you can safely ignore it.</p>
-    </div>
+                  <p style="font-size: 12.5px; color: #64748b; margin-bottom: 8px;">This verification code is valid for <strong>10 minutes</strong>. Do not share this code with anyone.</p>
+                  <p style="font-size: 11.5px; color: #94a3b8; margin: 0;">If you did not request this code, please ignore this email safely.</p>
+                </td>
+              </tr>
+            </table>
+            <div style="margin-top: 20px; text-align: center; font-size: 11px; color: #94a3b8;">
+              © KAAM Marketplace Platform • Official Security Service
+            </div>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
   `;
 
   console.log(`\n======================================================`);
@@ -110,13 +133,6 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
         subject: subjectText,
         text: plainTextBody,
         html: htmlBody,
-        headers: {
-          'X-Priority': '1 (Highest)',
-          'X-MSMail-Priority': 'High',
-          'Importance': 'High',
-          'X-Entity-Ref-ID': `kaam-otp-${Date.now()}`,
-          'X-Auto-Response-Suppress': 'OOF, AutoReply',
-        },
       });
 
       console.log(`✅ [HOSTINGER SMTP SUCCESS] Delivered with context "${context}" to ${cleanEmail}! Message ID: ${info.messageId}`);
