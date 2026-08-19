@@ -271,6 +271,11 @@ export default function App() {
     setUser(null);
   };
 
+  const handleProfileFormChange = (e) => {
+    setProfileForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    setProfileMessage('');
+  };
+
   const handleUpdateProfileSubmit = async (e) => {
     e.preventDefault();
     setIsUpdatingProfile(true);
