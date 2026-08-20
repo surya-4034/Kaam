@@ -912,12 +912,14 @@ export default function App() {
                           <span className="text-sm font-black text-slate-900 font-['Outfit']">₹{srv.price}</span>
                           <button
                             onClick={() => {
-                              setSelectedCategory(srv.category);
-                              window.scrollTo({ top: 550, behavior: 'smooth' });
+                              const matchingWorker = workerList.find(w => w.trade === srv.category) || workerList[0];
+                              setActiveWorkerStudio(matchingWorker);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
-                            className="px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 text-xs font-extrabold transition active:scale-95"
+                            className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 text-xs font-black transition active:scale-95 flex items-center gap-1 shadow-sm"
                           >
-                            Explore
+                            <span>View Packages</span>
+                            <ArrowRight className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
@@ -1011,26 +1013,20 @@ export default function App() {
                         {/* Bottom Pricing & Actions */}
                         <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                           <div>
-                            <span className="text-[10px] text-slate-400 uppercase block font-bold">Daily Wage</span>
+                            <span className="text-[10px] text-slate-400 uppercase block font-bold">Standard Rate</span>
                             <span className="text-lg font-black text-slate-900 font-['Outfit']">₹{w.dailyRate}<span className="text-xs text-slate-400 font-normal">/day</span></span>
                           </div>
 
-                          <div className="flex items-center gap-1.5">
+                          <div>
                             <button
                               onClick={() => {
                                 setActiveWorkerStudio(w);
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                               }}
-                              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-amber-100 hover:text-amber-900 text-slate-800 font-bold text-xs transition active:scale-95 flex items-center gap-1"
+                              className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:brightness-105 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all flex items-center gap-1.5"
                             >
                               <span>View Profile & Packages</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleHireWorkerClick(w)}
-                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:brightness-105 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 active:scale-95 transition"
-                            >
-                              Book Now ➔
+                              <ArrowRight className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
