@@ -938,13 +938,15 @@ export default function App() {
                           <span className="text-sm font-black text-slate-900 font-['Outfit']">₹{srv.price}</span>
                           <button
                             onClick={() => {
-                              const matchingWorker = workerList.find(w => w.trade === srv.category) || workerList[0];
-                              setActiveWorkerStudio(matchingWorker);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                              setSelectedCategory(srv.category);
+                              const targetSection = document.getElementById('verified-pros-section');
+                              if (targetSection) {
+                                targetSection.scrollIntoView({ behavior: 'smooth' });
+                              }
                             }}
-                            className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 text-xs font-black transition active:scale-95 flex items-center gap-1 shadow-sm"
+                            className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 text-xs font-bold transition active:scale-95 flex items-center gap-1 shadow-sm"
                           >
-                            <span>View Packages</span>
+                            <span>Explore Pros</span>
                             <ArrowRight className="w-3 h-3" />
                           </button>
                         </div>
@@ -955,7 +957,7 @@ export default function App() {
               </section>
 
               {/* SECTION 2: VERIFIED TRADESPERSON CARDS (PROFILES & BOOKING) */}
-              <section className="space-y-4 pt-4">
+              <section id="verified-pros-section" className="space-y-4 pt-4 scroll-mt-24">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
                   <div>
                     <h2 className="text-xl sm:text-2xl font-black text-slate-950 font-['Outfit'] tracking-tight flex items-center gap-2">
