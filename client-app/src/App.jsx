@@ -3,6 +3,7 @@ import { CATEGORIES, INITIAL_WORKERS, POPULAR_SERVICES, CUSTOMER_REVIEWS, TRADE_
 import { AuthPage } from './components/auth/AuthPage';
 import { ClientOnboardingWizard } from './components/onboarding/ClientOnboardingWizard';
 import { WorkerProfileDetail } from './components/profile/WorkerProfileDetail';
+import { CheckoutPage } from './components/checkout/CheckoutPage';
 import {
   Wrench,
   Droplets,
@@ -220,6 +221,7 @@ export default function App() {
 
   const [selectedWorkerProfile, setSelectedWorkerProfile] = useState(null);
   const [activeWorkerStudio, setActiveWorkerStudio] = useState(null);
+  const [activeCheckoutOrder, setActiveCheckoutOrder] = useState(null);
   const [bookingWorker, setBookingWorker] = useState(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -596,8 +598,11 @@ export default function App() {
             selectedCity={selectedCity}
             onBack={() => setActiveWorkerStudio(null)}
             onBookNow={(configuredWorker) => {
+              setActiveCheckoutOrder({
+                worker: configuredWorker,
+                cartItems: configuredWorker.selectedCartItems || []
+              });
               setActiveWorkerStudio(null);
-              handleHireWorkerClick(configuredWorker);
             }}
           />
         </div>
@@ -616,6 +621,27 @@ export default function App() {
           />
         )}
       </div>
+    );
+  }
+
+  // URBAN COMPANY CHECKOUT PAGE (EXACT IMAGE MATCH)
+  if (activeCheckoutOrder) {
+    return (
+      <CheckoutPage
+        worker={activeCheckoutOrder.worker}
+        user={user}
+        cartItems={activeCheckoutOrder.cartItems}
+        onBack={() => {
+          setActiveWorkerStudio(activeCheckoutOrder.worker);
+          setActiveCheckoutOrder(null);
+        }}
+        onRequireLogin={() => setShowAuthModal(true)}
+        onBookingComplete={() => {
+          setActiveCheckoutOrder(null);
+          setActiveTab('my-bookings');
+          fetchJobsFromAPI();
+        }}
+      />
     );
   }
 
