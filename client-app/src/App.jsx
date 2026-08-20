@@ -502,17 +502,25 @@ export default function App() {
     <div className="min-h-screen bg-gradient-to-br from-[#042522] via-[#083b36] to-[#031d1b] text-slate-100 selection:bg-amber-400 selection:text-teal-950 flex flex-col justify-between">
       
       <div>
-        {/* Header matching Diagram: Profile on Left, Search Worker in Center, Logout on Right */}
-        <header className="sticky top-0 z-40 bg-[#064e43]/95 backdrop-blur-md border-b border-[#0e7467] px-4 sm:px-8 py-3.5 shadow-2xl">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+        {/* Header matching Diagram & Replit Design */}
+        <header className="sticky top-0 z-40 bg-[#064e43]/95 backdrop-blur-xl border-b border-white/10 px-4 sm:px-8 py-3.5 shadow-2xl text-[#f4f4eb]">
+          <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row items-center justify-between gap-3.5">
             
-            {/* UPPER LEFT: LOGO & PROFILE BUTTON (DIAGRAM SPEC: Profile Button on Left) */}
+            {/* UPPER LEFT: LOGO & PROFILE & HELPDESK BADGE */}
             <div className="flex items-center justify-between w-full md:w-auto gap-3">
               <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-amber-400 to-yellow-300 flex items-center justify-center text-teal-950 font-black shadow-lg shadow-amber-500/30 shrink-0">
-                  <Wrench className="w-5 h-5 stroke-[2.5]" />
-                </div>
-                <span className="text-xl font-black text-white font-['Outfit'] tracking-tight">kaam</span>
+                <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-[#f4b942] text-[18px] font-black text-[#163d35] shadow-[0_5px_14px_rgba(244,185,66,.25)]">
+                  K
+                </span>
+                <span className="text-[21px] font-extrabold tracking-[-.05em] text-white font-['Outfit']">
+                  kaam <span className="font-semibold text-[#f4b942]">Client</span>
+                </span>
+              </div>
+
+              {/* HELPDESK CLIENT ID BADGE */}
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/15 bg-white/[.07] text-[11px] font-bold text-white/80 shadow-inner">
+                <span className="text-[#f4b942]">Client ID:</span>
+                <span className="font-mono text-[#f4b942] font-black">{user?.formattedClientId || '001'}</span>
               </div>
 
               {/* PROFILE BUTTON (UPPER LEFT AS IN DIAGRAM) */}
@@ -520,7 +528,7 @@ export default function App() {
                 type="button"
                 onClick={handleOpenProfileModal}
                 className="px-3.5 py-1.5 rounded-full bg-teal-500/20 hover:bg-teal-500/30 text-amber-300 border border-teal-500/40 text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                title="Click to view & update profile and Client ID"
+                title="Click to view & update profile"
               >
                 <User className="w-3.5 h-3.5 text-amber-400" />
                 <span className="max-w-[120px] truncate">{user?.fullName || user?.full_name || 'My Profile'}</span>
@@ -528,7 +536,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* CENTER TOP: PROMINENT WORKER SEARCH BAR (DIAGRAM SPEC: "Search Worker 🔍") */}
+            {/* CENTER TOP: PROMINENT WORKER SEARCH BAR (REPLIT & DIAGRAM SPEC) */}
             <div className="relative w-full md:max-w-md lg:max-w-xl">
               <Search className="w-4 h-4 text-teal-300 absolute left-4 top-3.5 pointer-events-none" />
               <input
@@ -555,19 +563,19 @@ export default function App() {
               <button
                 onClick={() => setActiveTab('browse')}
                 className={`text-xs font-bold px-3.5 py-2 rounded-xl transition-all ${
-                  activeTab === 'browse' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-300 hover:text-white'
+                  activeTab === 'browse' ? 'bg-[#f4b942] text-slate-950 font-black shadow-md' : 'text-slate-300 hover:text-white'
                 }`}
               >
-                Find Workers
+                Discover
               </button>
               
               <button
                 onClick={() => setActiveTab('my-bookings')}
                 className={`text-xs font-bold px-3.5 py-2 rounded-xl transition-all relative ${
-                  activeTab === 'my-bookings' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-300 hover:text-white'
+                  activeTab === 'my-bookings' ? 'bg-[#f4b942] text-slate-950 font-black shadow-md' : 'text-slate-300 hover:text-white'
                 }`}
               >
-                Requests ({jobs.length})
+                My Requests ({jobs.length})
               </button>
 
               <button
@@ -591,7 +599,7 @@ export default function App() {
         </header>
 
         {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        <main className="max-w-[1440px] mx-auto px-4 sm:px-7 py-6">
           {activeTab === 'my-bookings' ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between">

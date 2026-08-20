@@ -383,44 +383,45 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 selection:bg-amber-500 selection:text-slate-950 flex flex-col justify-between">
       <div>
-        {/* Navigation Header */}
-        <header className="sticky top-0 z-40 glass-panel border-b border-slate-800 px-6 py-4 shadow-2xl bg-slate-950/80 backdrop-blur-md">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-slate-950 font-black shadow-lg">
-                <HardHat className="w-5 h-5 stroke-[2.5]" />
-              </div>
-              <div>
-                <span className="text-2xl font-black text-white font-['Outfit'] tracking-tight">kaam Worker</span>
-                <span className="text-[10px] ml-2 bg-amber-500/10 text-amber-400 font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
-                  Port 5175 • SQLite Connected
-                </span>
-              </div>
+        {/* Navigation Header matching Replit Design */}
+        <header className="sticky top-0 z-40 border-b border-white/[.1] bg-[#17201f]/[.96] backdrop-blur-xl px-4 sm:px-7 py-3.5 shadow-2xl text-[#f1eee4]">
+          <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-4">
+            
+            {/* Logo */}
+            <div className="flex items-center gap-2.5">
+              <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-[#f2b63d] text-[18px] font-black text-[#172621] shadow-[0_5px_14px_rgba(242,182,61,.25)]">
+                K
+              </span>
+              <span className="text-[21px] font-extrabold tracking-[-.06em] text-[#f7f3e9] font-['Outfit']">
+                kaam <span className="font-semibold text-[#f2b63d]">Worker</span>
+              </span>
             </div>
 
+            {/* Online / Offline Status Toggle & Controls */}
             <div className="flex items-center gap-3">
-              <div className="text-right text-xs">
-                <span className="font-bold text-white block">{worker.name}</span>
-                <span className={worker.isAvailable ? 'text-emerald-400 font-semibold flex items-center gap-1 justify-end' : 'text-slate-400 font-semibold'}>
-                  <span className={`w-2 h-2 rounded-full ${worker.isAvailable ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
-                  {worker.isAvailable ? 'Online & Available' : 'Offline / Busy'}
-                </span>
+              <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-[#232e2c] px-3 py-2">
+                <div>
+                  <p className="text-[10px] font-extrabold text-[#f5bf53]">{worker.isAvailable ? "Online" : "Offline"}</p>
+                  <p className="hidden text-[10px] text-white/45 sm:block">{worker.isAvailable ? "Available for work" : "Not receiving requests"}</p>
+                </div>
+                <button
+                  aria-label="Toggle availability"
+                  onClick={handleToggleAvailability}
+                  className={`relative h-7 w-12 rounded-full p-1 transition ${worker.isAvailable ? "bg-[#e4a72e]" : "bg-[#53605f]"}`}
+                >
+                  <span className={`block h-5 w-5 rounded-full bg-[#fff7e4] shadow-sm transition-transform ${worker.isAvailable ? "translate-x-5" : "translate-x-0"}`} />
+                </button>
               </div>
 
-              <button
-                onClick={handleToggleAvailability}
-                title={worker.isAvailable ? 'Click to go Offline' : 'Click to go Online'}
-                className={`p-2.5 rounded-xl transition-all shadow-md active:scale-95 ${
-                  worker.isAvailable ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400' : 'bg-slate-800 text-slate-400 hover:text-white'
-                }`}
-              >
-                <Power className="w-4 h-4 stroke-[2.5]" />
-              </button>
+              <div className="hidden sm:flex items-center gap-2 rounded-xl border border-white/10 bg-[#232e2c] px-3 py-2">
+                <Briefcase className="h-4 w-4 text-[#f5bf53]" />
+                <span className="text-xs font-bold">Active Jobs <span className="text-[#f5bf53]">({jobs.filter(j => j.status === 'ACCEPTED' || j.status === 'IN_PROGRESS').length})</span></span>
+              </div>
 
               <button
                 onClick={handleLogout}
                 title="Sign Out"
-                className="p-2.5 rounded-xl bg-slate-900 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-800 transition-colors"
+                className="p-2 rounded-xl bg-slate-900/80 hover:bg-red-500/20 text-slate-300 hover:text-red-400 border border-slate-700 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -429,7 +430,7 @@ export default function App() {
         </header>
 
         {/* Main Content Area */}
-        <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+        <main className="max-w-[1440px] mx-auto px-4 sm:px-7 py-6 space-y-6">
           
           {/* Account Locked / Overdue Alert Banner */}
           {worker.isAccountLocked && (
