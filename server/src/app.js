@@ -5,6 +5,7 @@ import workerRoutes from './routes/workerRoutes.js';
 import jobRoutes from './routes/jobRoutes.js';
 import duesRoutes from './routes/duesRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import mapsRoutes from './routes/mapsRoutes.js';
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use('/api/workers', workerRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/dues', duesRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/maps', mapsRoutes);
 
 // Health Check
 app.get('/api/health', (req, res) => {

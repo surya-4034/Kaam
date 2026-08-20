@@ -18,6 +18,7 @@ import {
   LocateFixed,
   X
 } from 'lucide-react';
+import { AddressAndSlotWorkflow } from './AddressAndSlotWorkflow';
 
 export const CheckoutPage = ({
   worker,
@@ -824,135 +825,23 @@ export const CheckoutPage = ({
       )}
 
       {/* ======================================================== */}
-      {/* GOOGLE PLACES LOCATION SEARCH MODAL (EXACT SCREENSHOT)   */}
+      {/* 4-STEP ADDRESS & SLOT WORKFLOW (MATCHING VIDEO RECORDING) */}
       {/* ======================================================== */}
-      {isSearchingLocation && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-4 relative animate-in zoom-in-95">
-            
-            {/* Close Button */}
-            <button
-              onClick={() => {
-                setIsSearchingLocation(false);
-                setShowAddressModal(true);
-              }}
-              className="absolute -top-3 -right-3 sm:-top-4 sm:-right-4 w-9 h-9 rounded-full bg-white text-slate-700 hover:text-slate-950 shadow-xl border border-slate-200 grid place-items-center font-bold text-sm transition active:scale-95 z-10"
-            >
-              ✕
-            </button>
-
-            {/* Google Places Search Input Box (Matching screenshot) */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5 pointer-events-none" />
-              <input
-                type="text"
-                autoFocus
-                value={searchAddressQuery}
-                onChange={(e) => setSearchAddressQuery(e.target.value)}
-                placeholder="Search for area, street name..."
-                className="w-full pl-11 pr-10 py-3 rounded-2xl border border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:bg-white transition"
-              />
-              {searchAddressQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchAddressQuery('')}
-                  className="w-5 h-5 rounded-full bg-slate-300 hover:bg-slate-400 text-slate-700 grid place-items-center absolute right-3.5 top-3.5 text-[10px] font-bold"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            {/* Use Current Location Action */}
-            <button
-              type="button"
-              onClick={() => {
-                if (navigator.geolocation) {
-                  navigator.geolocation.getCurrentPosition(
-                    () => {
-                      const detected = {
-                        id: `addr-${Date.now()}`,
-                        label: 'Detected GPS Location',
-                        details: 'Goregaon East, Western Express Highway, Mumbai, Maharashtra, 400063',
-                        isDefault: true
-                      };
-                      setSavedAddresses(prev => [detected, ...prev]);
-                      setSelectedAddressId(detected.id);
-                      setAddress(detected.details);
-                      setIsSearchingLocation(false);
-                    },
-                    () => {
-                      const fallback = {
-                        id: `addr-${Date.now()}`,
-                        label: 'Current Location',
-                        details: 'Mumbai Central, Mumbai, Maharashtra, 400008, India',
-                        isDefault: true
-                      };
-                      setSavedAddresses(prev => [fallback, ...prev]);
-                      setSelectedAddressId(fallback.id);
-                      setAddress(fallback.details);
-                      setIsSearchingLocation(false);
-                    }
-                  );
-                }
-              }}
-              className="flex items-center gap-2.5 py-2 px-1 text-xs font-bold text-[#5932ea] hover:text-[#4927cb] transition active:scale-95"
-            >
-              <LocateFixed className="w-4 h-4 text-[#5932ea]" />
-              <span>Use current location</span>
-            </button>
-
-            {/* List of Autocomplete Suggestions (Exact Match) */}
-            <div className="space-y-1 max-h-72 overflow-y-auto divide-y divide-slate-100 pt-1">
-              {filteredLocationResults.map((item, index) => (
-                <div
-                  key={index}
-                  onClick={() => {
-                    const newLocation = {
-                      id: `addr-${Date.now()}`,
-                      label: item.title,
-                      details: item.fullAddress,
-                      isDefault: false
-                    };
-                    setSavedAddresses(prev => [newLocation, ...prev]);
-                    setSelectedAddressId(newLocation.id);
-                    setAddress(item.fullAddress);
-                    setIsSearchingLocation(false);
-                    setSearchAddressQuery('');
-                  }}
-                  className="flex items-start gap-3.5 py-3.5 px-2 rounded-2xl hover:bg-slate-50 cursor-pointer transition select-none group"
-                >
-                  <div className="pt-0.5 text-slate-400 group-hover:text-purple-600 transition">
-                    <MapPin className="w-4 h-4" />
-                  </div>
-                  <div className="space-y-0.5 flex-1">
-                    <h4 className="text-xs font-extrabold text-slate-900 leading-snug group-hover:text-purple-950">
-                      {item.title}
-                    </h4>
-                    <p className="text-[11px] text-slate-500 leading-tight">
-                      {item.subtitle}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Powered by Google Footer Badge (Matching screenshot) */}
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-center gap-1 text-[11px] text-slate-400">
-              <span>powered by</span>
-              <span className="font-bold text-slate-600 font-sans tracking-tight">
-                <span className="text-blue-500">G</span>
-                <span className="text-red-500">o</span>
-                <span className="text-yellow-500">o</span>
-                <span className="text-blue-500">g</span>
-                <span className="text-green-500">l</span>
-                <span className="text-red-500">e</span>
-              </span>
-            </div>
-
-          </div>
-        </div>
-      )}
+      <AddressAndSlotWorkflow
+        isOpen={isSearchingLocation}
+        onClose={() => setIsSearchingLocation(false)}
+        tradeTitle={worker.tradeTitle || 'Service'}
+        onComplete={(result) => {
+          setAddress(result.addressString);
+          setSelectedSlot(result.slot);
+          if (result.slotSurgeFee) {
+            setSelectedTip(prev => prev + result.slotSurgeFee);
+          }
+          setAddressSaved(true);
+          setIsSearchingLocation(false);
+          setShowAddressModal(false);
+        }}
+      />
 
     </div>
   );
