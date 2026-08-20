@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { CATEGORIES, INITIAL_WORKERS, POPULAR_SERVICES, CUSTOMER_REVIEWS } from './data/mockData';
+import { CATEGORIES, INITIAL_WORKERS, POPULAR_SERVICES, CUSTOMER_REVIEWS, TRADE_SERVICES } from './data/mockData';
 import { AuthPage } from './components/auth/AuthPage';
 import { ClientOnboardingWizard } from './components/onboarding/ClientOnboardingWizard';
+import { WorkerProfileDetail } from './components/profile/WorkerProfileDetail';
 import {
   Wrench,
   Droplets,
@@ -218,6 +219,7 @@ export default function App() {
   const [onlyVerified, setOnlyVerified] = useState(false);
 
   const [selectedWorkerProfile, setSelectedWorkerProfile] = useState(null);
+  const [activeWorkerStudio, setActiveWorkerStudio] = useState(null);
   const [bookingWorker, setBookingWorker] = useState(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -257,6 +259,7 @@ export default function App() {
     }));
   };
 
+  // Fetch live workers from SQLite database
   const fetchWorkersFromDB = async () => {
     try {
       const res = await fetch('http://localhost:5050/api/workers');
@@ -456,7 +459,7 @@ export default function App() {
       clientPhone: user?.phone || bookingForm.phone,
       locationAddress: bookingForm.address,
       workDescription: bookingForm.description,
-      agreedTotalFee: bookingWorker.dailyRate,
+      agreedTotalFee: bookingWorker.totalFee || bookingWorker.dailyRate,
       paymentMode: bookingForm.paymentMode,
     };
 
@@ -481,7 +484,7 @@ export default function App() {
           client_phone: user?.phone || bookingForm.phone,
           location_address: bookingForm.address,
           work_description: bookingForm.description,
-          agreed_total_fee: bookingWorker.dailyRate,
+          agreed_total_fee: bookingWorker.totalFee || bookingWorker.dailyRate,
           payment_mode: bookingForm.paymentMode,
           status: 'REQUESTED',
         };
@@ -501,11 +504,119 @@ export default function App() {
       return;
     }
     setBookingWorker(worker);
-  setBookingSuccess(false);
+    setBookingSuccess(false);
   };
 
   if (showOnboarding) {
     return <ClientOnboardingWizard user={user} onComplete={handleOnboardingComplete} />;
+  }
+
+  // URBAN COMPANY WORKER PROFILE & SERVICES DETAIL STUDIO PAGE (EXACT IMAGE)
+  if (activeWorkerStudio) {
+    return (
+      <div className="min-h-screen bg-[#fcfbf9] text-slate-900 flex flex-col justify-between font-['Plus_Jakarta_Sans',sans-serif]">
+        <div>
+          {/* Header */}
+          <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3.5 shadow-sm">
+            <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-4">
+              
+              <div className="flex items-center gap-6">
+                <div 
+                  onClick={() => setActiveWorkerStudio(null)}
+                  className="flex items-center gap-2.5 cursor-pointer"
+                >
+                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-tr from-amber-400 via-amber-500 to-yellow-400 text-[20px] font-black text-slate-950 shadow-md shadow-amber-500/20">
+                    K
+                  </span>
+                  <span className="text-2xl font-black text-slate-900 font-['Outfit'] tracking-tight">
+                    kaam
+                  </span>
+                </div>
+
+                <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700">
+                  <MapPin className="w-3.5 h-3.5 text-amber-600" />
+                  <span>{selectedCity}</span>
+                </div>
+              </div>
+
+              {/* Center search input */}
+              <div className="relative flex-1 max-w-lg hidden sm:block">
+                <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder={`Search services inside ${activeWorkerStudio.name}'s packages...`}
+                  className="w-full pl-11 pr-4 py-2.5 rounded-full bg-slate-100/90 border border-slate-200 text-slate-800 placeholder-slate-400 text-xs focus:outline-none focus:border-amber-500 focus:bg-white transition"
+                />
+              </div>
+
+              {/* Right User or Login */}
+              <div className="flex items-center gap-3">
+                {user ? (
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleOpenProfileModal}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-100/80 border border-amber-200 text-slate-900 text-xs font-bold shadow-sm"
+                    >
+                      <span className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] grid place-items-center">
+                        {(user.fullName || 'U').charAt(0)}
+                      </span>
+                      <span className="max-w-[100px] truncate">{user.fullName || 'My Account'}</span>
+                      <span className="text-[10px] text-amber-800 font-mono font-bold bg-amber-200 px-1.5 py-0.5 rounded">
+                        ID: {user.formattedClientId || '001'}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={handleLogout}
+                      title="Sign Out"
+                      className="p-2 rounded-xl text-slate-500 hover:text-red-600 hover:bg-red-50 transition"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowAuthModal(true)}
+                    className="px-5 py-2.5 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-black shadow-md shadow-slate-900/10 flex items-center gap-2 active:scale-95 transition-all"
+                  >
+                    <User className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Login / Sign Up</span>
+                  </button>
+                )}
+              </div>
+
+            </div>
+          </header>
+
+          {/* STUDIO DETAIL VIEW */}
+          <WorkerProfileDetail
+            worker={activeWorkerStudio}
+            selectedCity={selectedCity}
+            onBack={() => setActiveWorkerStudio(null)}
+            onBookNow={(configuredWorker) => {
+              setActiveWorkerStudio(null);
+              handleHireWorkerClick(configuredWorker);
+            }}
+          />
+        </div>
+
+        {/* Studio Footer */}
+        <footer className="bg-slate-950 text-slate-400 border-t border-slate-800 py-6 text-center text-xs">
+          © 2026 KAAM Platform • Urban Company Studio Standard
+        </footer>
+
+        {/* Auth Modal if triggered in studio */}
+        {showAuthModal && (
+          <AuthPage
+            onLoginSuccess={handleLoginSuccess}
+            isWorkerApp={false}
+            onClose={() => setShowAuthModal(false)}
+          />
+        )}
+      </div>
+    );
   }
 
   return (
@@ -906,10 +1017,13 @@ export default function App() {
 
                           <div className="flex items-center gap-1.5">
                             <button
-                              onClick={() => setSelectedWorkerProfile(w)}
-                              className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition active:scale-95"
+                              onClick={() => {
+                                setActiveWorkerStudio(w);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-amber-100 hover:text-amber-900 text-slate-800 font-bold text-xs transition active:scale-95 flex items-center gap-1"
                             >
-                              Profile
+                              <span>View Profile & Packages</span>
                             </button>
 
                             <button
