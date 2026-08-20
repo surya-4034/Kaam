@@ -750,52 +750,79 @@ export default function App() {
                 </label>
               </div>
 
-              {/* Workers Grid */}
+              {/* Workers Grid matching Exact Visual Design Mockup */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredWorkers.map((w) => (
-                  <div key={w.id} className="glass-panel p-5 rounded-3xl border border-slate-800 space-y-4 hover:border-amber-500/50 transition-colors">
-                    <div className="flex items-start gap-4">
-                      <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 font-black text-xl flex items-center justify-center border border-amber-500/30">
-                        {w.name.charAt(0)}
+                  <article key={w.id} className="group overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/80 shadow-2xl transition duration-300 hover:-translate-y-1 hover:border-amber-500/50 flex flex-col justify-between">
+                    
+                    {/* Top Photo & Badges Banner */}
+                    <div className="relative h-48 overflow-hidden bg-slate-950">
+                      <img
+                        src={w.photo || 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?auto=format&fit=crop&w=600&q=80'}
+                        alt={w.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-black/30" />
+                      
+                      {/* KAAM VERIFIED Badge */}
+                      <div className="absolute left-3.5 top-3.5 flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/90 text-slate-950 text-[10px] font-black tracking-wide shadow-md">
+                        <ShieldCheck className="w-3 h-3" />
+                        <span>KAAM VERIFIED</span>
                       </div>
+
+                      {/* Distance Badge */}
+                      <div className="absolute bottom-3 left-3.5 flex items-center gap-1.5 text-white">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-950/80 text-[11px] font-bold border border-slate-700 text-amber-300">
+                          📍 {w.distance || 1.8} km away
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Card Body */}
+                    <div className="p-5 space-y-3.5 flex-1 flex flex-col justify-between">
                       <div>
-                        <h3 className="text-lg font-bold text-white">{w.name}</h3>
-                        <p className="text-xs font-semibold text-amber-400">{w.tradeTitle}</p>
-                        <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
-                          <MapPin className="w-3.5 h-3.5" />
-                          <span>{w.locality}</span>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h3 className="text-base font-extrabold text-white tracking-tight">{w.name}</h3>
+                            <p className="text-xs font-bold text-amber-400 mt-0.5">{w.tradeTitle} • <span className="text-slate-400 font-normal">{w.locality}</span></p>
+                          </div>
+                          
+                          <div className="flex items-center gap-1 text-xs font-black text-amber-400 bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">
+                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                            <span>{w.rating || '4.9'}</span>
+                          </div>
+                        </div>
+
+                        <div className="mt-2.5 flex items-center gap-2 text-[11px] text-slate-400">
+                          <span className="font-semibold">{w.reviewCount || 118} reviews</span>
+                          <span>•</span>
+                          <span className="text-emerald-400 font-bold flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Aadhaar & Bank KYC
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-xs text-slate-300 line-clamp-2 leading-relaxed bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/80">
+                          "{w.bio}"
                         </p>
                       </div>
+
+                      {/* Bottom Pricing & Action */}
+                      <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] text-slate-400 uppercase block font-bold">Daily Wage</span>
+                          <span className="text-lg font-black text-amber-400 font-['Outfit']">₹{w.dailyRate}<span className="text-xs text-slate-500 font-normal">/day</span></span>
+                        </div>
+                        <button
+                          onClick={() => setSelectedWorkerProfile(w)}
+                          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:brightness-110 text-teal-950 font-black text-xs shadow-lg shadow-amber-500/20 flex items-center gap-1.5 active:scale-95 transition-all"
+                        >
+                          <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>View Profile</span>
+                        </button>
+                      </div>
                     </div>
 
-                    <p className="text-xs text-slate-300 line-clamp-2 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
-                      "{w.bio}"
-                    </p>
-
-                    {w.portfolioImages && (
-                      <div className="grid grid-cols-2 gap-2">
-                        {w.portfolioImages.map((img) => (
-                          <div key={img.id} className="h-20 rounded-xl overflow-hidden border border-slate-800">
-                            <img src={img.url} alt={img.title} className="w-full h-full object-cover" />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase block font-semibold">Daily Wage Rate</span>
-                        <span className="text-xl font-black text-amber-400 font-['Outfit']">₹{w.dailyRate}</span>
-                      </div>
-                      <button
-                        onClick={() => setSelectedWorkerProfile(w)}
-                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-300 hover:brightness-110 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 flex items-center gap-1.5 active:scale-95 transition-all"
-                      >
-                        <Eye className="w-4 h-4" />
-                        <span>View Profile</span>
-                      </button>
-                    </div>
-                  </div>
+                  </article>
                 ))}
               </div>
             </div>

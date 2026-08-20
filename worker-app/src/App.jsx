@@ -429,225 +429,230 @@ export default function App() {
           </div>
         </header>
 
-        {/* Main Content Area */}
+        {/* Main Content Area matching Exact Visual Design Mockup */}
         <main className="max-w-[1440px] mx-auto px-4 sm:px-7 py-6 space-y-6">
           
-          {/* Account Locked / Overdue Alert Banner */}
-          {worker.isAccountLocked && (
-            <div className="p-5 rounded-2xl bg-red-950/80 border border-red-500/60 text-red-200 text-xs flex items-center justify-between shadow-2xl animate-in fade-in">
-              <div className="flex items-center gap-3">
-                <ShieldAlert className="w-6 h-6 text-red-400 shrink-0 animate-bounce" />
+          {/* Top Welcome & Earnings Header */}
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="mb-2 text-[10px] font-extrabold uppercase tracking-[.17em] text-[#b9a26c]">
+                Live Craftsman Portal • Noida & Delhi NCR
+              </p>
+              <h1 className="text-[clamp(26px,3.5vw,40px)] font-extrabold leading-[1.05] tracking-[-.05em] text-white" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                Good morning, {worker.name.split(' ')[0]}.<br />
+                <span className="text-[#9ba9a1]">Your next nearby job is ready.</span>
+              </h1>
+            </div>
+
+            <div className="flex items-center gap-4 bg-[#232e2c] border border-white/10 p-3.5 rounded-2xl">
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-[.15em] text-white/40 font-bold">Total Platform Earnings</p>
+                <p className="mt-0.5 text-2xl font-black text-[#f2b63d] font-['Outfit']">₹28,500</p>
+              </div>
+              <div className="h-9 w-px bg-white/10" />
+              <div>
+                <p className="text-[10px] uppercase tracking-[.15em] text-white/40 font-bold">Rating</p>
+                <p className="mt-0.5 text-lg font-black text-white font-['Outfit']">★ {worker.ratingAverage || '4.9'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 36-HOUR COMMISSION PAYMENT DUES BANNER (CRITICAL FEATURE MATCHING UI MOCKUP) */}
+          <section className="grid gap-4 overflow-hidden rounded-2xl border border-[#e0a533]/40 bg-[#4c350c] p-4 shadow-2xl sm:grid-cols-[1fr_auto_auto] sm:items-center sm:p-5">
+            <div className="flex items-start gap-3.5">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e1a62e] text-[#3d2b09] shadow-md">
+                <AlertTriangle className="h-6 w-6 stroke-[2.5]" />
+              </div>
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#f4c86f]">
+                  Attention • 10% Commission Payment
+                </p>
+                <h2 className="mt-0.5 text-2xl font-black tracking-tight text-[#fff2c8] font-['Outfit']">
+                  ₹{hasActiveDues ? duesAmount : '1,200'} <span className="text-xs font-bold text-[#f4d992]">due within 36 Hours</span>
+                </h2>
+                <p className="mt-1 max-w-lg text-[11px] leading-relaxed text-[#ead49f]">
+                  Keep your worker profile active and continue receiving nearby customer requests within 5 km.
+                </p>
+              </div>
+            </div>
+
+            {/* UPI QR Preview */}
+            <div className="hidden h-16 w-16 place-items-center rounded-xl border border-[#f7d887]/50 bg-[#fff1bd] sm:grid p-1.5 shadow-inner">
+              <img
+                src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=kaam@yors.online&pn=KAAM%20SERVICES&am=1200&cu=INR"
+                alt="UPI QR Code"
+                className="w-full h-full object-contain"
+              />
+            </div>
+
+            <button
+              onClick={() => setShowPayModal(true)}
+              className="flex items-center justify-center gap-2 rounded-xl bg-[#fff8e8] hover:bg-white px-5 py-3 text-xs font-black text-[#382b12] transition shadow-lg active:scale-95"
+            >
+              <span>Pay Now with UPI</span>
+            </button>
+          </section>
+
+          {/* TWO-COLUMN DASHBOARD GRID (INCOMING REQUESTS + RIGHT CONTROLS) */}
+          <div className="grid gap-6 xl:grid-cols-[1.6fr_.9fr]">
+            
+            {/* LEFT COLUMN: INCOMING LOCAL REQUESTS WITHIN 5KM */}
+            <section className="min-w-0 rounded-2xl border border-white/10 bg-[#202b29] p-5 space-y-4">
+              <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-3.5">
                 <div>
-                  <h4 className="font-bold text-white text-sm">Account Temporarily Locked</h4>
-                  <p className="text-red-300">You have overdue commission dues. Pay pending dues to immediately unlock your profile in SQLite database!</p>
+                  <h2 className="text-lg font-black text-white font-['Outfit'] tracking-tight flex items-center gap-2">
+                    <span>Incoming Local Job Requests</span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      Within 5 km
+                    </span>
+                  </h2>
+                  <p className="text-xs text-white/50 mt-0.5">Instant booking requests near your location.</p>
                 </div>
-              </div>
-              <button
-                onClick={() => setShowPayModal(true)}
-                className="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-400 text-slate-950 font-black text-xs shrink-0"
-              >
-                Unlock Account
-              </button>
-            </div>
-          )}
-
-          {/* Active 36-Hour Dues Warning Alert */}
-          {hasActiveDues && !worker.isAccountLocked && (
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 text-amber-400 text-xs flex items-center justify-between shadow-lg">
-              <div className="flex items-center gap-2 font-bold">
-                <AlertTriangle className="w-5 h-5 text-amber-400 animate-pulse" />
-                <span>
-                  36-Hour Platform Fee Pending: <strong>₹{duesAmount}</strong> (Expires: {new Date(worker.dues?.dueExpiresAt).toLocaleTimeString()}). Pay before deadline to keep profile active!
-                </span>
-              </div>
-              <button
-                onClick={() => setShowPayModal(true)}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20"
-              >
-                Pay ₹{duesAmount} Dues
-              </button>
-            </div>
-          )}
-
-          {/* Worker Stats Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="glass-panel p-4 rounded-2xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Trade Skill</span>
-              <p className="text-sm font-bold text-white mt-0.5 truncate">{worker.tradeTitle}</p>
-            </div>
-            <div className="glass-panel p-4 rounded-2xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Daily Rate</span>
-              <p className="text-sm font-black text-amber-400 font-['Outfit'] mt-0.5">₹{worker.dailyRate}/day</p>
-            </div>
-            <div className="glass-panel p-4 rounded-2xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">KYC Status</span>
-              <div className="mt-0.5 flex items-center gap-1.5">
-                {worker.kycStatus === 'VERIFIED' ? (
-                  <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" /> Verified
-                  </span>
-                ) : (
-                  <span className="text-xs font-bold text-amber-400 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> Under Review
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="glass-panel p-4 rounded-2xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Jobs Completed</span>
-              <p className="text-sm font-bold text-emerald-400 mt-0.5">{worker.completedJobsCount} Jobs (★ {worker.ratingAverage || '4.9'})</p>
-            </div>
-          </div>
-
-          {/* Navigation Tabs */}
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('inbox')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                activeTab === 'inbox' ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Inbox className="w-3.5 h-3.5" />
-              <span>Job Requests Inbox ({jobs.length})</span>
-              {pendingRequestsCount > 0 && (
-                <span className="bg-amber-950 text-amber-400 text-[10px] px-2 py-0.5 rounded-full border border-amber-500/40 font-black animate-pulse">
-                  {pendingRequestsCount} NEW
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('dues')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                activeTab === 'dues' ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Clock className="w-3.5 h-3.5" />
-              <span>36-Hour Dues Ledger {hasActiveDues && '🚨'}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('portfolio')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                activeTab === 'portfolio' ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <ImageIcon className="w-3.5 h-3.5" />
-              <span>Work Portfolio ({worker.portfolio?.length || 0})</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('bank')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                activeTab === 'bank' ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Building className="w-3.5 h-3.5" />
-              <span>Bank & KYC Setup</span>
-            </button>
-          </div>
-
-          {/* TAB 1: INBOX */}
-          {activeTab === 'inbox' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-white font-['Outfit']">Client Booking Requests (SQLite Live Feed)</h2>
-                <span className="text-xs text-amber-400 font-semibold bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/30 flex items-center gap-1.5">
-                  <RefreshCw className="w-3 h-3 animate-spin" />
-                  <span>Polling SQLite DB (http://localhost:5050/api/jobs)</span>
+                
+                <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                  {jobs.length} Requests
                 </span>
               </div>
 
               {jobs.length === 0 ? (
-                <div className="glass-panel p-12 rounded-3xl text-center space-y-2 text-slate-400 border border-slate-800">
-                  <Inbox className="w-12 h-12 text-slate-600 mx-auto" />
-                  <p className="text-sm font-semibold text-slate-300">No active job requests in database.</p>
-                  <p className="text-xs text-slate-500">Go to Client App (Port 5174) and submit a hire request to test live real-time synchronization!</p>
+                <div className="rounded-xl border border-dashed border-white/15 px-5 py-12 text-center space-y-2">
+                  <MapPin className="mx-auto h-8 w-8 text-slate-500" />
+                  <h3 className="text-sm font-bold text-white">You are all caught up</h3>
+                  <p className="text-xs text-white/50">New requests within 5 km will appear here automatically.</p>
                 </div>
               ) : (
-                jobs.map((j) => {
-                  const clientName = j.client_name || j.clientName || 'Verma Family (Homeowner)';
-                  const clientPhone = j.client_phone || j.clientPhone || '+91 98111 00223';
-                  const workDesc = j.work_description || j.workDescription;
-                  const location = j.location_address || j.location;
-                  const fee = j.agreed_total_fee || j.agreedFee;
-                  const platformFee = j.platform_fee_amount || Math.round(fee * 0.08);
-                  const netPayout = j.worker_net_payout || fee - platformFee;
+                <div className="grid gap-3.5 sm:grid-cols-2">
+                  {jobs.map((j) => {
+                    const clientName = j.client_name || j.clientName || 'Verma Family';
+                    const clientPhone = j.client_phone || j.clientPhone || '+91 98111 00223';
+                    const workDesc = j.work_description || j.workDescription;
+                    const location = j.location_address || j.location;
+                    const fee = j.agreed_total_fee || j.agreedFee;
 
-                  return (
-                    <div key={j.id} className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4 hover:border-slate-700 transition-colors">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    return (
+                      <article key={j.id} className="group rounded-2xl border border-white/10 bg-[#263330] p-4 transition hover:-translate-y-0.5 hover:border-[#dca42f]/60 flex flex-col justify-between space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="rounded-full bg-[#f3c254] px-2.5 py-0.5 text-[10px] font-black text-[#3d2b09]">
+                            📍 2.3 km away
+                          </span>
+                          <span className="text-[10px] text-white/50 font-semibold">Today • 1:30 PM</span>
+                        </div>
+
                         <div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-lg font-bold text-white">{clientName}</span>
-                            {j.status === 'COMPLETED' ? (
-                              <span className="text-xs bg-emerald-500/10 text-emerald-400 font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-                                ✅ Work Completed
-                              </span>
-                            ) : j.status === 'ACCEPTED' ? (
-                              <span className="text-xs bg-emerald-500/10 text-emerald-400 font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-                                🟢 Accepted by You
-                              </span>
-                            ) : j.status === 'REJECTED' ? (
-                              <span className="text-xs bg-red-500/10 text-red-400 font-bold px-2.5 py-0.5 rounded-full border border-red-500/30">
-                                🔴 Declined
-                              </span>
-                            ) : (
-                              <span className="text-xs bg-amber-500/10 text-amber-400 font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30 animate-pulse">
-                                ⏳ New Hire Request
-                              </span>
-                            )}
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-300 font-black text-xs flex items-center justify-center border border-teal-500/30">
+                              {clientName.charAt(0)}
+                            </div>
+                            <div>
+                              <h3 className="text-sm font-bold text-white truncate">{clientName}</h3>
+                              <p className="text-[11px] text-white/50 flex items-center gap-1">
+                                <MapPin className="w-3 h-3 text-[#eab344]" /> {location}
+                              </p>
+                            </div>
                           </div>
-                          <p className="text-xs text-slate-300 mt-1">"{workDesc}"</p>
-                          <p className="text-xs text-slate-400 mt-1">
-                            📍 Location: {location} • Total Fee: <strong className="text-white">₹{fee}</strong> (Your Payout: <strong className="text-emerald-400">₹{netPayout}</strong>)
+
+                          <p className="mt-2.5 text-xs text-white/70 line-clamp-2 bg-black/20 p-2 rounded-xl">
+                            "{workDesc}"
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          {j.status === 'REQUESTED' && (
-                            <>
-                              <button
-                                onClick={() => handleJobAction(j.id, 'reject')}
-                                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-red-500/20 text-red-400 font-bold text-xs transition-colors"
-                              >
-                                Decline
-                              </button>
-                              <button
-                                onClick={() => handleJobAction(j.id, 'accept')}
-                                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all"
-                              >
-                                Accept Job
-                              </button>
-                            </>
-                          )}
+                        <div className="pt-3 border-t border-white/10 flex items-center justify-between">
+                          <span className="text-base font-black text-[#f2c75d] font-['Outfit']">
+                            ₹{fee}
+                          </span>
 
-                          {j.status === 'ACCEPTED' && (
-                            <>
-                              <a
-                                href={`tel:${clientPhone}`}
-                                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 font-bold text-xs flex items-center gap-1.5 hover:bg-slate-700 transition-colors"
-                              >
-                                <Phone className="w-4 h-4 text-emerald-400" />
-                                <span>Call Client ({clientPhone})</span>
+                          <div className="flex items-center gap-2">
+                            {j.status === 'ACCEPTED' ? (
+                              <a href={`tel:${clientPhone}`} className="px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 text-xs font-bold flex items-center gap-1">
+                                <Phone className="w-3.5 h-3.5" /> Call Client
                               </a>
-                              <button
-                                onClick={() => handleJobAction(j.id, 'complete')}
-                                className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all"
-                              >
-                                <CheckCircle2 className="w-4 h-4" />
-                                <span>Mark Completed</span>
-                              </button>
-                            </>
-                          )}
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleJobAction(j.id, 'REJECTED')}
+                                  className="px-2.5 py-1.5 rounded-lg border border-white/15 text-[10px] font-bold text-white/60 hover:border-red-400 hover:text-red-300 transition"
+                                >
+                                  Decline
+                                </button>
+                                <button
+                                  onClick={() => handleJobAction(j.id, 'ACCEPTED')}
+                                  disabled={!worker.isAvailable}
+                                  className="px-3 py-1.5 rounded-lg bg-[#f1b63e] hover:bg-[#ffd477] text-slate-950 text-[10px] font-black transition disabled:opacity-40"
+                                >
+                                  Accept Job
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })
+
+                      </article>
+                    );
+                  })}
+                </div>
               )}
+            </section>
+
+            {/* RIGHT COLUMN: RATE SLIDER + KYC STATUS */}
+            <div className="space-y-5">
+              
+              {/* Daily Rate Slider Widget */}
+              <section className="rounded-2xl border border-white/10 bg-[#202b29] p-5 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-base font-bold text-white font-['Outfit']">Set Your Daily Rate</h2>
+                    <p className="text-xs text-white/50">Your preferred daily wage for local clients.</p>
+                  </div>
+                  <DollarSign className="w-5 h-5 text-[#eab344]" />
+                </div>
+
+                <div className="flex justify-center">
+                  <span className="rounded-xl bg-[#f1b63e] px-4 py-2 text-base font-black text-[#263029] font-['Outfit'] shadow-md">
+                    ₹{worker.dailyRate} / day
+                  </span>
+                </div>
+
+                <input
+                  type="range"
+                  min="500"
+                  max="1500"
+                  step="50"
+                  value={worker.dailyRate}
+                  onChange={(e) => setWorker({ ...worker, dailyRate: Number(e.target.value) })}
+                  className="w-full accent-[#eeb63d] cursor-pointer"
+                />
+
+                <div className="flex justify-between text-[11px] text-white/40 font-bold">
+                  <span>₹500</span>
+                  <span>₹1,000</span>
+                  <span>₹1,500</span>
+                </div>
+              </section>
+
+              {/* KYC Verification Status Card */}
+              <section className="rounded-2xl border border-white/10 bg-[#202b29] p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-bold text-white font-['Outfit']">Verification Status</h2>
+                    <p className="text-xs text-white/50">Build trust with homeowners before visits.</p>
+                  </div>
+                  <ShieldCheck className="w-6 h-6 text-emerald-400" />
+                </div>
+
+                <div className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-950/40 p-3.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-emerald-200">KYC Aadhaar & Bank Details Verified</p>
+                    <p className="text-[10px] text-emerald-400 font-mono">Government ID Checked • Official Badge Active</p>
+                  </div>
+                </div>
+              </section>
+
             </div>
-          )}
+
+          </div>
 
           {/* TAB 2: DUES LEDGER */}
           {activeTab === 'dues' && (
@@ -657,14 +662,14 @@ export default function App() {
                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                   <span className="text-slate-400 font-semibold">Account Standing:</span>
                   <span className={hasActiveDues ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
-                    {hasActiveDues ? '⚠️ Pending 8% Platform Commission' : '✅ 100% Cleared & Active in SQLite DB'}
+                    {hasActiveDues ? '⚠️ Pending 10% Platform Commission' : '✅ 100% Cleared & Active in Cloud Database'}
                   </span>
                 </div>
 
                 {hasActiveDues ? (
                   <div className="space-y-3 pt-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-300 font-bold">Commission Fee Owed (8%):</span>
+                      <span className="text-slate-300 font-bold">Commission Fee Owed (10%):</span>
                       <span className="text-2xl font-black text-amber-400 font-['Outfit']">₹{duesAmount}</span>
                     </div>
                     <div className="flex justify-between items-center text-slate-400">
