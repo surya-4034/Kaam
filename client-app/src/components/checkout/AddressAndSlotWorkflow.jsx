@@ -365,12 +365,23 @@ export const AddressAndSlotWorkflow = ({
           </button>
 
           {/* LEFT PANE: INTERACTIVE MAP CANVAS (EXACT SCREENSHOT) */}
-          <div className="md:col-span-6 bg-slate-100 relative min-h-[320px] md:min-h-[540px] flex items-center justify-center overflow-hidden select-none border-b md:border-b-0 md:border-r border-slate-200">
+          <div 
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const xPercent = (e.clientX - rect.left) / rect.width;
+              const yPercent = (e.clientY - rect.top) / rect.height;
+              // Subtle dynamic coordinate shift based on user tap
+              const newLat = selectedLocation.lat + (yPercent - 0.5) * 0.005;
+              const newLng = selectedLocation.lng + (xPercent - 0.5) * 0.005;
+              setPinCoords({ lat: newLat, lng: newLng });
+            }}
+            className="md:col-span-6 bg-slate-100 relative min-h-[320px] md:min-h-[540px] flex items-center justify-center overflow-hidden select-none border-b md:border-b-0 md:border-r border-slate-200 cursor-crosshair group"
+          >
             
             {/* Styled Realistic Google Map Background Image / Layer */}
             <div className="absolute inset-0 bg-[#e5e3df] opacity-95">
               <div 
-                className="w-full h-full bg-cover bg-center"
+                className="w-full h-full bg-cover bg-center transition-all duration-300 transform scale-105"
                 style={{
                   backgroundImage: `url('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=1200&q=80')`,
                   filter: 'contrast(1.05) saturate(0.9)'
@@ -400,7 +411,10 @@ export const AddressAndSlotWorkflow = ({
 
             {/* Target GPS recenter button at bottom-right */}
             <button
-              onClick={handleUseCurrentLocation}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleUseCurrentLocation();
+              }}
               title="Locate Me"
               className="absolute bottom-4 right-4 z-20 w-10 h-10 rounded-full bg-white text-slate-800 shadow-xl border border-slate-200 grid place-items-center hover:bg-slate-50 active:scale-95 transition"
             >
