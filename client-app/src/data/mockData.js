@@ -136,3 +136,108 @@ export const INITIAL_WORKERS = [
     ]
   }
 ];
+
+export const POPULAR_SERVICES = [
+  {
+    id: 'srv-1',
+    title: 'Tap & Mixer Repair / Leakage',
+    category: 'plumber',
+    categoryName: 'Plumbing',
+    price: 199,
+    timeEst: '30 mins',
+    rating: 4.85,
+    reviews: '28k+',
+    image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=600&q=80',
+    description: 'Diagnosis & complete fix for leaking taps, valves, or flush tanks.'
+  },
+  {
+    id: 'srv-2',
+    title: 'Switchboard & Socket Installation',
+    category: 'electrician',
+    categoryName: 'Electrical',
+    price: 149,
+    timeEst: '25 mins',
+    rating: 4.9,
+    reviews: '34k+',
+    image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=600&q=80',
+    description: 'Safe replacement of 6A/16A switches, MCBs, or heavy appliance sockets.'
+  },
+  {
+    id: 'srv-3',
+    title: 'Wooden Door Lock & Handle Fitting',
+    category: 'carpenter',
+    categoryName: 'Carpentry',
+    price: 299,
+    timeEst: '45 mins',
+    rating: 4.78,
+    reviews: '14k+',
+    image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80',
+    description: 'Installation of mortise locks, handles, or wooden cupboard repairs.'
+  },
+  {
+    id: 'srv-4',
+    title: 'Wall Putty & 1-Wall Texture Paint',
+    category: 'painter',
+    categoryName: 'Painting',
+    price: 899,
+    timeEst: '3 hrs',
+    rating: 4.92,
+    reviews: '19k+',
+    image: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&w=600&q=80',
+    description: 'Premium acrylic paint coat with zero mess and spotless edge finishes.'
+  },
+  {
+    id: 'srv-5',
+    title: 'Deep Home & Bathroom Sanitation',
+    category: 'cleaner',
+    categoryName: 'Cleaning',
+    price: 499,
+    timeEst: '1.5 hrs',
+    rating: 4.88,
+    reviews: '41k+',
+    image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=600&q=80',
+    description: 'Tile descaling, stain removal, and mechanized floor scrubbing.'
+  },
+  {
+    id: 'srv-6',
+    title: 'Tile Grouting & Broken Tile Fix',
+    category: 'mason',
+    categoryName: 'Masonry',
+    price: 349,
+    timeEst: '1 hr',
+    rating: 4.75,
+    reviews: '9k+',
+    image: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=600&q=80',
+    description: 'Epoxy grouting and precision leveling for kitchen and bathroom tiles.'
+  }
+];
+
+export const CUSTOMER_REVIEWS = [
+  {
+    id: 'rev-1',
+    clientName: 'Priya Sharma',
+    city: 'Mumbai',
+    tradeUsed: 'Plumbing Service',
+    rating: 5,
+    comment: 'Harish was at my home within 25 minutes. Repaired the bathroom mixer faucet with zero extra hassle. Very clean work!',
+    date: 'Yesterday'
+  },
+  {
+    id: 'rev-2',
+    clientName: 'Ankit Mehta',
+    city: 'Delhi NCR',
+    tradeUsed: 'Electrician Service',
+    rating: 5,
+    comment: 'Booked Aamir for short circuit fault finding. Super polite, professional, and transparent about rates. Highly recommend kaam!',
+    date: '3 days ago'
+  },
+  {
+    id: 'rev-3',
+    clientName: 'Sunita Rao',
+    city: 'Bengaluru',
+    tradeUsed: 'Carpentry Repair',
+    rating: 5,
+    comment: 'Fixed our sagging modular wardrobe in under an hour. Great craftsmanship and genuine background-verified professional.',
+    date: '1 week ago'
+  }
+];

@@ -3,7 +3,7 @@ import { User, Lock, Mail, MapPin, Eye, EyeOff, Wrench, ShieldCheck, ArrowRight,
 import { auth, googleProvider } from '../../config/firebase';
 import { signInWithPopup } from 'firebase/auth';
 
-export const AuthPage = ({ onLoginSuccess, isWorkerApp = false }) => {
+export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }) => {
   // View State
   // 'LOGIN_MAIN' | 'LOGIN_EMAIL_FORM' | 'SIGNUP_MAIN' | 'SIGNUP_EMAIL_FORM' | 'FORGOT_REQUEST' | 'FORGOT_RESET'
   const [viewState, setViewState] = useState('LOGIN_MAIN');
@@ -58,12 +58,6 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false }) => {
       googleProvider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, googleProvider);
       if (result && result.user) {
-        googleUser = {
-          googleUid: result.user.uid,
-          email: result.user.email,
-          fullName: result.user.displayName || result.user.email.split('@')[0],
-          photoURL: result.user.photoURL,
-        };
       }
     } catch (fbErr) {
       console.warn('Firebase popup notice / IndexedDB fallback activated:', fbErr.message || fbErr);
@@ -423,26 +417,38 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false }) => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-[#042e2b] via-[#0b4d45] to-[#04332d] font-['Plus_Jakarta_Sans',sans-serif] relative overflow-hidden">
+    <div className={onClose ? "fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-md font-['Plus_Jakarta_Sans',sans-serif] overflow-y-auto" : "min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-[#042e2b] via-[#0b4d45] to-[#04332d] font-['Plus_Jakarta_Sans',sans-serif] relative overflow-hidden"}>
       
-      {/* High-Definition Modern Home Architecture Background Image */}
+      {/* Background Dim / Image */}
       <div 
         className="absolute inset-0 bg-cover bg-center opacity-25 mix-blend-overlay pointer-events-none scale-105" 
         style={{ 
           backgroundImage: `url('${isWorkerApp ? "https://images.unsplash.com/photo-1581092160607-ee22621dd758?q=80&w=2070&auto=format&fit=crop" : "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2070&auto=format&fit=crop"}')` 
         }}
       ></div>
-      <div className="absolute inset-0 bg-gradient-to-b from-[#042e2b]/90 via-[#0b4d45]/85 to-[#04332d]/95 pointer-events-none"></div>
+      {!onClose && <div className="absolute inset-0 bg-gradient-to-b from-[#042e2b]/90 via-[#0b4d45]/85 to-[#04332d]/95 pointer-events-none"></div>}
 
       {/* Main Container Card */}
-      <div className="relative z-10 w-full max-w-md bg-white rounded-3xl shadow-2xl shadow-teal-950/80 overflow-hidden transition-all duration-300">
+      <div className="relative z-10 w-full max-w-md bg-white rounded-3xl shadow-2xl shadow-black/80 overflow-hidden transition-all duration-300 my-auto">
         
-        {/* Header Illustration - Deep Teal & Warm Gold Accent (Image 1 Theme) */}
+        {/* Header Illustration - Deep Teal & Warm Gold Accent */}
         <div className="h-44 sm:h-50 w-full bg-gradient-to-b from-[#064e43] via-[#0a5c52] to-[#127a6e] relative flex flex-col justify-end p-6 text-white overflow-hidden">
-          <div className="absolute top-6 right-8 w-14 h-14 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-300 opacity-90 shadow-lg shadow-amber-500/40 ring-4 ring-amber-300/20"></div>
+          
+          {/* Close Button if Modal Mode */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              type="button"
+              className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center text-xs font-black transition-all"
+            >
+              ✕
+            </button>
+          )}
+
+          <div className="absolute top-6 right-14 w-14 h-14 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-300 opacity-90 shadow-lg shadow-amber-500/40 ring-4 ring-amber-300/20"></div>
           <div className="absolute top-4 left-10 w-24 h-0.5 bg-gradient-to-r from-transparent via-amber-300 to-transparent transform -rotate-45 opacity-60"></div>
 
-          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="none">
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 200" preserveAspectRatio="none">
             <path d="M0 160 Q 120 100 240 160 T 400 160 L 400 200 L 0 200 Z" fill="#0b4d45" opacity="0.6" />
             <path d="M0 175 Q 180 120 360 185 T 400 185 L 400 200 L 0 200 Z" fill="#042e2b" opacity="0.9" />
           </svg>
@@ -454,7 +460,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false }) => {
             </div>
             
             <h2 className="text-2xl font-black font-['Outfit'] text-white tracking-tight">
-              {viewState === 'LOGIN_MAIN' || viewState === 'LOGIN_EMAIL_FORM' || viewState === 'FORGOT_REQUEST' || viewState === 'FORGOT_RESET' ? 'KAAM Login' : 'CREATING Kaam Account'}
+              {viewState === 'LOGIN_MAIN' || viewState === 'LOGIN_EMAIL_FORM' || viewState === 'FORGOT_REQUEST' || viewState === 'FORGOT_RESET' ? 'KAAM Login' : 'Create Kaam Account'}
             </h2>
             <p className="text-xs text-amber-100/90 font-medium">
               {isWorkerApp ? 'Connect with homeowners & accept daily jobs' : 'Hire verified local tradespeople & skilled workers'}
