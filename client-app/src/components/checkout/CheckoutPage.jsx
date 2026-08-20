@@ -24,11 +24,33 @@ export const CheckoutPage = ({
   onBookingComplete,
   onRequireLogin
 }) => {
+  // Saved addresses list state
+  const [savedAddresses, setSavedAddresses] = useState([
+    {
+      id: 'addr-home',
+      label: 'Home',
+      details: user?.address || 'astavinayak colony sangoda rd, Mumbai Central, Mumbai, Maharashtra, India',
+      isDefault: true
+    },
+    {
+      id: 'addr-work',
+      label: 'Work / Office',
+      details: 'Unit 402, Cyber Tower B, Sector 62, Noida, Uttar Pradesh, 201301',
+      isDefault: false
+    }
+  ]);
+
+  const [selectedAddressId, setSelectedAddressId] = useState('addr-home');
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [isAddingNewAddress, setIsAddingNewAddress] = useState(false);
+  const [newAddressLabel, setNewAddressLabel] = useState('Home');
+  const [newAddressText, setNewAddressText] = useState('');
+
   // Address & contact step state
   const [phone, setPhone] = useState(user?.phone || '+91 9653192752');
-  const [address, setAddress] = useState(user?.address || 'Flat 402, Royal Palms, Goregaon East, Mumbai, MH');
-  const [isSelectingAddress, setIsSelectingAddress] = useState(false);
-  const [addressSaved, setAddressSaved] = useState(Boolean(user?.address));
+  const activeAddressObj = savedAddresses.find(a => a.id === selectedAddressId) || savedAddresses[0];
+  const [address, setAddress] = useState(activeAddressObj.details);
+  const [addressSaved, setAddressSaved] = useState(true);
   const [avoidCalling, setAvoidCalling] = useState(false);
 
   // Time slot step
@@ -224,9 +246,9 @@ export const CheckoutPage = ({
                 <div className="flex-1 space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-slate-900">Address</h3>
-                    {addressSaved && (
+                    {address && (
                       <button
-                        onClick={() => setIsSelectingAddress(!isSelectingAddress)}
+                        onClick={() => setShowAddressModal(true)}
                         className="text-xs font-bold text-purple-700 hover:underline"
                       >
                         Change
@@ -234,30 +256,28 @@ export const CheckoutPage = ({
                     )}
                   </div>
 
-                  {addressSaved && !isSelectingAddress ? (
-                    <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-2xl border border-slate-100 leading-relaxed font-medium">
-                      {address}
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      <textarea
-                        rows={3}
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        placeholder="House / Flat No., Street, Landmark, City, Pincode"
-                        className="w-full p-3 rounded-2xl border border-slate-200 text-xs focus:outline-none focus:border-purple-600 bg-white"
-                      />
+                  {address ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-600 bg-slate-50 p-3.5 rounded-2xl border border-slate-100 leading-relaxed font-medium">
+                        <span className="font-bold text-slate-900 block mb-0.5">{activeAddressObj?.label || 'Selected Location'}:</span>
+                        {address}
+                      </p>
                       <button
                         type="button"
-                        onClick={() => {
-                          setAddressSaved(true);
-                          setIsSelectingAddress(false);
-                        }}
+                        onClick={() => setShowAddressModal(true)}
                         className="w-full py-3.5 rounded-2xl bg-[#5932ea] hover:bg-[#4927cb] text-white font-bold text-xs shadow-md shadow-purple-600/20 active:scale-95 transition-all"
                       >
-                        Select address / Confirm Location
+                        Select address
                       </button>
                     </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddressModal(true)}
+                      className="w-full py-3.5 rounded-2xl bg-[#5932ea] hover:bg-[#4927cb] text-white font-bold text-xs shadow-md shadow-purple-600/20 active:scale-95 transition-all"
+                    >
+                      Select address
+                    </button>
                   )}
                 </div>
               </div>
@@ -561,6 +581,156 @@ export const CheckoutPage = ({
 
         </div>
       </main>
+
+      {/* ======================================================== */}
+      {/* SAVED ADDRESS POPUP MODAL (EXACT URBAN COMPANY SCREENSHOT) */}
+      {/* ======================================================== */}
+      {showAddressModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-5 relative animate-in zoom-in-95">
+            
+            {/* Close Button (Exact circle X positioned top-right) */}
+            <button
+              onClick={() => {
+                setShowAddressModal(false);
+                setIsAddingNewAddress(false);
+              }}
+              className="absolute -top-3 -right-3 sm:-top-4 sm:-right-4 w-9 h-9 rounded-full bg-white text-slate-700 hover:text-slate-950 shadow-xl border border-slate-200 grid place-items-center font-bold text-sm transition active:scale-95 z-10"
+            >
+              ✕
+            </button>
+
+            {/* Modal Title */}
+            <h2 className="text-xl font-black text-slate-900 font-['Outfit'] tracking-tight">
+              Saved address
+            </h2>
+
+            {/* Add another address Action */}
+            <div>
+              <button
+                onClick={() => setIsAddingNewAddress(!isAddingNewAddress)}
+                className="flex items-center gap-2 text-xs font-black text-[#5932ea] hover:text-[#4927cb] transition"
+              >
+                <Plus className="w-4 h-4 stroke-[3]" />
+                <span>Add another address</span>
+              </button>
+            </div>
+
+            {/* Add New Address Form (if opened) */}
+            {isAddingNewAddress && (
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 animate-in fade-in text-xs">
+                <div className="flex gap-2">
+                  {['Home', 'Work', 'Other'].map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setNewAddressLabel(type)}
+                      className={`px-3 py-1 rounded-xl font-bold border ${newAddressLabel === type ? 'border-purple-600 bg-purple-100 text-purple-900' : 'border-slate-200 bg-white'}`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  rows={2}
+                  value={newAddressText}
+                  onChange={(e) => setNewAddressText(e.target.value)}
+                  placeholder="Complete flat no, building, road, landmark, city, pincode..."
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-purple-600"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newAddressText.trim()) {
+                      const newObj = {
+                        id: `addr-${Date.now()}`,
+                        label: newAddressLabel,
+                        details: newAddressText.trim(),
+                        isDefault: false
+                      };
+                      setSavedAddresses(prev => [newObj, ...prev]);
+                      setSelectedAddressId(newObj.id);
+                      setAddress(newObj.details);
+                      setNewAddressText('');
+                      setIsAddingNewAddress(false);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl bg-purple-700 text-white font-bold text-xs active:scale-95"
+                >
+                  Save Address
+                </button>
+              </div>
+            )}
+
+            {/* Radio List of Saved Addresses (Matching screenshot) */}
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+              {savedAddresses.map((addr) => {
+                const isSelected = selectedAddressId === addr.id;
+                return (
+                  <label
+                    key={addr.id}
+                    onClick={() => {
+                      setSelectedAddressId(addr.id);
+                      setAddress(addr.details);
+                    }}
+                    className={`flex items-start justify-between gap-3 p-4 rounded-2xl border cursor-pointer transition select-none ${
+                      isSelected
+                        ? 'border-purple-500/80 bg-purple-50/40 shadow-sm'
+                        : 'border-slate-100 bg-white hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Radio Circle */}
+                      <div className="pt-0.5">
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition ${
+                          isSelected ? 'border-purple-600 bg-purple-600' : 'border-slate-400'
+                        }`}>
+                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white"></div>}
+                        </div>
+                      </div>
+
+                      {/* Address Text Content */}
+                      <div>
+                        <h4 className="text-sm font-extrabold text-slate-900">{addr.label}</h4>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-sm">
+                          {addr.details}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Three-dots options */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAddress(addr.details);
+                      }}
+                      className="text-slate-400 hover:text-slate-700 p-1 text-sm font-bold"
+                    >
+                      ⋮
+                    </button>
+                  </label>
+                );
+              })}
+            </div>
+
+            {/* Bottom Proceed Button (Exact match) */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddressModal(false);
+                  setAddressSaved(true);
+                }}
+                className="w-full py-4 rounded-2xl bg-slate-100 hover:bg-purple-700 hover:text-white text-slate-700 font-bold text-xs transition-all active:scale-95 shadow-sm"
+              >
+                Proceed
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );
