@@ -200,10 +200,7 @@ export default function App() {
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    if (!user) return false;
-    return !user.onboardingCompleted;
-  });
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const [activeTab, setActiveTab] = useState('browse'); // 'browse' | 'my-bookings'
   const [selectedCategory, setSelectedCategory] = useState('all');
