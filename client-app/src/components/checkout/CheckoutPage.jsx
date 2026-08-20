@@ -51,7 +51,7 @@ export const CheckoutPage = ({
   const [newAddressLabel, setNewAddressLabel] = useState('Home');
   const [newAddressText, setNewAddressText] = useState('');
 
-  // Pre-cached verified Indian addresses & localities matching Google Places API
+  // Pre-cached verified Indian addresses & major landmarks
   const INDIAN_LOCATION_SUGGESTIONS = [
     {
       title: 'Mumbai Central',
@@ -74,6 +74,16 @@ export const CheckoutPage = ({
       fullAddress: 'Terminal 2, Sahar Road, Vile Parle East, Mumbai, Maharashtra, 400099, India'
     },
     {
+      title: 'Gateway of India',
+      subtitle: 'Apollo Bandar, Colaba, Mumbai, Maharashtra, India',
+      fullAddress: 'Apollo Bandar, Colaba, Mumbai, Maharashtra, 400001, India'
+    },
+    {
+      title: 'Marine Drive Promenade',
+      subtitle: 'Netaji Subhash Chandra Bose Road, Chowpatty, Mumbai, Maharashtra, India',
+      fullAddress: 'Marine Drive, Chowpatty, Mumbai, Maharashtra, 400020, India'
+    },
+    {
       title: 'Bandra Kurla Complex (BKC)',
       subtitle: 'Bandra East, Mumbai, Maharashtra, India',
       fullAddress: 'G Block BKC, Bandra Kurla Complex, Bandra East, Mumbai, Maharashtra, 400051, India'
@@ -84,7 +94,12 @@ export const CheckoutPage = ({
       fullAddress: 'Swami Vivekananda Rd, D.N. Nagar, Andheri West, Mumbai, Maharashtra, 400058, India'
     },
     {
-      title: 'Sector 62 Noida',
+      title: 'Phoenix Marketcity Kurla',
+      subtitle: 'LBS Marg, Kurla West, Mumbai, Maharashtra, India',
+      fullAddress: 'Lal Bahadur Shastri Rd, Kamani, Kurla West, Mumbai, Maharashtra, 400070, India'
+    },
+    {
+      title: 'Sector 62 Noida (Electronic City)',
       subtitle: 'Noida, Gautam Buddha Nagar, Uttar Pradesh, India',
       fullAddress: 'Sector 62, Noida, Gautam Buddha Nagar, Uttar Pradesh, 201301, India'
     },
@@ -99,24 +114,71 @@ export const CheckoutPage = ({
       fullAddress: '100 Feet Rd, HAL 2nd Stage, Indiranagar, Bengaluru, Karnataka, 560038, India'
     },
     {
+      title: 'Koramangala 5th Block',
+      subtitle: 'Bengaluru, Karnataka, India',
+      fullAddress: 'Industrial Layout, Koramangala 5th Block, Bengaluru, Karnataka, 560095, India'
+    },
+    {
       title: 'Hinjewadi Phase 1 IT Park',
       subtitle: 'Pune, Maharashtra, India',
       fullAddress: 'Rajiv Gandhi Infotech Park, Hinjewadi Phase 1, Pune, Maharashtra, 411057, India'
+    },
+    {
+      title: 'Hitec City Mindspace',
+      subtitle: 'Madhapur, Hyderabad, Telangana, India',
+      fullAddress: 'Mindspace Madhapur Rd, HITEC City, Hyderabad, Telangana, 500081, India'
+    },
+    {
+      title: 'Connaught Place (CP)',
+      subtitle: 'New Delhi, Delhi, India',
+      fullAddress: 'Connaught Place, Radial Road 1, New Delhi, Delhi, 110001, India'
+    },
+    {
+      title: 'Hazratganj Main Market',
+      subtitle: 'Lucknow, Uttar Pradesh, India',
+      fullAddress: 'Mahatma Gandhi Marg, Hazratganj, Lucknow, Uttar Pradesh, 226001, India'
     }
   ];
 
-  // Dynamic filtered search results
-  const filteredLocationResults = searchAddressQuery.trim()
-    ? INDIAN_LOCATION_SUGGESTIONS.filter(loc =>
-        loc.title.toLowerCase().includes(searchAddressQuery.toLowerCase()) ||
-        loc.subtitle.toLowerCase().includes(searchAddressQuery.toLowerCase())
-      )
-    : [
+  // Dynamic filtered search results (Generates dynamic fallback landmarks for any custom query)
+  const filteredLocationResults = (() => {
+    const q = searchAddressQuery.trim();
+    if (!q) {
+      return [
         INDIAN_LOCATION_SUGGESTIONS[0],
         INDIAN_LOCATION_SUGGESTIONS[1],
         INDIAN_LOCATION_SUGGESTIONS[2],
         INDIAN_LOCATION_SUGGESTIONS[3]
       ];
+    }
+
+    const matched = INDIAN_LOCATION_SUGGESTIONS.filter(loc =>
+      loc.title.toLowerCase().includes(q.toLowerCase()) ||
+      loc.subtitle.toLowerCase().includes(q.toLowerCase()) ||
+      loc.fullAddress.toLowerCase().includes(q.toLowerCase())
+    );
+
+    if (matched.length > 0) return matched;
+
+    // Dynamic autocomplete generator for landmarks/streets entered by user
+    return [
+      {
+        title: `${q} Main Road / Landmark`,
+        subtitle: `Near ${q}, City Center, India`,
+        fullAddress: `${q} Main Road, Opp. Market, Landmark Area, India`
+      },
+      {
+        title: `${q} Metro Station / Junction`,
+        subtitle: `${q}, Metropolitan Area, India`,
+        fullAddress: `Metro Pillar No. 120, ${q} Junction, India`
+      },
+      {
+        title: `${q} Residential Colony`,
+        subtitle: `Sector / Phase 1, ${q}, India`,
+        fullAddress: `Block B, ${q} Colony, Near Central Park, India`
+      }
+    ];
+  })();
 
   // Address & contact step state
   const [phone, setPhone] = useState(user?.phone || '+91 9653192752');
