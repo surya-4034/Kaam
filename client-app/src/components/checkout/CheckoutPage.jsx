@@ -955,14 +955,9 @@ export const CheckoutPage = ({
               />
             </div>
 
-            <div className="space-y-1">
-              <p className="text-xs font-black text-slate-800 tracking-tight">
-                Google Pay • PhonePe • Paytm • BHIM
-              </p>
-              <p className="text-[11px] font-mono text-slate-500 font-bold">
-                UPI ID: {receiverUpiId}
-              </p>
-            </div>
+            <p className="text-xs font-black text-slate-800 tracking-tight">
+              Google Pay • PhonePe • Paytm • BHIM
+            </p>
 
             {/* Confirm Paid Action */}
             <div className="pt-2">
