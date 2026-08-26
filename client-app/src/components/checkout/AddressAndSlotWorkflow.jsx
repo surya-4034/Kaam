@@ -173,17 +173,24 @@ export const AddressAndSlotWorkflow = ({
     }
   };
 
+  // Map Style state: 'satellite' | 'streets'
+  const [mapStyle, setMapStyle] = useState('satellite');
+
   // 3. Initialize / Update Mapbox GL Map when entering MAP_PINPOINT step
   useEffect(() => {
     if (currentStep === 'MAP_PINPOINT' && mapContainerRef.current) {
       mapboxgl.accessToken = MAPBOX_TOKEN;
 
+      const styleUrl = mapStyle === 'satellite'
+        ? 'mapbox://styles/mapbox/satellite-streets-v12'
+        : 'mapbox://styles/mapbox/streets-v12';
+
       // Create Map
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
-        style: 'mapbox://styles/mapbox/streets-v12',
+        style: styleUrl,
         center: [pinCoords.lng, pinCoords.lat],
-        zoom: 15,
+        zoom: 16,
         attributionControl: false
       });
 
@@ -214,7 +221,7 @@ export const AddressAndSlotWorkflow = ({
         map.remove();
       };
     }
-  }, [currentStep]);
+  }, [currentStep, mapStyle]);
 
   // Handle user selecting an address from autocomplete list
   const handleSelectLandmark = (item) => {
@@ -440,6 +447,32 @@ export const AddressAndSlotWorkflow = ({
                 <div className="w-0.5 h-4 bg-[#5932ea] shadow-md"></div>
                 <div className="w-4 h-1.5 bg-black/30 rounded-full blur-[1px]"></div>
               </div>
+            </div>
+
+            {/* Map Mode Toggle: Satellite vs Streets (Top-Left) */}
+            <div className="absolute top-4 left-4 z-30 flex items-center bg-white/90 backdrop-blur-md p-1 rounded-xl shadow-lg border border-slate-200 text-[11px] font-black">
+              <button
+                type="button"
+                onClick={() => setMapStyle('satellite')}
+                className={`px-2.5 py-1 rounded-lg transition-all ${
+                  mapStyle === 'satellite'
+                    ? 'bg-[#5932ea] text-white shadow-sm'
+                    : 'text-slate-700 hover:text-slate-950'
+                }`}
+              >
+                🛰️ Satellite
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapStyle('streets')}
+                className={`px-2.5 py-1 rounded-lg transition-all ${
+                  mapStyle === 'streets'
+                    ? 'bg-[#5932ea] text-white shadow-sm'
+                    : 'text-slate-700 hover:text-slate-950'
+                }`}
+              >
+                🗺️ Streets
+              </button>
             </div>
 
             {/* Target GPS Recenter Button */}
