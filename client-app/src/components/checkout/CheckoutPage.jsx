@@ -540,82 +540,20 @@ export const CheckoutPage = ({
                     </div>
                   )}
 
-                  {/* DYNAMIC LIVE UPI QR DISPLAY (When UPI_QR is selected) */}
+                  {/* CLEAN SCANNABLE LIVE UPI QR DISPLAY (ONLY QR CODE) */}
                   {paymentMethod === 'UPI_QR' && (
-                    <div className="mt-4 bg-gradient-to-br from-slate-900 via-[#1e1b4b] to-slate-900 text-white p-5 rounded-3xl space-y-4 shadow-xl border border-purple-900/40 animate-in fade-in">
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-xl bg-purple-500/20 text-purple-300 grid place-items-center">
-                            <QrCode className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-black tracking-tight text-purple-100">Live Dynamic UPI QR</h4>
-                            <p className="text-[10px] text-slate-400">Scan using any UPI App</p>
-                          </div>
-                        </div>
-
-                        <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black border border-emerald-500/30">
-                          ₹{finalPayable} Exact
-                        </span>
-                      </div>
-
-                      {/* Scannable QR Code Canvas */}
-                      <div className="bg-white p-4 rounded-2xl flex flex-col items-center justify-center shadow-inner mx-auto max-w-[200px]">
+                    <div className="mt-4 bg-white border-2 border-slate-200 p-5 rounded-3xl flex flex-col items-center justify-center space-y-3 shadow-md animate-in fade-in">
+                      <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-inner flex flex-col items-center">
                         <QRCodeSVG
                           value={`upi://pay?pa=${receiverUpiId}&pn=KAAM%20Services&am=${finalPayable}&cu=INR&tn=KAAM-Booking`}
-                          size={160}
+                          size={190}
                           level="H"
                           includeMargin={true}
                         />
-                        <p className="text-[10px] font-bold text-slate-800 mt-2 text-center">
-                          Pay ₹{finalPayable} to KAAM Services
-                        </p>
                       </div>
-
-                      {/* Supported UPI Apps Row */}
-                      <div className="flex items-center justify-center gap-2 text-[10px] text-purple-200 font-semibold bg-white/5 py-2 px-3 rounded-xl border border-white/10">
-                        <span>GPay</span> • 
-                        <span>PhonePe</span> • 
-                        <span>Paytm</span> • 
-                        <span>BHIM</span> • 
-                        <span>Cred</span>
-                      </div>
-
-                      {/* Receiver UPI ID with Copy button */}
-                      <div className="flex items-center justify-between bg-black/40 px-3.5 py-2 rounded-xl text-xs border border-white/10">
-                        <div className="truncate mr-2">
-                          <span className="text-[10px] text-slate-400 block">UPI ID:</span>
-                          <span className="font-mono text-purple-200 font-bold text-xs">{receiverUpiId}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(receiverUpiId);
-                            setCopiedUpi(true);
-                            setTimeout(() => setCopiedUpi(false), 2000);
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold flex items-center gap-1 transition shrink-0"
-                        >
-                          {copiedUpi ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                          <span>{copiedUpi ? 'Copied' : 'Copy'}</span>
-                        </button>
-                      </div>
-
-                      {/* Optional UPI Ref / UTR Input */}
-                      <div className="space-y-1">
-                        <label className="block text-[10px] font-bold text-purple-200">
-                          12-Digit UPI Ref / UTR No. (Optional after paying)
-                        </label>
-                        <input
-                          type="text"
-                          value={upiUtr}
-                          onChange={(e) => setUpiUtr(e.target.value)}
-                          placeholder="e.g. 423819283921"
-                          className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 text-xs font-mono focus:outline-none focus:border-purple-400 transition"
-                        />
-                      </div>
-
+                      <p className="text-xs font-black text-slate-900 tracking-tight text-center">
+                        Scan with GPay / PhonePe / Paytm to pay ₹{finalPayable}
+                      </p>
                     </div>
                   )}
                 </div>
