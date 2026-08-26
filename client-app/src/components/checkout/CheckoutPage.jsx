@@ -383,7 +383,7 @@ export const CheckoutPage = ({
                     <h3 className="text-sm font-bold text-slate-900">Address</h3>
                     {address && (
                       <button
-                        onClick={() => setIsSearchingLocation(true)}
+                        onClick={() => setShowAddressModal(true)}
                         className="text-xs font-bold text-[#5932ea] hover:underline"
                       >
                         Change
@@ -399,16 +399,16 @@ export const CheckoutPage = ({
                       </p>
                       <button
                         type="button"
-                        onClick={() => setIsSearchingLocation(true)}
+                        onClick={() => setShowAddressModal(true)}
                         className="w-full py-3.5 rounded-2xl bg-[#5932ea] hover:bg-[#4927cb] text-white font-bold text-xs shadow-md shadow-purple-600/20 active:scale-95 transition-all"
                       >
-                        Select address / Pinpoint on Map
+                        Select address
                       </button>
                     </div>
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setIsSearchingLocation(true)}
+                      onClick={() => setShowAddressModal(true)}
                       className="w-full py-3.5 rounded-2xl bg-[#5932ea] hover:bg-[#4927cb] text-white font-bold text-xs shadow-md shadow-purple-600/20 active:scale-95 transition-all"
                     >
                       Select address
