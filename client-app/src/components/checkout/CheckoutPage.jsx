@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   MapPin,
   Clock,
@@ -16,7 +17,11 @@ import {
   AlertCircle,
   Search,
   LocateFixed,
-  X
+  X,
+  QrCode,
+  Smartphone,
+  Copy,
+  Check
 } from 'lucide-react';
 import { AddressAndSlotWorkflow } from './AddressAndSlotWorkflow';
 
@@ -194,8 +199,11 @@ export const CheckoutPage = ({
   const [showSlotPicker, setShowSlotPicker] = useState(false);
 
   // Payment method step
-  const [paymentMethod, setPaymentMethod] = useState('DIRECT_CASH'); // 'DIRECT_CASH' | 'UPI_ONLINE' | 'CARD'
+  const [paymentMethod, setPaymentMethod] = useState('UPI_QR'); // 'UPI_QR' | 'DIRECT_CASH' | 'CARD'
   const [showPaymentPicker, setShowPaymentPicker] = useState(false);
+  const [receiverUpiId, setReceiverUpiId] = useState(import.meta.env.VITE_RECEIVER_UPI_ID || 'surya.kaam@okhdfcbank');
+  const [copiedUpi, setCopiedUpi] = useState(false);
+  const [upiUtr, setUpiUtr] = useState('');
 
   // Tip selection
   const [selectedTip, setSelectedTip] = useState(75);
@@ -260,6 +268,8 @@ export const CheckoutPage = ({
       workDescription: items.map(i => `${i.title} (x${i.qty})`).join(', '),
       agreedTotalFee: finalPayable,
       paymentMode: paymentMethod,
+      upiUtr: upiUtr || null,
+      paymentStatus: paymentMethod === 'UPI_QR' ? 'PAID_VIA_UPI_QR' : 'PAY_AFTER_SERVICE',
       timeSlot: selectedSlot,
       avoidCallingBeforeArrival: avoidCalling,
       tipAmount: tipAmount
@@ -476,24 +486,136 @@ export const CheckoutPage = ({
                     </button>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {paymentMethod === 'DIRECT_CASH' ? 'Pay after service (Cash / UPI to Worker)' : 'Online UPI / Card Payment'}
+                    {paymentMethod === 'UPI_QR'
+                      ? 'Scan & Pay directly via Live UPI QR (GPay / PhonePe / Paytm)'
+                      : paymentMethod === 'DIRECT_CASH'
+                      ? 'Pay after service (Cash / UPI to Worker)'
+                      : 'Online Card / NetBanking'}
                   </p>
 
                   {showPaymentPicker && (
                     <div className="mt-3 space-y-2 text-xs">
+                      {/* Option 1: Live UPI QR (Direct to your account) */}
                       <button
+                        type="button"
+                        onClick={() => { setPaymentMethod('UPI_QR'); setShowPaymentPicker(false); }}
+                        className={`w-full p-3.5 rounded-2xl border text-left flex items-center justify-between transition ${
+                          paymentMethod === 'UPI_QR'
+                            ? 'border-[#5932ea] bg-purple-50/70 font-bold text-purple-950 shadow-sm'
+                            : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-purple-600 text-white grid place-items-center shrink-0">
+                            <QrCode className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="font-extrabold text-xs text-slate-900">Scan & Pay via UPI QR Code</p>
+                            <p className="text-[10px] text-slate-500">Google Pay, PhonePe, Paytm, BHIM, Cred</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">Fast & Direct</span>
+                      </button>
+
+                      {/* Option 2: Pay After Service */}
+                      <button
+                        type="button"
                         onClick={() => { setPaymentMethod('DIRECT_CASH'); setShowPaymentPicker(false); }}
-                        className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between ${paymentMethod === 'DIRECT_CASH' ? 'border-purple-600 bg-purple-50 font-bold text-purple-900' : 'border-slate-200'}`}
+                        className={`w-full p-3.5 rounded-2xl border text-left flex items-center justify-between transition ${
+                          paymentMethod === 'DIRECT_CASH'
+                            ? 'border-[#5932ea] bg-purple-50/70 font-bold text-purple-950 shadow-sm'
+                            : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                        }`}
                       >
-                        <span>Pay After Service (Cash / Direct UPI)</span>
-                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Recommended</span>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white grid place-items-center shrink-0">
+                            <Receipt className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="font-extrabold text-xs text-slate-900">Pay After Service</p>
+                            <p className="text-[10px] text-slate-500">Cash or UPI directly to worker after job completion</p>
+                          </div>
+                        </div>
                       </button>
-                      <button
-                        onClick={() => { setPaymentMethod('UPI_ONLINE'); setShowPaymentPicker(false); }}
-                        className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between ${paymentMethod === 'UPI_ONLINE' ? 'border-purple-600 bg-purple-50 font-bold text-purple-900' : 'border-slate-200'}`}
-                      >
-                        <span>Pay Online via UPI / Card / NetBanking</span>
-                      </button>
+                    </div>
+                  )}
+
+                  {/* DYNAMIC LIVE UPI QR DISPLAY (When UPI_QR is selected) */}
+                  {paymentMethod === 'UPI_QR' && (
+                    <div className="mt-4 bg-gradient-to-br from-slate-900 via-[#1e1b4b] to-slate-900 text-white p-5 rounded-3xl space-y-4 shadow-xl border border-purple-900/40 animate-in fade-in">
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-xl bg-purple-500/20 text-purple-300 grid place-items-center">
+                            <QrCode className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-black tracking-tight text-purple-100">Live Dynamic UPI QR</h4>
+                            <p className="text-[10px] text-slate-400">Scan using any UPI App</p>
+                          </div>
+                        </div>
+
+                        <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black border border-emerald-500/30">
+                          ₹{finalPayable} Exact
+                        </span>
+                      </div>
+
+                      {/* Scannable QR Code Canvas */}
+                      <div className="bg-white p-4 rounded-2xl flex flex-col items-center justify-center shadow-inner mx-auto max-w-[200px]">
+                        <QRCodeSVG
+                          value={`upi://pay?pa=${receiverUpiId}&pn=KAAM%20Services&am=${finalPayable}&cu=INR&tn=KAAM-Booking`}
+                          size={160}
+                          level="H"
+                          includeMargin={true}
+                        />
+                        <p className="text-[10px] font-bold text-slate-800 mt-2 text-center">
+                          Pay ₹{finalPayable} to KAAM Services
+                        </p>
+                      </div>
+
+                      {/* Supported UPI Apps Row */}
+                      <div className="flex items-center justify-center gap-2 text-[10px] text-purple-200 font-semibold bg-white/5 py-2 px-3 rounded-xl border border-white/10">
+                        <span>GPay</span> • 
+                        <span>PhonePe</span> • 
+                        <span>Paytm</span> • 
+                        <span>BHIM</span> • 
+                        <span>Cred</span>
+                      </div>
+
+                      {/* Receiver UPI ID with Copy button */}
+                      <div className="flex items-center justify-between bg-black/40 px-3.5 py-2 rounded-xl text-xs border border-white/10">
+                        <div className="truncate mr-2">
+                          <span className="text-[10px] text-slate-400 block">UPI ID:</span>
+                          <span className="font-mono text-purple-200 font-bold text-xs">{receiverUpiId}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(receiverUpiId);
+                            setCopiedUpi(true);
+                            setTimeout(() => setCopiedUpi(false), 2000);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold flex items-center gap-1 transition shrink-0"
+                        >
+                          {copiedUpi ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedUpi ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      </div>
+
+                      {/* Optional UPI Ref / UTR Input */}
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-bold text-purple-200">
+                          12-Digit UPI Ref / UTR No. (Optional after paying)
+                        </label>
+                        <input
+                          type="text"
+                          value={upiUtr}
+                          onChange={(e) => setUpiUtr(e.target.value)}
+                          placeholder="e.g. 423819283921"
+                          className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 text-xs font-mono focus:outline-none focus:border-purple-400 transition"
+                        />
+                      </div>
+
                     </div>
                   )}
                 </div>
@@ -706,9 +828,15 @@ export const CheckoutPage = ({
                 <button
                   disabled={isSubmitting}
                   onClick={handleProceedToBook}
-                  className="py-3 px-8 rounded-2xl bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-purple-600/30 active:scale-95 transition-all disabled:opacity-50"
+                  className="py-3.5 px-8 rounded-2xl bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-purple-600/30 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                 >
-                  {isSubmitting ? 'Confirming...' : 'Place Booking ➔'}
+                  <span>
+                    {isSubmitting
+                      ? 'Confirming...'
+                      : paymentMethod === 'UPI_QR'
+                      ? `I Have Paid ₹${finalPayable} (Confirm)`
+                      : 'Place Booking ➔'}
+                  </span>
                 </button>
               </div>
 
