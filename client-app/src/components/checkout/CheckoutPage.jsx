@@ -202,7 +202,7 @@ export const CheckoutPage = ({
   const [paymentMethod, setPaymentMethod] = useState('UPI_QR'); // 'UPI_QR' | 'DIRECT_CASH' | 'CARD'
   const [showPaymentPicker, setShowPaymentPicker] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
-  const [receiverUpiId, setReceiverUpiId] = useState(import.meta.env.VITE_RECEIVER_UPI_ID || 'surya.kaam@okhdfcbank');
+  const [receiverUpiId, setReceiverUpiId] = useState(import.meta.env.VITE_RECEIVER_UPI_ID || '9653192752@kotakbank');
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [upiUtr, setUpiUtr] = useState('');
 
@@ -946,7 +946,7 @@ export const CheckoutPage = ({
             </div>
 
             {/* Centered QR Code */}
-            <div className="bg-white p-3 rounded-2xl border-2 border-slate-200 shadow-inner inline-block mx-auto">
+            <div className="bg-white p-3.5 rounded-2xl border-2 border-slate-200 shadow-inner inline-block mx-auto">
               <QRCodeSVG
                 value={`upi://pay?pa=${receiverUpiId}&pn=KAAM%20Services&am=${finalPayable}&cu=INR&tn=KAAM-Booking`}
                 size={210}
@@ -955,9 +955,14 @@ export const CheckoutPage = ({
               />
             </div>
 
-            <p className="text-xs font-black text-slate-800 tracking-tight">
-              Google Pay • PhonePe • Paytm • BHIM
-            </p>
+            <div className="space-y-1">
+              <p className="text-xs font-black text-slate-800 tracking-tight">
+                Google Pay • PhonePe • Paytm • BHIM
+              </p>
+              <p className="text-[11px] font-mono text-slate-500 font-bold">
+                UPI ID: {receiverUpiId}
+              </p>
+            </div>
 
             {/* Confirm Paid Action */}
             <div className="pt-2">
