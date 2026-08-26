@@ -590,13 +590,14 @@ export const AddressAndSlotWorkflow = ({
                   </div>
                 </div>
 
-                {/* Submit Action */}
+                {/* Submit Action (Save Address & Proceed to Slots) */}
                 <div className="pt-4">
                   <button
                     type="submit"
-                    className="w-full py-4 rounded-2xl bg-[#5932ea] hover:bg-[#4927cb] text-white font-black text-xs shadow-lg shadow-purple-600/30 active:scale-95 transition-all"
+                    className="w-full py-4 rounded-2xl bg-[#5932ea] hover:bg-[#4927cb] text-white font-black text-xs shadow-lg shadow-purple-600/30 active:scale-95 transition-all flex items-center justify-center gap-2"
                   >
-                    Save and proceed to slots
+                    <span>Save Address & Proceed to Slots</span>
+                    <span>➔</span>
                   </button>
                 </div>
 

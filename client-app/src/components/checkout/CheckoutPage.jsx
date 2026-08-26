@@ -45,6 +45,7 @@ export const CheckoutPage = ({
   ]);
 
   const [selectedAddressId, setSelectedAddressId] = useState('addr-home');
+  const [selectedAddressCoordinates, setSelectedAddressCoordinates] = useState({ lat: 25.4358, lng: 81.8463 });
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [isAddingNewAddress, setIsAddingNewAddress] = useState(false);
   const [searchAddressQuery, setSearchAddressQuery] = useState('');
@@ -255,6 +256,7 @@ export const CheckoutPage = ({
       clientName: user.fullName || 'Homeowner',
       clientPhone: phone,
       locationAddress: address,
+      coordinates: selectedAddressCoordinates || null,
       workDescription: items.map(i => `${i.title} (x${i.qty})`).join(', '),
       agreedTotalFee: finalPayable,
       paymentMode: paymentMethod,
@@ -832,8 +834,22 @@ export const CheckoutPage = ({
         onClose={() => setIsSearchingLocation(false)}
         tradeTitle={worker.tradeTitle || 'Service'}
         onComplete={(result) => {
+          const newAddrId = `addr-${Date.now()}`;
+          const newSavedAddr = {
+            id: newAddrId,
+            label: result.saveAs || 'Home',
+            details: result.addressString,
+            coordinates: result.coordinates,
+            isDefault: true
+          };
+
+          // Append to saved addresses list
+          setSavedAddresses(prev => [newSavedAddr, ...prev]);
+          setSelectedAddressId(newAddrId);
           setAddress(result.addressString);
+          setSelectedAddressCoordinates(result.coordinates);
           setSelectedSlot(result.slot);
+
           if (result.slotSurgeFee) {
             setSelectedTip(prev => prev + result.slotSurgeFee);
           }
