@@ -413,7 +413,7 @@ export const AddressAndSlotWorkflow = ({
       {/* STEP 3: REAL INTERACTIVE PINPOINT MAP & DOORSTEP FORM    */}
       {/* ======================================================== */}
       {currentStep === 'MAP_PINPOINT' && (
-        <div className="bg-white rounded-3xl max-w-4xl w-full overflow-hidden shadow-2xl relative animate-in zoom-in-95 grid grid-cols-1 md:grid-cols-12 font-['Plus_Jakarta_Sans',sans-serif] max-h-[92vh]">
+        <div className="bg-white rounded-3xl max-w-4xl w-full overflow-hidden shadow-2xl relative animate-in zoom-in-95 grid grid-cols-1 md:grid-cols-2 font-['Plus_Jakarta_Sans',sans-serif] max-h-[92vh] h-[600px]">
           
           {/* Close Button */}
           <button
@@ -423,13 +423,13 @@ export const AddressAndSlotWorkflow = ({
             ✕
           </button>
 
-          {/* LEFT PANE: LIVE REAL MAPBOX MAP CANVAS (FIXED CENTER PIN) */}
-          <div className="md:col-span-6 bg-slate-100 relative min-h-[340px] md:min-h-[540px] overflow-hidden select-none border-b md:border-b-0 md:border-r border-slate-200">
+          {/* LEFT PANE (50%): SATELLITE MAP CANVAS */}
+          <div className="relative w-full h-[280px] md:h-full bg-slate-100 overflow-hidden select-none border-b md:border-b-0 md:border-r border-slate-200">
             
-            {/* Real Mapbox GL Canvas Container */}
+            {/* Mapbox GL Canvas Container */}
             <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
-            {/* Exactly Centered Pinpoint Marker & Floating Tooltip (Absolute Center) */}
+            {/* Centered Pinpoint Marker & Floating Tooltip */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
               <div className="flex flex-col items-center transform -translate-y-7">
                 
@@ -494,32 +494,32 @@ export const AddressAndSlotWorkflow = ({
             </button>
           </div>
 
-          {/* RIGHT PANE: DOORSTEP DETAILS FORM */}
-          <div className="md:col-span-6 p-6 sm:p-8 flex flex-col justify-between overflow-y-auto space-y-6 bg-white">
+          {/* RIGHT PANE (50%): DOORSTEP DETAILS FORM + STICKY BOTTOM BUTTON */}
+          <div className="p-6 sm:p-7 flex flex-col justify-between overflow-y-auto bg-white h-full">
             
-            <div className="space-y-5">
-              {/* Area Header with Change Button */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <h3 className="text-xl font-black text-slate-900 font-['Outfit']">
-                    {selectedLocation.areaName || selectedLocation.title}
-                  </h3>
-                  <p className="text-xs text-slate-500 leading-relaxed max-w-sm">
-                    {selectedLocation.fullAddress}
-                  </p>
+            <form onSubmit={handleSaveAddressAndProceedToSlots} className="space-y-4 flex flex-col justify-between h-full">
+              
+              <div className="space-y-4">
+                {/* Area Header with Change Button */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-black text-slate-900 font-['Outfit']">
+                      {selectedLocation.areaName || selectedLocation.title}
+                    </h3>
+                    <p className="text-xs text-slate-500 leading-relaxed max-w-xs">
+                      {selectedLocation.fullAddress}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep('SEARCH')}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 hover:border-purple-600 text-[#5932ea] font-extrabold text-xs transition active:scale-95 shrink-0"
+                  >
+                    Change
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep('SEARCH')}
-                  className="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:border-purple-600 text-[#5932ea] font-extrabold text-xs transition active:scale-95 shrink-0"
-                >
-                  Change
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveAddressAndProceedToSlots} className="space-y-4 pt-2">
-                
                 {/* Input 1: House/Flat Number* */}
                 <div className="relative">
                   <label className="block text-[11px] font-bold text-slate-500 mb-1">
@@ -531,13 +531,13 @@ export const AddressAndSlotWorkflow = ({
                     value={houseNumber}
                     onChange={(e) => setHouseNumber(e.target.value)}
                     placeholder="e.g. Flat 402, Abhilasha Park"
-                    className="w-full px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#5932ea] bg-white transition"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#5932ea] bg-white transition"
                   />
                   {houseNumber && (
                     <button
                       type="button"
                       onClick={() => setHouseNumber('')}
-                      className="w-4 h-4 rounded-full bg-slate-300 text-slate-700 grid place-items-center absolute right-3.5 top-8 text-[9px] font-bold"
+                      className="w-4 h-4 rounded-full bg-slate-300 text-slate-700 grid place-items-center absolute right-3 top-8 text-[9px] font-bold"
                     >
                       ✕
                     </button>
@@ -554,13 +554,13 @@ export const AddressAndSlotWorkflow = ({
                     value={landmarkDetail}
                     onChange={(e) => setLandmarkDetail(e.target.value)}
                     placeholder="e.g. Near SGT School, Opp. Metro Pillar"
-                    className="w-full px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#5932ea] bg-white transition"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#5932ea] bg-white transition"
                   />
                   {landmarkDetail && (
                     <button
                       type="button"
                       onClick={() => setLandmarkDetail('')}
-                      className="w-4 h-4 rounded-full bg-slate-300 text-slate-700 grid place-items-center absolute right-3.5 top-8 text-[9px] font-bold"
+                      className="w-4 h-4 rounded-full bg-slate-300 text-slate-700 grid place-items-center absolute right-3 top-8 text-[9px] font-bold"
                     >
                       ✕
                     </button>
@@ -568,7 +568,7 @@ export const AddressAndSlotWorkflow = ({
                 </div>
 
                 {/* Save As Pill Selector */}
-                <div className="space-y-1.5 pt-1">
+                <div className="space-y-1.5">
                   <label className="block text-[11px] font-bold text-slate-500">
                     Save as
                   </label>
@@ -578,7 +578,7 @@ export const AddressAndSlotWorkflow = ({
                         key={type}
                         type="button"
                         onClick={() => setSaveAsType(type)}
-                        className={`px-5 py-2 rounded-xl text-xs font-black border transition-all ${
+                        className={`px-4 py-1.5 rounded-xl text-xs font-black border transition-all ${
                           saveAsType === type
                             ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
                             : 'border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -589,20 +589,20 @@ export const AddressAndSlotWorkflow = ({
                     ))}
                   </div>
                 </div>
+              </div>
 
-                {/* Submit Action (Save Address & Proceed to Slots) */}
-                <div className="pt-4">
-                  <button
-                    type="submit"
-                    className="w-full py-4 rounded-2xl bg-[#5932ea] hover:bg-[#4927cb] text-white font-black text-xs shadow-lg shadow-purple-600/30 active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    <span>Save Address & Proceed to Slots</span>
-                    <span>➔</span>
-                  </button>
-                </div>
+              {/* Submit Action (Always visible at bottom) */}
+              <div className="pt-3 border-t border-slate-100 mt-auto">
+                <button
+                  type="submit"
+                  className="w-full py-3.5 rounded-2xl bg-[#5932ea] hover:bg-[#4927cb] text-white font-black text-xs shadow-lg shadow-purple-600/30 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Save and proceed to slots</span>
+                  <span>➔</span>
+                </button>
+              </div>
 
-              </form>
-            </div>
+            </form>
 
           </div>
         </div>
