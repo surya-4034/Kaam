@@ -416,28 +416,30 @@ export const AddressAndSlotWorkflow = ({
             ✕
           </button>
 
-          {/* LEFT PANE: LIVE REAL MAPBOX MAP CANVAS */}
-          <div className="md:col-span-6 bg-slate-100 relative min-h-[340px] md:min-h-[540px] flex items-center justify-center overflow-hidden select-none border-b md:border-b-0 md:border-r border-slate-200">
+          {/* LEFT PANE: LIVE REAL MAPBOX MAP CANVAS (FIXED CENTER PIN) */}
+          <div className="md:col-span-6 bg-slate-100 relative min-h-[340px] md:min-h-[540px] overflow-hidden select-none border-b md:border-b-0 md:border-r border-slate-200">
             
             {/* Real Mapbox GL Canvas Container */}
             <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
-            {/* Custom Center Pinpoint Marker & Floating Tooltip */}
-            <div className="relative z-10 flex flex-col items-center pointer-events-none transform -translate-y-6">
-              
-              {/* Dark floating tooltip */}
-              <div className="bg-[#1e293b] text-white px-3.5 py-1.5 rounded-xl text-[11px] font-bold shadow-2xl mb-1 text-center whitespace-nowrap animate-bounce">
-                Place the pin accurately on map
-              </div>
+            {/* Exactly Centered Pinpoint Marker & Floating Tooltip (Absolute Center) */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+              <div className="flex flex-col items-center transform -translate-y-7">
+                
+                {/* Dark floating tooltip */}
+                <div className="bg-[#1e293b] text-white px-3.5 py-1.5 rounded-xl text-[11px] font-bold shadow-2xl mb-1 text-center whitespace-nowrap animate-bounce">
+                  Place the pin accurately on map
+                </div>
 
-              {/* Pinpoint Blue Dot */}
-              <div className="w-8 h-8 rounded-full bg-[#5932ea] text-white border-2 border-white shadow-2xl grid place-items-center font-black">
-                <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
-              </div>
+                {/* Pinpoint Blue Dot */}
+                <div className="w-8 h-8 rounded-full bg-[#5932ea] text-white border-2 border-white shadow-2xl grid place-items-center font-black">
+                  <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
+                </div>
 
-              {/* Pin stem & shadow */}
-              <div className="w-0.5 h-4 bg-[#5932ea] shadow-md"></div>
-              <div className="w-4 h-1.5 bg-black/30 rounded-full blur-[1px]"></div>
+                {/* Pin stem & shadow */}
+                <div className="w-0.5 h-4 bg-[#5932ea] shadow-md"></div>
+                <div className="w-4 h-1.5 bg-black/30 rounded-full blur-[1px]"></div>
+              </div>
             </div>
 
             {/* Target GPS Recenter Button */}
@@ -448,11 +450,12 @@ export const AddressAndSlotWorkflow = ({
                     const lat = pos.coords.latitude;
                     const lng = pos.coords.longitude;
                     mapInstanceRef.current.flyTo({ center: [lng, lat], zoom: 16 });
+                    reverseGeocode(lat, lng);
                   });
                 }
               }}
               title="Locate Me"
-              className="absolute bottom-4 left-4 z-20 w-10 h-10 rounded-full bg-white text-slate-800 shadow-xl border border-slate-200 grid place-items-center hover:bg-slate-50 active:scale-95 transition"
+              className="absolute bottom-4 left-4 z-30 w-10 h-10 rounded-full bg-white text-slate-800 shadow-xl border border-slate-200 grid place-items-center hover:bg-slate-50 active:scale-95 transition"
             >
               <LocateFixed className="w-5 h-5 text-slate-700" />
             </button>
