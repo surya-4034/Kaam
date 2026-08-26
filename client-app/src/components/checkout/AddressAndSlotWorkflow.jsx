@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import {
   Search,
   MapPin,
@@ -10,8 +12,11 @@ import {
   Clock,
   CheckCircle2,
   ChevronRight,
-  Plus
+  Plus,
+  Loader2
 } from 'lucide-react';
+
+const MAPBOX_TOKEN = 'pk.eyJ1Ijoic3VyeWEwMDEiLCJhIjoiY210MXV5NHpiMGc3czJ5cjI0NTVwZXYwbiJ9.pJajjwb6MfjO_SsDaMRYDA';
 
 export const AddressAndSlotWorkflow = ({
   isOpen,
@@ -20,236 +25,52 @@ export const AddressAndSlotWorkflow = ({
   defaultAddress = '',
   tradeTitle = 'Service'
 }) => {
-  // Navigation state between the 4 steps:
+  // Navigation state between the steps:
   // 'SEARCH' | 'MAP_PINPOINT' | 'SLOT_PICKER'
   const [currentStep, setCurrentStep] = useState('SEARCH');
 
-  // Step 1 & 2: Live Search & Landmark Autocomplete State
+  // Step 1 & 2: Search & Live Real-World Mapbox Autocomplete State
   const [searchQuery, setSearchQuery] = useState('');
   const [autocompleteResults, setAutocompleteResults] = useState([]);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
 
-  // Live Recents fetched from backend / initial API
+  // Recents History
   const [recentSearches, setRecentSearches] = useState([
     {
-      title: 'Bhopal',
-      subtitle: 'Madhya Pradesh, India',
-      fullAddress: 'Bhopal, Madhya Pradesh, 462001, India',
-      lat: 23.2599,
-      lng: 77.4126
-    },
-    {
-      title: 'Mumbai Central',
-      subtitle: 'Mumbai, Maharashtra, India',
-      fullAddress: 'Mumbai Central, Mumbai, Maharashtra, 400008, India',
-      lat: 18.9696,
-      lng: 72.8193
-    }
-  ]);
-
-  // Verified extensive Indian landmark database for immediate, zero-latency autocomplete
-  const INDIAN_LOCALITY_CATALOG = [
-    // Prayagraj (Matching user screenshot)
-    {
-      queryMatch: 'prayagraj',
       title: 'Prayagraj',
       subtitle: 'Uttar Pradesh, India',
-      areaName: 'Prayagraj',
-      fullAddress: 'Prayagraj, Uttar Pradesh 211001, India',
+      fullAddress: 'Prayagraj, Uttar Pradesh, India',
       lat: 25.4358,
       lng: 81.8463
     },
     {
-      queryMatch: 'prayagraj',
-      title: 'Prayagraj Junction',
-      subtitle: 'Civil Lines, Prayagraj, Uttar Pradesh, India',
-      areaName: 'Civil Lines',
-      fullAddress: 'Civil Lines, Prayagraj, Uttar Pradesh 211001, India',
-      lat: 25.4439,
-      lng: 81.8252
-    },
-    {
-      queryMatch: 'prayagraj',
-      title: 'Prayagraj Airport',
-      subtitle: 'Bamrauli, Prayagraj, Uttar Pradesh, India',
-      areaName: 'Bamrauli',
-      fullAddress: 'Bamrauli, Prayagraj, Uttar Pradesh 211012, India',
-      lat: 25.4398,
-      lng: 81.7340
-    },
-    {
-      queryMatch: 'prayagraj',
-      title: 'Prayagraj Sangam Railway Station',
-      subtitle: 'Daraganj, Prayagraj, Uttar Pradesh, India',
-      areaName: 'Daraganj',
-      fullAddress: 'Daraganj, Prayagraj, Uttar Pradesh 211006, India',
-      lat: 25.4300,
-      lng: 81.8750
-    },
-    {
-      queryMatch: 'prayagraj',
-      title: 'Prayagraj Bus Stand',
-      subtitle: 'Unnamed Road, Civil Lines, Prayagraj, Uttar Pradesh, India',
-      areaName: 'Civil Lines',
-      fullAddress: 'Civil Lines, Prayagraj, Uttar Pradesh 211001, India',
-      lat: 25.4480,
-      lng: 81.8310
-    },
-
-    // Bhopal (Matching user recording)
-    {
-      queryMatch: 'bhopal',
       title: 'Bhopal',
       subtitle: 'Madhya Pradesh, India',
-      areaName: 'Bhopal',
-      fullAddress: 'Bhopal, Madhya Pradesh 462001, India',
+      fullAddress: 'Bhopal, Madhya Pradesh, India',
       lat: 23.2599,
       lng: 77.4126
-    },
-    {
-      queryMatch: 'bhopal',
-      title: 'Bhopal Junction Railway Station',
-      subtitle: 'Railway Colony, Bhopal, Madhya Pradesh, India',
-      areaName: 'East Railway Colony',
-      fullAddress: 'East Railway Colony, Bhopal, Madhya Pradesh 462010, India',
-      lat: 23.2678,
-      lng: 77.4147
-    },
-    {
-      queryMatch: 'bhopal',
-      title: 'Bhopal Railway Station',
-      subtitle: 'Bajariya, Navbahar Colony, Bhopal, Madhya Pradesh, India',
-      areaName: 'Hamidia Rd',
-      fullAddress: 'Hamidia Rd, Bhopal Talkies, Bajariya, Navbahar Colony, Bhopal, Madhya Pradesh 462001, India',
-      lat: 23.2655,
-      lng: 77.4112
-    },
-    {
-      queryMatch: 'bhopal',
-      title: 'Bhopal Talkies',
-      subtitle: 'Beldarpura, Peer Gate Area, Bhopal, Madhya Pradesh, India',
-      areaName: 'Peer Gate Area',
-      fullAddress: 'Beldarpura, Peer Gate Area, Bhopal, Madhya Pradesh 462001, India',
-      lat: 23.2580,
-      lng: 77.4040
-    },
-    {
-      queryMatch: 'bhopal',
-      title: 'Bhopal Airport',
-      subtitle: 'Airport Rd, Raja Bhoj Airport Area, Gandhi Nagar, Bhopal, Madhya Pradesh, India',
-      areaName: 'Gandhi Nagar',
-      fullAddress: 'Airport Rd, Raja Bhoj Airport Area, Gandhi Nagar, Bhopal, Madhya Pradesh 462036, India',
-      lat: 23.2875,
-      lng: 77.3378
-    },
-
-    // Mumbai
-    {
-      queryMatch: 'mumbai',
-      title: 'Mumbai Central',
-      subtitle: 'Mumbai, Maharashtra, India',
-      areaName: 'Mumbai Central',
-      fullAddress: 'Dr Anandrao Nair Marg, Mumbai Central, Mumbai, Maharashtra 400008, India',
-      lat: 18.9696,
-      lng: 72.8193
-    },
-    {
-      queryMatch: 'mumbai',
-      title: 'Chhatrapati Shivaji Maharaj International Airport (T2)',
-      subtitle: 'Navpada, Vile Parle East, Mumbai, Maharashtra, India',
-      areaName: 'Vile Parle East',
-      fullAddress: 'CSMIA Terminal 2, Sahar Road, Vile Parle East, Mumbai, Maharashtra 400099, India',
-      lat: 19.0896,
-      lng: 72.8656
     }
-  ];
+  ]);
 
-  // Query and generate instant Google-style autocomplete predictions as user types
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setAutocompleteResults([]);
-      return;
-    }
-
-    const q = searchQuery.toLowerCase().trim();
-
-    // 1. Check verified catalog first
-    const matches = INDIAN_LOCALITY_CATALOG.filter(
-      item =>
-        item.title.toLowerCase().includes(q) ||
-        item.subtitle.toLowerCase().includes(q) ||
-        item.areaName.toLowerCase().includes(q) ||
-        item.queryMatch.toLowerCase().includes(q)
-    );
-
-    if (matches.length > 0) {
-      setAutocompleteResults(matches);
-      return;
-    }
-
-    // 2. Dynamic multi-landmark generator (for any other Indian city / area typed)
-    const formattedCapital = searchQuery.charAt(0).toUpperCase() + searchQuery.slice(1);
-    const generated = [
-      {
-        title: formattedCapital,
-        subtitle: `${formattedCapital}, India`,
-        areaName: formattedCapital,
-        fullAddress: `${formattedCapital}, Main District, India`,
-        lat: 23.2599,
-        lng: 77.4126
-      },
-      {
-        title: `${formattedCapital} Junction`,
-        subtitle: `Station Road, ${formattedCapital}, India`,
-        areaName: `${formattedCapital} Station Area`,
-        fullAddress: `Station Road, ${formattedCapital}, India`,
-        lat: 23.2655,
-        lng: 77.4112
-      },
-      {
-        title: `${formattedCapital} Airport`,
-        subtitle: `Airport Road, ${formattedCapital}, India`,
-        areaName: `Airport Area`,
-        fullAddress: `Airport Road, ${formattedCapital}, India`,
-        lat: 23.2875,
-        lng: 77.3378
-      },
-      {
-        title: `${formattedCapital} Bus Stand`,
-        subtitle: `Central Bus Depot, ${formattedCapital}, India`,
-        areaName: `City Center`,
-        fullAddress: `Central Bus Depot, ${formattedCapital}, India`,
-        lat: 23.2580,
-        lng: 77.4040
-      },
-      {
-        title: `${formattedCapital} Main Market`,
-        subtitle: `Commercial Hub, ${formattedCapital}, India`,
-        areaName: `Commercial Hub`,
-        fullAddress: `Commercial Hub, ${formattedCapital}, India`,
-        lat: 23.2600,
-        lng: 77.4100
-      }
-    ];
-
-    setAutocompleteResults(generated);
-  }, [searchQuery]);
-
-  // Step 3: Selected Location & Doorstep Details State
+  // Step 3: Selected Location & Map Coordinates State
   const [selectedLocation, setSelectedLocation] = useState({
-    id: 'bhopal-station',
-    title: 'Bhopal Railway Station',
-    distance: '865 m',
-    subtitle: 'Bajariya, Navbahar Colony, Bhopal, Madhya Pradesh, India',
-    areaName: 'Hamidia Rd',
-    fullAddress: 'Hamidia Rd, Bhopal Talkies, Bajariya, Navbahar Colony, Bhopal, Madhya Pradesh 462001, India',
-    lat: 23.2655,
-    lng: 77.4112
+    title: 'Prayagraj',
+    subtitle: 'Uttar Pradesh, India',
+    areaName: 'Prayagraj',
+    fullAddress: 'Prayagraj, Uttar Pradesh, India',
+    lat: 25.4358,
+    lng: 81.8463
   });
-  const [pinCoords, setPinCoords] = useState({ lat: 23.2655, lng: 77.4112 });
-  const [houseNumber, setHouseNumber] = useState('abhilasha park');
-  const [landmarkDetail, setLandmarkDetail] = useState('sgt school');
+
+  const [pinCoords, setPinCoords] = useState({ lat: 25.4358, lng: 81.8463 });
+  const [houseNumber, setHouseNumber] = useState('');
+  const [landmarkDetail, setLandmarkDetail] = useState('');
   const [saveAsType, setSaveAsType] = useState('Home'); // 'Home' | 'Other'
+
+  // Mapbox Container Ref & Instance Ref
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markerRef = useRef(null);
 
   // Step 4: Slot Picker State
   const [selectedDate, setSelectedDate] = useState('Fri 21');
@@ -280,6 +101,122 @@ export const AddressAndSlotWorkflow = ({
     { time: '02:00 PM', surge: 0 }
   ];
 
+  // 1. Live Real-World Search via Mapbox Geocoding API
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setAutocompleteResults([]);
+      setIsLoadingResults(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsLoadingResults(true);
+      try {
+        const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+          searchQuery.trim()
+        )}.json?country=in&language=en&types=country,region,postcode,district,place,locality,neighborhood,address,poi&access_token=${MAPBOX_TOKEN}`;
+
+        const res = await fetch(endpoint);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.features) {
+            const mapped = data.features.map((item) => {
+              const [lng, lat] = item.center;
+              const placeName = item.text || item.place_name.split(',')[0];
+              const subtitle = item.place_name.replace(placeName + ',', '').trim() || item.place_name;
+
+              return {
+                id: item.id,
+                title: placeName,
+                subtitle: subtitle,
+                areaName: placeName,
+                fullAddress: item.place_name,
+                lat: lat,
+                lng: lng
+              };
+            });
+            setAutocompleteResults(mapped);
+          }
+        }
+      } catch (err) {
+        console.warn('[Mapbox Autocomplete Error]', err);
+      } finally {
+        setIsLoadingResults(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // 2. Reverse Geocode helper (when user drags/clicks map pin)
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?country=in&language=en&access_token=${MAPBOX_TOKEN}`;
+      const res = await fetch(endpoint);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.features && data.features.length > 0) {
+          const topFeature = data.features[0];
+          const mainTitle = topFeature.text || topFeature.place_name.split(',')[0];
+          setSelectedLocation(prev => ({
+            ...prev,
+            title: mainTitle,
+            areaName: mainTitle,
+            fullAddress: topFeature.place_name,
+            lat,
+            lng
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('[Mapbox Reverse Geocoding Error]', err);
+    }
+  };
+
+  // 3. Initialize / Update Mapbox GL Map when entering MAP_PINPOINT step
+  useEffect(() => {
+    if (currentStep === 'MAP_PINPOINT' && mapContainerRef.current) {
+      mapboxgl.accessToken = MAPBOX_TOKEN;
+
+      // Create Map
+      const map = new mapboxgl.Map({
+        container: mapContainerRef.current,
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [pinCoords.lng, pinCoords.lat],
+        zoom: 15,
+        attributionControl: false
+      });
+
+      mapInstanceRef.current = map;
+
+      // Add Zoom / Recenter controls
+      map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
+
+      // Update coordinates on map move/drag
+      map.on('move', () => {
+        const center = map.getCenter();
+        setPinCoords({ lat: center.lat, lng: center.lng });
+      });
+
+      // On map drag end -> reverse geocode to update address name
+      map.on('moveend', () => {
+        const center = map.getCenter();
+        reverseGeocode(center.lat, center.lng);
+      });
+
+      // On click anywhere on map -> pan to that point
+      map.on('click', (e) => {
+        map.flyTo({ center: [e.lngLat.lng, e.lngLat.lat], essential: true });
+      });
+
+      // Cleanup
+      return () => {
+        map.remove();
+      };
+    }
+  }, [currentStep]);
+
+  // Handle user selecting an address from autocomplete list
   const handleSelectLandmark = (item) => {
     setSelectedLocation(item);
     setPinCoords({ lat: item.lat, lng: item.lng });
@@ -301,28 +238,26 @@ export const AddressAndSlotWorkflow = ({
     });
   };
 
+  // Handle GPS Current Location Button
   const handleUseCurrentLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const customLoc = {
-            id: 'gps-loc',
-            title: 'Current GPS Location',
-            distance: '0 m',
-            subtitle: 'Detected via device GPS',
-            areaName: 'Current Location',
-            fullAddress: 'Current Location, Detected Area, India',
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude
-          };
-          handleSelectLandmark(customLoc);
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setPinCoords({ lat, lng });
+
+          // Reverse geocode to find address name
+          reverseGeocode(lat, lng).then(() => {
+            setCurrentStep('MAP_PINPOINT');
+          });
         },
-        () => {
-          handleSelectLandmark(LANDMARKS_DATA[0]);
+        (err) => {
+          console.warn('Geolocation failed:', err);
+          // Fallback to default
+          setCurrentStep('MAP_PINPOINT');
         }
       );
-    } else {
-      handleSelectLandmark(LANDMARKS_DATA[0]);
     }
   };
 
@@ -354,7 +289,7 @@ export const AddressAndSlotWorkflow = ({
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in">
       
       {/* ======================================================== */}
-      {/* STEP 1 & 2: SEARCH & LANDMARK AUTOCOMPLETE MODAL        */}
+      {/* STEP 1 & 2: SEARCH & REAL-WORLD AUTOCOMPLETE MODAL       */}
       {/* ======================================================== */}
       {currentStep === 'SEARCH' && (
         <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-4 relative animate-in zoom-in-95 font-['Plus_Jakarta_Sans',sans-serif]">
@@ -367,7 +302,7 @@ export const AddressAndSlotWorkflow = ({
             ✕
           </button>
 
-          {/* Search Box (Exact Frame 05 / 15 Match) */}
+          {/* Search Box */}
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5 pointer-events-none" />
             <input
@@ -378,7 +313,9 @@ export const AddressAndSlotWorkflow = ({
               placeholder="Search for your location/society/apartment"
               className="w-full pl-11 pr-10 py-3 rounded-2xl border border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#5932ea] focus:bg-white transition"
             />
-            {searchQuery && (
+            {isLoadingResults ? (
+              <Loader2 className="w-4 h-4 text-purple-600 animate-spin absolute right-3.5 top-3.5" />
+            ) : searchQuery ? (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
@@ -386,7 +323,7 @@ export const AddressAndSlotWorkflow = ({
               >
                 ✕
               </button>
-            )}
+            ) : null}
           </div>
 
           {/* Use Current Location CTA */}
@@ -399,50 +336,44 @@ export const AddressAndSlotWorkflow = ({
             <span>Use current location</span>
           </button>
 
-          {/* AUTOCOMPLETE RESULTS (When user is typing - EXACT SCREENSHOT 2 MATCH) */}
+          {/* AUTOCOMPLETE RESULTS (Real-World Live Mapbox Data) */}
           {searchQuery.trim() ? (
             <div className="space-y-1 max-h-80 overflow-y-auto divide-y divide-slate-100 pt-1">
-              {autocompleteResults.map((item, idx) => (
-                <div
-                  key={item.id || idx}
-                  onClick={() => handleSelectLandmark(item)}
-                  className="flex items-start gap-3.5 py-3.5 px-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition select-none group"
-                >
-                  <div className="pt-0.5 text-slate-400 group-hover:text-[#5932ea] transition shrink-0">
-                    <MapPin className="w-4 h-4" />
+              {autocompleteResults.length > 0 ? (
+                autocompleteResults.map((item, idx) => (
+                  <div
+                    key={item.id || idx}
+                    onClick={() => handleSelectLandmark(item)}
+                    className="flex items-start gap-3.5 py-3.5 px-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition select-none group"
+                  >
+                    <div className="pt-0.5 text-slate-400 group-hover:text-[#5932ea] transition shrink-0">
+                      <MapPin className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-0.5 flex-1">
+                      <h4 className="text-xs font-black text-slate-900 group-hover:text-[#5932ea] transition">
+                        {item.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 leading-tight">
+                        {item.subtitle}
+                      </p>
+                    </div>
                   </div>
-                  <div className="space-y-0.5 flex-1">
-                    <h4 className="text-xs font-black text-slate-900 group-hover:text-[#5932ea] transition">
-                      {item.title}
-                    </h4>
-                    <p className="text-[11px] text-slate-500 leading-tight">
-                      {item.subtitle}
-                    </p>
-                  </div>
+                ))
+              ) : !isLoadingResults ? (
+                <div className="p-4 text-center text-xs text-slate-500 font-medium">
+                  No matching locations found for "{searchQuery}". Try searching city, colony, or landmark.
                 </div>
-              ))}
+              ) : null}
             </div>
           ) : (
-            /* RECENTS LIST (Exact Frame 05 Match) */
+            /* RECENTS LIST */
             <div className="space-y-3 pt-2">
               <h3 className="text-xs font-extrabold text-slate-900 tracking-tight">Recents</h3>
               <div className="space-y-1 max-h-60 overflow-y-auto divide-y divide-slate-100">
                 {recentSearches.map((rec, idx) => (
                   <div
                     key={idx}
-                    onClick={() => {
-                      const found = LANDMARKS_DATA.find(l => l.title === rec.title) || {
-                        id: `rec-${idx}`,
-                        title: rec.title,
-                        distance: '500 m',
-                        subtitle: rec.subtitle,
-                        areaName: rec.title,
-                        fullAddress: rec.fullAddress,
-                        lat: rec.lat,
-                        lng: rec.lng
-                      };
-                      handleSelectLandmark(found);
-                    }}
+                    onClick={() => handleSelectLandmark(rec)}
                     className="flex items-start gap-3.5 py-3 px-2 rounded-2xl hover:bg-slate-50 cursor-pointer transition select-none group"
                   >
                     <div className="pt-0.5 text-slate-400 group-hover:text-purple-600">
@@ -462,24 +393,17 @@ export const AddressAndSlotWorkflow = ({
             </div>
           )}
 
-          {/* Powered by Google Footer */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-center gap-1 text-[11px] text-slate-400">
+          {/* Powered by Mapbox Footer */}
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
             <span>powered by</span>
-            <span className="font-bold text-slate-600 font-sans tracking-tight">
-              <span className="text-blue-500">G</span>
-              <span className="text-red-500">o</span>
-              <span className="text-yellow-500">o</span>
-              <span className="text-blue-500">g</span>
-              <span className="text-green-500">l</span>
-              <span className="text-red-500">e</span>
-            </span>
+            <span className="font-bold text-slate-700 font-sans tracking-tight">Mapbox</span>
           </div>
 
         </div>
       )}
 
       {/* ======================================================== */}
-      {/* STEP 3: TWO-PANE PINPOINT MAP & DOORSTEP DETAILS (FRAME 20/32) */}
+      {/* STEP 3: REAL INTERACTIVE PINPOINT MAP & DOORSTEP FORM    */}
       {/* ======================================================== */}
       {currentStep === 'MAP_PINPOINT' && (
         <div className="bg-white rounded-3xl max-w-4xl w-full overflow-hidden shadow-2xl relative animate-in zoom-in-95 grid grid-cols-1 md:grid-cols-12 font-['Plus_Jakarta_Sans',sans-serif] max-h-[92vh]">
@@ -492,70 +416,49 @@ export const AddressAndSlotWorkflow = ({
             ✕
           </button>
 
-          {/* LEFT PANE: INTERACTIVE MAP CANVAS (EXACT SCREENSHOT) */}
-          <div 
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const xPercent = (e.clientX - rect.left) / rect.width;
-              const yPercent = (e.clientY - rect.top) / rect.height;
-              // Subtle dynamic coordinate shift based on user tap
-              const newLat = selectedLocation.lat + (yPercent - 0.5) * 0.005;
-              const newLng = selectedLocation.lng + (xPercent - 0.5) * 0.005;
-              setPinCoords({ lat: newLat, lng: newLng });
-            }}
-            className="md:col-span-6 bg-slate-100 relative min-h-[320px] md:min-h-[540px] flex items-center justify-center overflow-hidden select-none border-b md:border-b-0 md:border-r border-slate-200 cursor-crosshair group"
-          >
+          {/* LEFT PANE: LIVE REAL MAPBOX MAP CANVAS */}
+          <div className="md:col-span-6 bg-slate-100 relative min-h-[340px] md:min-h-[540px] flex items-center justify-center overflow-hidden select-none border-b md:border-b-0 md:border-r border-slate-200">
             
-            {/* Styled Realistic Google Map Background Image / Layer */}
-            <div className="absolute inset-0 bg-[#e5e3df] opacity-95">
-              <div 
-                className="w-full h-full bg-cover bg-center transition-all duration-300 transform scale-105"
-                style={{
-                  backgroundImage: `url('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=1200&q=80')`,
-                  filter: 'contrast(1.05) saturate(0.9)'
-                }}
-              />
-              <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px]"></div>
-            </div>
+            {/* Real Mapbox GL Canvas Container */}
+            <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
-            {/* Custom Urban Company Pinpoint Marker & Floating Tooltip */}
+            {/* Custom Center Pinpoint Marker & Floating Tooltip */}
             <div className="relative z-10 flex flex-col items-center pointer-events-none transform -translate-y-6">
               
-              {/* Dark floating pill tooltip (Exact frame 20/32 match) */}
+              {/* Dark floating tooltip */}
               <div className="bg-[#1e293b] text-white px-3.5 py-1.5 rounded-xl text-[11px] font-bold shadow-2xl mb-1 text-center whitespace-nowrap animate-bounce">
                 Place the pin accurately on map
               </div>
 
-              {/* Pinpoint Target Circle & Blue Dot */}
+              {/* Pinpoint Blue Dot */}
               <div className="w-8 h-8 rounded-full bg-[#5932ea] text-white border-2 border-white shadow-2xl grid place-items-center font-black">
                 <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
               </div>
 
-              {/* Pin stem */}
+              {/* Pin stem & shadow */}
               <div className="w-0.5 h-4 bg-[#5932ea] shadow-md"></div>
-              {/* Pin shadow base */}
               <div className="w-4 h-1.5 bg-black/30 rounded-full blur-[1px]"></div>
             </div>
 
-            {/* Target GPS recenter button at bottom-right */}
+            {/* Target GPS Recenter Button */}
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleUseCurrentLocation();
+              onClick={() => {
+                if (navigator.geolocation && mapInstanceRef.current) {
+                  navigator.geolocation.getCurrentPosition((pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    mapInstanceRef.current.flyTo({ center: [lng, lat], zoom: 16 });
+                  });
+                }
               }}
               title="Locate Me"
-              className="absolute bottom-4 right-4 z-20 w-10 h-10 rounded-full bg-white text-slate-800 shadow-xl border border-slate-200 grid place-items-center hover:bg-slate-50 active:scale-95 transition"
+              className="absolute bottom-4 left-4 z-20 w-10 h-10 rounded-full bg-white text-slate-800 shadow-xl border border-slate-200 grid place-items-center hover:bg-slate-50 active:scale-95 transition"
             >
               <LocateFixed className="w-5 h-5 text-slate-700" />
             </button>
-
-            {/* Bottom Google Branding */}
-            <div className="absolute bottom-3 left-4 z-20 text-[11px] font-bold text-slate-600 bg-white/80 px-2 py-0.5 rounded shadow-sm">
-              Google Maps
-            </div>
           </div>
 
-          {/* RIGHT PANE: DOORSTEP DETAILS FORM (EXACT FRAME 20/32) */}
+          {/* RIGHT PANE: DOORSTEP DETAILS FORM */}
           <div className="md:col-span-6 p-6 sm:p-8 flex flex-col justify-between overflow-y-auto space-y-6 bg-white">
             
             <div className="space-y-5">
@@ -563,7 +466,7 @@ export const AddressAndSlotWorkflow = ({
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
                   <h3 className="text-xl font-black text-slate-900 font-['Outfit']">
-                    {selectedLocation.areaName}
+                    {selectedLocation.areaName || selectedLocation.title}
                   </h3>
                   <p className="text-xs text-slate-500 leading-relaxed max-w-sm">
                     {selectedLocation.fullAddress}
@@ -651,7 +554,7 @@ export const AddressAndSlotWorkflow = ({
                   </div>
                 </div>
 
-                {/* Submit Action (Exact Frame 32 Match) */}
+                {/* Submit Action */}
                 <div className="pt-4">
                   <button
                     type="submit"
@@ -669,7 +572,7 @@ export const AddressAndSlotWorkflow = ({
       )}
 
       {/* ======================================================== */}
-      {/* STEP 4: DATE & TIME SLOT PICKER MODAL (FRAME 36 MATCH)   */}
+      {/* STEP 4: DATE & TIME SLOT PICKER MODAL                    */}
       {/* ======================================================== */}
       {currentStep === 'SLOT_PICKER' && (
         <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-6 relative animate-in zoom-in-95 font-['Plus_Jakarta_Sans',sans-serif]">
@@ -692,7 +595,7 @@ export const AddressAndSlotWorkflow = ({
             </p>
           </div>
 
-          {/* Date Selector Cards (Exact Frame 36 Match) */}
+          {/* Date Selector Cards */}
           <div className="flex gap-2.5">
             {DATES.map(item => {
               const isSelected = selectedDate === item.key;
@@ -721,7 +624,7 @@ export const AddressAndSlotWorkflow = ({
             </h3>
           </div>
 
-          {/* 3-Column Time Slot Grid (Exact Frame 36 Match) */}
+          {/* 3-Column Time Slot Grid */}
           <div className="grid grid-cols-3 gap-2 text-xs max-h-64 overflow-y-auto pr-1">
             {TIME_SLOTS.map((slot, sIdx) => {
               const isSelected = selectedTimeSlot === slot.time;
@@ -752,7 +655,7 @@ export const AddressAndSlotWorkflow = ({
             })}
           </div>
 
-          {/* Bottom Proceed to Checkout CTA (Exact Frame 36 Match) */}
+          {/* Bottom Proceed to Checkout CTA */}
           <div className="pt-2">
             <button
               type="button"
