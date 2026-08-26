@@ -201,6 +201,7 @@ export const CheckoutPage = ({
   // Payment method step
   const [paymentMethod, setPaymentMethod] = useState('UPI_QR'); // 'UPI_QR' | 'DIRECT_CASH' | 'CARD'
   const [showPaymentPicker, setShowPaymentPicker] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
   const [receiverUpiId, setReceiverUpiId] = useState(import.meta.env.VITE_RECEIVER_UPI_ID || 'surya.kaam@okhdfcbank');
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [upiUtr, setUpiUtr] = useState('');
@@ -248,12 +249,7 @@ export const CheckoutPage = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
-  const handleProceedToBook = async () => {
-    if (!user) {
-      onRequireLogin();
-      return;
-    }
-
+  const submitBookingOrder = async () => {
     setIsSubmitting(true);
 
     const payload = {
@@ -283,16 +279,33 @@ export const CheckoutPage = ({
       });
 
       if (res.ok) {
+        setShowQrModal(false);
         setBookingSuccess(true);
       } else {
+        setShowQrModal(false);
         setBookingSuccess(true);
       }
     } catch (e) {
       console.warn('Job submitted offline mode fallback:', e);
+      setShowQrModal(false);
       setBookingSuccess(true);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleProceedToBook = () => {
+    if (!user) {
+      onRequireLogin();
+      return;
+    }
+
+    if (paymentMethod === 'UPI_QR') {
+      setShowQrModal(true);
+      return;
+    }
+
+    submitBookingOrder();
   };
 
   if (bookingSuccess) {
@@ -539,23 +552,6 @@ export const CheckoutPage = ({
                       </button>
                     </div>
                   )}
-
-                  {/* CLEAN SCANNABLE LIVE UPI QR DISPLAY (ONLY QR CODE) */}
-                  {paymentMethod === 'UPI_QR' && (
-                    <div className="mt-4 bg-white border-2 border-slate-200 p-5 rounded-3xl flex flex-col items-center justify-center space-y-3 shadow-md animate-in fade-in">
-                      <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-inner flex flex-col items-center">
-                        <QRCodeSVG
-                          value={`upi://pay?pa=${receiverUpiId}&pn=KAAM%20Services&am=${finalPayable}&cu=INR&tn=KAAM-Booking`}
-                          size={190}
-                          level="H"
-                          includeMargin={true}
-                        />
-                      </div>
-                      <p className="text-xs font-black text-slate-900 tracking-tight text-center">
-                        Scan with GPay / PhonePe / Paytm to pay ₹{finalPayable}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -769,11 +765,7 @@ export const CheckoutPage = ({
                   className="py-3.5 px-8 rounded-2xl bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-purple-600/30 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                 >
                   <span>
-                    {isSubmitting
-                      ? 'Confirming...'
-                      : paymentMethod === 'UPI_QR'
-                      ? `I Have Paid ₹${finalPayable} (Confirm)`
-                      : 'Place Booking ➔'}
+                    {isSubmitting ? 'Please wait...' : 'Proceed to book ➔'}
                   </span>
                 </button>
               </div>
@@ -924,6 +916,63 @@ export const CheckoutPage = ({
           setShowAddressModal(false);
         }}
       />
+
+      {/* ======================================================== */}
+      {/* UPI QR CODE PAYMENT POPUP MODAL (AFTER PROCEED TO BOOK)  */}
+      {/* ======================================================== */}
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 relative animate-in zoom-in-95 text-center font-['Plus_Jakarta_Sans',sans-serif]">
+            
+            {/* Close Button */}
+            <button
+              onClick={() => setShowQrModal(false)}
+              className="absolute -top-3 -right-3 sm:-top-4 sm:-right-4 w-9 h-9 rounded-full bg-white text-slate-700 hover:text-slate-950 shadow-xl border border-slate-200 grid place-items-center font-bold text-sm transition active:scale-95 z-10"
+            >
+              ✕
+            </button>
+
+            {/* Header */}
+            <div>
+              <span className="text-[10px] uppercase font-extrabold tracking-wider bg-purple-100 text-purple-800 px-3 py-1 rounded-full">
+                Scan & Pay via UPI
+              </span>
+              <h3 className="text-xl font-black text-slate-900 font-['Outfit'] mt-2">
+                Pay ₹{finalPayable}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Scan this QR code with any UPI app to pay
+              </p>
+            </div>
+
+            {/* Centered QR Code */}
+            <div className="bg-white p-3 rounded-2xl border-2 border-slate-200 shadow-inner inline-block mx-auto">
+              <QRCodeSVG
+                value={`upi://pay?pa=${receiverUpiId}&pn=KAAM%20Services&am=${finalPayable}&cu=INR&tn=KAAM-Booking`}
+                size={210}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+
+            <p className="text-xs font-black text-slate-800 tracking-tight">
+              Google Pay • PhonePe • Paytm • BHIM
+            </p>
+
+            {/* Confirm Paid Action */}
+            <div className="pt-2">
+              <button
+                disabled={isSubmitting}
+                onClick={submitBookingOrder}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-purple-600/30 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmitting ? 'Confirming Payment...' : 'I Have Paid (Confirm Booking) ➔'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );
