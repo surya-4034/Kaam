@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: kaam-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5050
+      - key: JWT_SECRET
+        value: kaam_super_secret_jwt_key_2026
+      - key: RESEND_API_KEY
+        value: re_cDFX99ay_Ad3ij4KZ8hQhrSaSMrmEZuWR
+      - key: EMAIL_USER
+        value: kaam@yors.online
+      - key: EMAIL_PASS
+        value: "Aa065405#"
+      - key: MONGO_URI
+        value: mongodb+srv://sujal:Sujal957@cluster0.0yxyzl6.mongodb.net/kaam_db?retryWrites=true&w=majority&appName=Cluster0
