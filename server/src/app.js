@@ -24,6 +24,25 @@ app.use('/api/maps', mapsRoutes);
 app.use('/api/location', spatialRoutes);
 
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    platform: 'kaam Production API Server',
+    version: '4.0.0',
+    health: '/api/health',
+    endpoints: {
+      auth: '/api/auth',
+      workers: '/api/workers',
+      jobs: '/api/jobs',
+      dues: '/api/dues',
+      admin: '/api/admin',
+      maps: '/api/maps',
+      location: '/api/location'
+    }
+  });
+});
+
 // Health Check
 app.get('/api/health', (req, res) => {
   res.json({
