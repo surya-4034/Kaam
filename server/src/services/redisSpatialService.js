@@ -229,13 +229,11 @@ export const resolveWorkerCoordinates = (worker) => {
   let wLat = liveTelemetry ? liveTelemetry.lat : (worker.latitude ?? worker.lat);
   let wLng = liveTelemetry ? liveTelemetry.lng : (worker.longitude ?? worker.lng);
 
-  // If coordinates exist and are inside the Mumbai Metropolitan Region range, use them
+  // If valid coordinates exist, use them directly (real GPS coordinates)
   if (wLat !== undefined && wLat !== null && !isNaN(Number(wLat)) &&
       wLng !== undefined && wLng !== null && !isNaN(Number(wLng)) &&
       Number(wLat) !== 0 && Number(wLng) !== 0) {
-    if (isWithinMumbaiRange(wLat, wLng)) {
-      return { lat: Number(wLat), lng: Number(wLng), isRealGps: true };
-    }
+    return { lat: Number(wLat), lng: Number(wLng), isRealGps: true };
   }
 
   // Lookup locality/city string in Geocode Dictionary
@@ -248,7 +246,7 @@ export const resolveWorkerCoordinates = (worker) => {
     }
   }
 
-  // Default fallback for any Mumbai worker with unspecified sub-locality
+  // Default fallback for any worker with unspecified sub-locality
   return { lat: 19.0760, lng: 72.8777, isRealGps: false };
 };
 
