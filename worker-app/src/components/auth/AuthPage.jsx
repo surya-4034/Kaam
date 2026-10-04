@@ -81,7 +81,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = true, initialMode = 'SI
       } else if (fbErr.code === 'auth/popup-blocked') {
         setErrorMessage('Popup was blocked by your browser. Please allow popups for localhost and try again.');
       } else if (fbErr.code === 'auth/unauthorized-domain') {
-        setErrorMessage('Firebase auth domain not authorized for localhost. Please check Firebase settings.');
+        setErrorMessage(`Domain '${window.location.hostname}' is not authorized in Firebase Console > Authentication > Settings > Authorized domains. You can also use Email Login below.`);
       } else if (rawMsg.includes('database is closing') || rawMsg.includes('closing/hidden') || rawMsg.includes('internal-error')) {
         try {
           await new Promise((r) => setTimeout(r, 500));
