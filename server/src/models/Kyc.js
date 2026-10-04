@@ -1,19 +1,42 @@
 import mongoose from 'mongoose';
+import { getMongoDb } from '../config/mongoose.js';
 
-const kycSchema = new mongoose.Schema({
+export const kycSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
-  worker_id: { type: String, required: true, unique: true },
-  account_holder_name: { type: String, required: true },
-  bank_name: { type: String, required: true },
-  account_number: { type: String, required: true },
-  ifsc_code: { type: String, required: true },
-  upi_id: { type: String, required: true },
-  govt_id_type: { type: String, default: 'AADHAAR' },
-  govt_id_number: { type: String, required: true },
-  aadhaar_doc_url: { type: String },
+  workerId: { type: String, required: true, index: true },
+  accountHolderName: { type: String, required: true },
+  bankName: { type: String, required: true },
+  accountNumber: { type: String, required: true },
+  ifscCode: { type: String, required: true },
+  upiId: { type: String, required: true },
+  upiPhone: { type: String, default: '' },
+  govtIdType: { type: String, default: 'AADHAAR' },
+  govtIdNumber: { type: String, required: true },
+  aadhaarDocUrl: { type: String, default: '' },
   status: { type: String, enum: ['PENDING', 'VERIFIED', 'REJECTED'], default: 'PENDING' },
-  rejection_reason: { type: String },
-  submitted_at: { type: Date, default: Date.now }
-}, { timestamps: true });
+  rejectionReason: { type: String, default: '' },
+  verifiedAt: { type: Date, default: null },
+  submittedAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+}, { timestamps: true, bufferCommands: false });
 
-export default mongoose.models.Kyc || mongoose.model('Kyc', kycSchema);
+export const getKycModel = () => {
+  const db = getMongoDb();
+  if (db) {
+    return db.models.Kyc || db.model('Kyc', kycSchema, 'kyc_records');
+  }
+  return mongoose.models.Kyc || mongoose.model('Kyc', kycSchema, 'kyc_records');
+};
+
+const ProxyKyc = new Proxy({}, {
+  get(target, prop) {
+    const model = getKycModel();
+    if (typeof model[prop] === 'function') {
+      return model[prop].bind(model);
+    }
+    return model[prop];
+  }
+});
+
+export default ProxyKyc;
+

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '../../config/api';
 import { User, Phone, MapPin, Building, ShieldCheck, CheckCircle2, ArrowRight, ArrowLeft, Home } from 'lucide-react';
 
 const INDIAN_STATES = [
@@ -81,7 +82,7 @@ export const ClientOnboardingWizard = ({ user, onComplete }) => {
     const fullAddress = `${formData.locality}, near ${formData.landmark}, ${formData.state} - ${formData.pincode}`;
 
     try {
-      const response = await fetch('http://localhost:5050/api/auth/update-profile', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/update-profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

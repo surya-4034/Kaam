@@ -1,5 +1,12 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { 
+  getAuth, 
+  initializeAuth, 
+  browserLocalPersistence, 
+  browserSessionPersistence,
+  browserPopupRedirectResolver, 
+  GoogleAuthProvider 
+} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDfeL6rICld9rg4RihSrwwYhPkWgcbw0EM",
@@ -11,9 +18,22 @@ const firebaseConfig = {
   measurementId: "G-9C4Z3H86V7"
 };
 
-// Initialize Firebase App & Auth Services
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
+// Initialize Firebase App
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
+// Initialize Firebase Auth with proper persistence & browser popup redirect resolver
+let auth;
+try {
+  auth = initializeAuth(app, {
+    persistence: [browserLocalPersistence, browserSessionPersistence],
+    popupRedirectResolver: browserPopupRedirectResolver
+  });
+} catch (e) {
+  auth = getAuth(app);
+}
+
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+export { auth, browserPopupRedirectResolver };
 export default app;

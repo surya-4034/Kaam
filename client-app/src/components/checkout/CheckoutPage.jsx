@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
+import React, { useState, useEffect } from 'react';
 import {
   MapPin,
   Clock,
@@ -24,6 +23,8 @@ import {
   Check
 } from 'lucide-react';
 import { AddressAndSlotWorkflow } from './AddressAndSlotWorkflow';
+import { API_BASE_URL } from '../../config/api';
+import { isMumbaiLocation } from '../../services/locationService';
 
 export const CheckoutPage = ({
   worker,
@@ -33,24 +34,24 @@ export const CheckoutPage = ({
   onBookingComplete,
   onRequireLogin
 }) => {
-  // Saved addresses list state
+  // Saved addresses list state (Defaulted to Mumbai Operating Region)
   const [savedAddresses, setSavedAddresses] = useState([
     {
       id: 'addr-home',
-      label: 'Home',
-      details: user?.address || 'astavinayak colony sangoda rd, Mumbai Central, Mumbai, Maharashtra, India',
+      label: 'Home (Mumbai)',
+      details: user?.address || 'Astavinayak Colony, Sangoda Rd, Mumbai Central, Mumbai, Maharashtra 400008',
       isDefault: true
     },
     {
       id: 'addr-work',
-      label: 'Work / Office',
-      details: 'Unit 402, Cyber Tower B, Sector 62, Noida, Uttar Pradesh, 201301',
+      label: 'Work / Office (Mumbai)',
+      details: 'Unit 402, Trade World, C-Wing, Kamala Mills, Lower Parel, Mumbai, Maharashtra 400013',
       isDefault: false
     }
   ]);
 
   const [selectedAddressId, setSelectedAddressId] = useState('addr-home');
-  const [selectedAddressCoordinates, setSelectedAddressCoordinates] = useState({ lat: 25.4358, lng: 81.8463 });
+  const [selectedAddressCoordinates, setSelectedAddressCoordinates] = useState({ lat: 18.9690, lng: 72.8205 });
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [isAddingNewAddress, setIsAddingNewAddress] = useState(false);
   const [searchAddressQuery, setSearchAddressQuery] = useState('');
@@ -194,6 +195,10 @@ export const CheckoutPage = ({
   const [addressSaved, setAddressSaved] = useState(true);
   const [avoidCalling, setAvoidCalling] = useState(false);
 
+  // Mumbai boundary validation for chosen address
+  const addressAvailability = isMumbaiLocation(address, selectedAddressCoordinates);
+  const isAddressInMumbai = addressAvailability.isAvailable;
+
   // Time slot step
   const [selectedSlot, setSelectedSlot] = useState('Tomorrow, 10:00 AM - 11:00 AM');
   const [showSlotPicker, setShowSlotPicker] = useState(false);
@@ -201,15 +206,22 @@ export const CheckoutPage = ({
   // Payment method step
   const [paymentMethod, setPaymentMethod] = useState('UPI_QR'); // 'UPI_QR' | 'DIRECT_CASH' | 'CARD'
   const [showPaymentPicker, setShowPaymentPicker] = useState(false);
-  const [showQrModal, setShowQrModal] = useState(false);
-  const [receiverUpiId, setReceiverUpiId] = useState(import.meta.env.VITE_RECEIVER_UPI_ID || '9653192752@kotakbank');
+  const partnerUpi = worker?.bank?.upi || worker?.upiId || worker?.upi || (worker?.phone ? `${worker.phone.replace(/\D/g, '')}@paytm` : (import.meta.env.VITE_RECEIVER_UPI_ID || '9653192752@kotakbank'));
+  const [receiverUpiId, setReceiverUpiId] = useState(partnerUpi);
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [upiUtr, setUpiUtr] = useState('');
+
+  useEffect(() => {
+    const upi = worker?.bank?.upi || worker?.upiId || worker?.upi || (worker?.phone ? `${worker.phone.replace(/\D/g, '')}@paytm` : '');
+    if (upi) setReceiverUpiId(upi);
+  }, [worker]);
 
   // Tip selection
   const [selectedTip, setSelectedTip] = useState(75);
   const [customTip, setCustomTip] = useState('');
   const [isCustomTip, setIsCustomTip] = useState(false);
+
+  const visitingCharge = Number(worker?.visitingCharge || worker?.visiting_charge || 149);
 
   // Cart items state to allow increment/decrement directly in checkout
   const [items, setItems] = useState(
@@ -217,11 +229,16 @@ export const CheckoutPage = ({
       ? cartItems
       : [
           {
-            id: 'default-pkg',
-            title: `${worker.tradeTitle || 'Trade'} Standard Service Package`,
-            price: worker.dailyRate || 758,
+            id: 'visiting-charge-item',
+            title: `Doorstep Visiting & Inspection Charge`,
+            price: visitingCharge,
             qty: 1,
-            features: ['Diagnostic inspection', 'Standard repair & fitting', 'Post-service cleanup']
+            isVisitingCharge: true,
+            features: [
+              'Mandatory partner doorstep visiting charge',
+              'Problem diagnosis & quotation at your home',
+              'Waived if you select a specific service package'
+            ]
           }
         ]
   );
@@ -241,7 +258,7 @@ export const CheckoutPage = ({
   };
 
   // Calculations
-  const itemTotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
+  const itemTotal = items.reduce((sum, i) => sum + (Number(i.price || 0) * Number(i.qty || 1)), 0);
   const taxesAndFees = Math.round(itemTotal * 0.05) + 15; // 5% GST + Convenience
   const tipAmount = isCustomTip ? (Number(customTip) || 0) : selectedTip;
   const finalPayable = itemTotal + taxesAndFees + tipAmount;
@@ -253,42 +270,47 @@ export const CheckoutPage = ({
     setIsSubmitting(true);
 
     const payload = {
-      workerId: worker.id,
-      workerName: worker.name,
-      tradeTitle: worker.tradeTitle,
-      workerPhone: worker.phone,
-      clientName: user.fullName || 'Homeowner',
+      clientId: user?.id,
+      workerId: worker?.id || 'w-direct',
+      workerName: worker?.name || 'Partner',
+      tradeTitle: worker?.tradeTitle || 'Specialist',
+      categoryTitle: worker?.tradeTitle || 'General Service',
+      workerPhone: worker?.phone || '',
+      workerUpi: partnerUpi || worker?.bank?.upi || worker?.upiId || '',
+      workerUpiPhone: worker?.bank?.upiPhone || worker?.phone || '',
+      workerUpiHolder: worker?.bank?.holder || worker?.name || 'Verified Partner',
+      clientName: user?.fullName || user?.full_name || 'Homeowner',
+      clientEmail: user?.email || 'client@kaam.com',
       clientPhone: phone,
       locationAddress: address,
       coordinates: selectedAddressCoordinates || null,
-      workDescription: items.map(i => `${i.title} (x${i.qty})`).join(', '),
+      workDescription: items.map(i => `${i.title} (x${i.qty || 1})`).join(', '),
+      packagesJson: JSON.stringify(items),
       agreedTotalFee: finalPayable,
       paymentMode: paymentMethod,
       upiUtr: upiUtr || null,
-      paymentStatus: paymentMethod === 'UPI_QR' ? 'PAID_VIA_UPI_QR' : 'PAY_AFTER_SERVICE',
+      paymentStatus: 'PENDING_ON_ACCEPTANCE',
       timeSlot: selectedSlot,
       avoidCallingBeforeArrival: avoidCalling,
       tipAmount: tipAmount
     };
 
     try {
-      const res = await fetch('http://localhost:5050/api/jobs', {
+      const res = await fetch(`${API_BASE_URL}/api/jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
       if (res.ok) {
-        setShowQrModal(false);
-        setBookingSuccess(true);
+        const data = await res.json();
+        onBookingComplete(data.job || payload);
       } else {
-        setShowQrModal(false);
-        setBookingSuccess(true);
+        onBookingComplete(payload);
       }
     } catch (e) {
       console.warn('Job submitted offline mode fallback:', e);
-      setShowQrModal(false);
-      setBookingSuccess(true);
+      onBookingComplete(payload);
     } finally {
       setIsSubmitting(false);
     }
@@ -300,11 +322,12 @@ export const CheckoutPage = ({
       return;
     }
 
-    if (paymentMethod === 'UPI_QR') {
-      setShowQrModal(true);
+    if (!isAddressInMumbai) {
+      alert('Service was unavailable at this place, sorry for inconvenience!');
       return;
     }
 
+    // Direct submission & immediate redirect to My Requests
     submitBookingOrder();
   };
 
@@ -422,6 +445,14 @@ export const CheckoutPage = ({
                         <span className="font-bold text-slate-900 block mb-0.5">{activeAddressObj?.label || 'Selected Location'}:</span>
                         {address}
                       </p>
+
+                      {!isAddressInMumbai && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-bold flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                          <span>Service was unavailable at this place, sorry for inconvenience!</span>
+                        </div>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => setShowAddressModal(true)}
@@ -578,8 +609,8 @@ export const CheckoutPage = ({
               
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 font-['Outfit']">{worker.name}</h3>
-                  <p className="text-xs text-amber-700 font-bold">{worker.tradeTitle} • {worker.locality}</p>
+                  <h3 className="text-lg font-black text-slate-900 font-['Outfit']">{worker?.name || 'Partner'}</h3>
+                  <p className="text-xs text-amber-700 font-bold">{worker?.tradeTitle || 'Specialist'} • {worker?.locality || 'Mumbai'}</p>
                 </div>
                 <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200 flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3" /> VERIFIED
@@ -588,11 +619,29 @@ export const CheckoutPage = ({
 
               {/* Service Items List */}
               <div className="space-y-4">
+                {items.some(i => i.isVisitingCharge || i.id === 'visiting-charge-item') && (
+                  <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-950 space-y-1">
+                    <p className="font-extrabold flex items-center gap-1.5 text-amber-900">
+                      <span>⚠️ Mandatory Doorstep Visiting Fee: ₹{visitingCharge}</span>
+                    </p>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      You are booking without selecting a service package. The partner's visiting charge is mandatory for doorstep inspection and travel. If you choose a package instead, this visiting fee is waived.
+                    </p>
+                  </div>
+                )}
+
                 {items.map((item) => (
                   <div key={item.id} className="space-y-2">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h4 className="text-sm font-extrabold text-slate-900">{item.title}</h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-extrabold text-slate-900">{item.title}</h4>
+                          {(item.isVisitingCharge || item.id === 'visiting-charge-item') && (
+                            <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                              Mandatory Fee
+                            </span>
+                          )}
+                        </div>
                         <ul className="mt-1 space-y-0.5 text-[11px] text-slate-500">
                           {(item.features || []).map((feat, fIdx) => (
                             <li key={fIdx} className="flex items-center gap-1.5">
@@ -760,12 +809,16 @@ export const CheckoutPage = ({
                 </div>
 
                 <button
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !isAddressInMumbai}
                   onClick={handleProceedToBook}
-                  className="py-3.5 px-8 rounded-2xl bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-purple-600/30 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                  className={`py-3.5 px-8 rounded-2xl text-white font-black text-xs shadow-lg active:scale-95 transition-all flex items-center gap-2 ${
+                    isAddressInMumbai 
+                      ? 'bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 hover:brightness-110 shadow-purple-600/30 cursor-pointer' 
+                      : 'bg-red-600 hover:bg-red-700 opacity-90 cursor-not-allowed'
+                  }`}
                 >
                   <span>
-                    {isSubmitting ? 'Please wait...' : 'Proceed to book ➔'}
+                    {isSubmitting ? 'Please wait...' : !isAddressInMumbai ? 'Service was unavailable at this place, sorry for inconvenience!' : 'Proceed to book ➔'}
                   </span>
                 </button>
               </div>
@@ -890,7 +943,7 @@ export const CheckoutPage = ({
       <AddressAndSlotWorkflow
         isOpen={isSearchingLocation}
         onClose={() => setIsSearchingLocation(false)}
-        tradeTitle={worker.tradeTitle || 'Service'}
+        tradeTitle={worker?.tradeTitle || 'Service'}
         onComplete={(result) => {
           const newAddrId = `addr-${Date.now()}`;
           const newSavedAddr = {
@@ -916,63 +969,6 @@ export const CheckoutPage = ({
           setShowAddressModal(false);
         }}
       />
-
-      {/* ======================================================== */}
-      {/* UPI QR CODE PAYMENT POPUP MODAL (AFTER PROCEED TO BOOK)  */}
-      {/* ======================================================== */}
-      {showQrModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 relative animate-in zoom-in-95 text-center font-['Plus_Jakarta_Sans',sans-serif]">
-            
-            {/* Close Button */}
-            <button
-              onClick={() => setShowQrModal(false)}
-              className="absolute -top-3 -right-3 sm:-top-4 sm:-right-4 w-9 h-9 rounded-full bg-white text-slate-700 hover:text-slate-950 shadow-xl border border-slate-200 grid place-items-center font-bold text-sm transition active:scale-95 z-10"
-            >
-              ✕
-            </button>
-
-            {/* Header */}
-            <div>
-              <span className="text-[10px] uppercase font-extrabold tracking-wider bg-purple-100 text-purple-800 px-3 py-1 rounded-full">
-                Scan & Pay via UPI
-              </span>
-              <h3 className="text-xl font-black text-slate-900 font-['Outfit'] mt-2">
-                Pay ₹{finalPayable}
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Scan this QR code with any UPI app to pay
-              </p>
-            </div>
-
-            {/* Centered QR Code */}
-            <div className="bg-white p-3.5 rounded-2xl border-2 border-slate-200 shadow-inner inline-block mx-auto">
-              <QRCodeSVG
-                value={`upi://pay?pa=${receiverUpiId}&pn=KAAM%20Services&am=${finalPayable}&cu=INR&tn=KAAM-Booking`}
-                size={210}
-                level="H"
-                includeMargin={true}
-              />
-            </div>
-
-            <p className="text-xs font-black text-slate-800 tracking-tight">
-              Google Pay • PhonePe • Paytm • BHIM
-            </p>
-
-            {/* Confirm Paid Action */}
-            <div className="pt-2">
-              <button
-                disabled={isSubmitting}
-                onClick={submitBookingOrder}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-purple-600/30 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
-              >
-                {isSubmitting ? 'Confirming Payment...' : 'I Have Paid (Confirm Booking) ➔'}
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
 
     </div>
   );

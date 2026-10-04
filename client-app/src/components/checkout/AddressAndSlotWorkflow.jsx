@@ -13,10 +13,12 @@ import {
   CheckCircle2,
   ChevronRight,
   Plus,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
+import { isMumbaiLocation } from '../../services/locationService';
 
-const MAPBOX_TOKEN = 'pk.eyJ1Ijoic3VyeWEwMDEiLCJhIjoiY210MXV5NHpiMGc3czJ5cjI0NTVwZXYwbiJ9.pJajjwb6MfjO_SsDaMRYDA';
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1Ijoic3VyeWEwMDEiLCJhIjoiY210MXV5NHpiMGc3czJ5cjI0NTVwZXYwbiJ9.pJajjwb6MfjO_SsDaMRYDA';
 
 export const AddressAndSlotWorkflow = ({
   isOpen,
@@ -34,72 +36,138 @@ export const AddressAndSlotWorkflow = ({
   const [autocompleteResults, setAutocompleteResults] = useState([]);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
 
-  // Recents History
+  // Recents History (Defaulted to verified Mumbai Locations)
   const [recentSearches, setRecentSearches] = useState([
     {
-      title: 'Prayagraj',
-      subtitle: 'Uttar Pradesh, India',
-      fullAddress: 'Prayagraj, Uttar Pradesh, India',
-      lat: 25.4358,
-      lng: 81.8463
+      title: 'Andheri West',
+      subtitle: 'Mumbai, Maharashtra, India',
+      fullAddress: 'Andheri West, Mumbai, Maharashtra 400058, India',
+      lat: 19.1363,
+      lng: 72.8277
     },
     {
-      title: 'Bhopal',
-      subtitle: 'Madhya Pradesh, India',
-      fullAddress: 'Bhopal, Madhya Pradesh, India',
-      lat: 23.2599,
-      lng: 77.4126
+      title: 'Bandra West',
+      subtitle: 'Mumbai, Maharashtra, India',
+      fullAddress: 'Bandra West, Mumbai, Maharashtra 400050, India',
+      lat: 19.0596,
+      lng: 72.8295
+    },
+    {
+      title: 'Powai',
+      subtitle: 'Mumbai, Maharashtra, India',
+      fullAddress: 'Hiranandani Gardens, Powai, Mumbai, Maharashtra 400076, India',
+      lat: 19.1176,
+      lng: 72.9060
     }
   ]);
 
-  // Step 3: Selected Location & Map Coordinates State
+  // Step 3: Selected Location & Map Coordinates State (Defaulted to Mumbai)
   const [selectedLocation, setSelectedLocation] = useState({
-    title: 'Prayagraj',
-    subtitle: 'Uttar Pradesh, India',
-    areaName: 'Prayagraj',
-    fullAddress: 'Prayagraj, Uttar Pradesh, India',
-    lat: 25.4358,
-    lng: 81.8463
+    title: 'Andheri West',
+    subtitle: 'Mumbai, Maharashtra, India',
+    areaName: 'Andheri West',
+    fullAddress: 'Andheri West, Mumbai, Maharashtra 400058, India',
+    lat: 19.1363,
+    lng: 72.8277
   });
 
-  const [pinCoords, setPinCoords] = useState({ lat: 25.4358, lng: 81.8463 });
+  const [pinCoords, setPinCoords] = useState({ lat: 19.1363, lng: 72.8277 });
   const [houseNumber, setHouseNumber] = useState('');
   const [landmarkDetail, setLandmarkDetail] = useState('');
   const [saveAsType, setSaveAsType] = useState('Home'); // 'Home' | 'Other'
+
+  // Boundary verification for current map pinpoint
+  const pinLocationCheck = isMumbaiLocation(selectedLocation.fullAddress || selectedLocation.title, pinCoords);
+  const isPinInMumbai = pinLocationCheck.isAvailable;
 
   // Mapbox Container Ref & Instance Ref
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markerRef = useRef(null);
 
-  // Step 4: Slot Picker State
-  const [selectedDate, setSelectedDate] = useState('Fri 21');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState('08:30 AM');
+  // Step 4: Real Dynamic Dates & Timing Slot Picker State
+  const dynamicDates = React.useMemo(() => {
+    const list = [];
+    const now = new Date();
+    for (let i = 0; i < 3; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() + i);
+      const dayShort = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const dateNum = d.getDate();
+      const monthShort = d.toLocaleDateString('en-US', { month: 'short' });
+      const key = `${dayShort} ${dateNum}`;
+      list.push({
+        day: dayShort,
+        date: String(dateNum),
+        month: monthShort,
+        key: key,
+        isToday: i === 0,
+        fullLabel: `${dayShort}, ${dateNum} ${monthShort}`
+      });
+    }
+    return list;
+  }, []);
+
+  const ALL_TIME_SLOTS = [
+    { time: '07:00 AM', hour24: 7, minute: 0, surge: 100 },
+    { time: '07:30 AM', hour24: 7, minute: 30, surge: 100 },
+    { time: '08:00 AM', hour24: 8, minute: 0, surge: 100 },
+    { time: '08:30 AM', hour24: 8, minute: 30, surge: 0 },
+    { time: '09:00 AM', hour24: 9, minute: 0, surge: 0 },
+    { time: '09:30 AM', hour24: 9, minute: 30, surge: 0 },
+    { time: '10:00 AM', hour24: 10, minute: 0, surge: 0 },
+    { time: '10:30 AM', hour24: 10, minute: 30, surge: 0 },
+    { time: '11:00 AM', hour24: 11, minute: 0, surge: 0 },
+    { time: '11:30 AM', hour24: 11, minute: 30, surge: 0 },
+    { time: '12:00 PM', hour24: 12, minute: 0, surge: 0 },
+    { time: '12:30 PM', hour24: 12, minute: 30, surge: 0 },
+    { time: '01:00 PM', hour24: 13, minute: 0, surge: 0 },
+    { time: '01:30 PM', hour24: 13, minute: 30, surge: 0 },
+    { time: '02:00 PM', hour24: 14, minute: 0, surge: 0 },
+    { time: '02:30 PM', hour24: 14, minute: 30, surge: 0 },
+    { time: '03:00 PM', hour24: 15, minute: 0, surge: 0 },
+    { time: '03:30 PM', hour24: 15, minute: 30, surge: 0 },
+    { time: '04:00 PM', hour24: 16, minute: 0, surge: 0 },
+    { time: '04:30 PM', hour24: 16, minute: 30, surge: 0 },
+    { time: '05:00 PM', hour24: 17, minute: 0, surge: 0 },
+    { time: '05:30 PM', hour24: 17, minute: 30, surge: 0 },
+    { time: '06:00 PM', hour24: 18, minute: 0, surge: 0 },
+    { time: '06:30 PM', hour24: 18, minute: 30, surge: 0 },
+    { time: '07:00 PM', hour24: 19, minute: 0, surge: 0 },
+    { time: '07:30 PM', hour24: 19, minute: 30, surge: 0 },
+    { time: '08:00 PM', hour24: 20, minute: 0, surge: 0 },
+    { time: '08:30 PM', hour24: 20, minute: 30, surge: 0 }
+  ];
+
+  // Helper: check if a time slot is under 30 minutes from current time
+  const isSlotUnder30Min = (slotObj, isToday) => {
+    if (!isToday) return false;
+    const now = new Date();
+    const minAllowedTime = new Date(now.getTime() + 30 * 60 * 1000);
+    const slotDate = new Date(now);
+    slotDate.setHours(slotObj.hour24, slotObj.minute, 0, 0);
+    return slotDate.getTime() < minAllowedTime.getTime();
+  };
+
+  const [selectedDate, setSelectedDate] = useState(() => dynamicDates[0]?.key || '');
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
   const [slotSurgeFee, setSlotSurgeFee] = useState(0);
+  const [slotErrorMsg, setSlotErrorMsg] = useState('');
 
-  const DATES = [
-    { day: 'Fri', date: '21', key: 'Fri 21' },
-    { day: 'Sat', date: '22', key: 'Sat 22' },
-    { day: 'Sun', date: '23', key: 'Sun 23' }
-  ];
-
-  const TIME_SLOTS = [
-    { time: '07:00 AM', surge: 100 },
-    { time: '07:30 AM', surge: 100 },
-    { time: '08:00 AM', surge: 100 },
-    { time: '08:30 AM', surge: 0 },
-    { time: '09:00 AM', surge: 0 },
-    { time: '09:30 AM', surge: 0 },
-    { time: '10:00 AM', surge: 0 },
-    { time: '10:30 AM', surge: 0 },
-    { time: '11:00 AM', surge: 0 },
-    { time: '11:30 AM', surge: 0 },
-    { time: '12:00 PM', surge: 0 },
-    { time: '12:30 PM', surge: 0 },
-    { time: '01:00 PM', surge: 0 },
-    { time: '01:30 PM', surge: 0 },
-    { time: '02:00 PM', surge: 0 }
-  ];
+  // Auto-select initial valid slot on mount or date change
+  useEffect(() => {
+    const isToday = dynamicDates.find(d => d.key === selectedDate)?.isToday;
+    const firstValid = ALL_TIME_SLOTS.find(s => !isSlotUnder30Min(s, isToday));
+    if (firstValid) {
+      setSelectedTimeSlot(firstValid.time);
+      setSlotSurgeFee(firstValid.surge);
+    } else if (isToday && dynamicDates.length > 1) {
+      // If all slots today have already passed, auto-switch to tomorrow
+      setSelectedDate(dynamicDates[1].key);
+      setSelectedTimeSlot(ALL_TIME_SLOTS[0].time);
+      setSlotSurgeFee(ALL_TIME_SLOTS[0].surge);
+    }
+  }, [selectedDate, dynamicDates]);
 
   // 1. Live Real-World Search via Mapbox Geocoding API
   useEffect(() => {
@@ -271,10 +339,21 @@ export const AddressAndSlotWorkflow = ({
   const handleSaveAddressAndProceedToSlots = (e) => {
     e.preventDefault();
     if (!houseNumber.trim()) return;
+    if (!isPinInMumbai) {
+      alert('Service was unavailable at this place, sorry for inconvenience!');
+      return;
+    }
     setCurrentStep('SLOT_PICKER');
   };
 
   const handleFinalConfirm = () => {
+    const isToday = dynamicDates.find(d => d.key === selectedDate)?.isToday;
+    const slotObj = ALL_TIME_SLOTS.find(s => s.time === selectedTimeSlot);
+    if (!selectedTimeSlot || (slotObj && isSlotUnder30Min(slotObj, isToday))) {
+      setSlotErrorMsg("Please choose 30 min after of current time");
+      return;
+    }
+
     const formattedAddress = `${saveAsType} - ${houseNumber}${landmarkDetail ? `, near ${landmarkDetail}` : ''}, ${selectedLocation.fullAddress}`;
     
     onComplete({
@@ -317,7 +396,7 @@ export const AddressAndSlotWorkflow = ({
               autoFocus
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for your location/society/apartment"
+              placeholder="Search for Mumbai locality / society / landmark"
               className="w-full pl-11 pr-10 py-3 rounded-2xl border border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#5932ea] focus:bg-white transition"
             />
             {isLoadingResults ? (
@@ -340,35 +419,52 @@ export const AddressAndSlotWorkflow = ({
             className="flex items-center gap-2.5 py-1 text-xs font-black text-[#5932ea] hover:text-[#4927cb] transition active:scale-95"
           >
             <LocateFixed className="w-4 h-4 text-[#5932ea]" />
-            <span>Use current location</span>
+            <span>Use current location (Mumbai)</span>
           </button>
 
           {/* AUTOCOMPLETE RESULTS (Real-World Live Mapbox Data) */}
           {searchQuery.trim() ? (
             <div className="space-y-1 max-h-80 overflow-y-auto divide-y divide-slate-100 pt-1">
               {autocompleteResults.length > 0 ? (
-                autocompleteResults.map((item, idx) => (
-                  <div
-                    key={item.id || idx}
-                    onClick={() => handleSelectLandmark(item)}
-                    className="flex items-start gap-3.5 py-3.5 px-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition select-none group"
-                  >
-                    <div className="pt-0.5 text-slate-400 group-hover:text-[#5932ea] transition shrink-0">
-                      <MapPin className="w-4 h-4" />
+                autocompleteResults.map((item, idx) => {
+                  const itemInMumbai = isMumbaiLocation(item.fullAddress, { lat: item.lat, lng: item.lng }).isAvailable;
+                  return (
+                    <div
+                      key={item.id || idx}
+                      onClick={() => handleSelectLandmark(item)}
+                      className={`flex items-start gap-3.5 py-3.5 px-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition select-none group ${
+                        !itemInMumbai ? 'bg-red-50/40 border border-red-100' : ''
+                      }`}
+                    >
+                      <div className={`pt-0.5 ${itemInMumbai ? 'text-slate-400 group-hover:text-[#5932ea]' : 'text-red-500'} transition shrink-0`}>
+                        <MapPin className="w-4 h-4" />
+                      </div>
+                      <div className="space-y-0.5 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className={`text-xs font-black ${itemInMumbai ? 'text-slate-900 group-hover:text-[#5932ea]' : 'text-red-950'} transition`}>
+                            {item.title}
+                          </h4>
+                          {!itemInMumbai && (
+                            <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-black shrink-0">
+                              Unavailable
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-tight">
+                          {item.subtitle}
+                        </p>
+                        {!itemInMumbai && (
+                          <p className="text-[10px] text-red-600 font-bold mt-1">
+                            Service was unavailable at this place, sorry for inconvenience!
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="space-y-0.5 flex-1">
-                      <h4 className="text-xs font-black text-slate-900 group-hover:text-[#5932ea] transition">
-                        {item.title}
-                      </h4>
-                      <p className="text-[11px] text-slate-500 leading-tight">
-                        {item.subtitle}
-                      </p>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               ) : !isLoadingResults ? (
                 <div className="p-4 text-center text-xs text-slate-500 font-medium">
-                  No matching locations found for "{searchQuery}". Try searching city, colony, or landmark.
+                  No matching locations found for "{searchQuery}". Try searching Mumbai localities (Andheri, Bandra, Powai, Dadar, etc.).
                 </div>
               ) : null}
             </div>
@@ -589,16 +685,42 @@ export const AddressAndSlotWorkflow = ({
                     ))}
                   </div>
                 </div>
+
+                {/* Outside Mumbai Service Unavailable Warning */}
+                {!isPinInMumbai && (
+                  <div className="p-3.5 bg-red-50 border-2 border-red-200 rounded-2xl flex items-start gap-2.5 animate-in fade-in">
+                    <span className="text-red-600 text-lg shrink-0">⚠️</span>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-black text-red-950">
+                        Service was unavailable at this place, sorry for inconvenience!
+                      </p>
+                      <p className="text-[11px] text-red-700 leading-tight">
+                        Kaam home services currently operate exclusively within Mumbai and the Mumbai Metropolitan Region (MMR). Please select an address located in Mumbai.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Submit Action (Always visible at bottom) */}
               <div className="pt-3 border-t border-slate-100 mt-auto">
                 <button
                   type="submit"
-                  className="w-full py-3.5 rounded-2xl bg-[#5932ea] hover:bg-[#4927cb] text-white font-black text-xs shadow-lg shadow-purple-600/30 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  disabled={!isPinInMumbai}
+                  className={`w-full py-3.5 rounded-2xl text-white font-black text-xs shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${
+                    isPinInMumbai 
+                      ? 'bg-[#5932ea] hover:bg-[#4927cb] shadow-purple-600/30 cursor-pointer' 
+                      : 'bg-red-600 hover:bg-red-700 opacity-90 cursor-not-allowed'
+                  }`}
                 >
-                  <span>Save and proceed to slots</span>
-                  <span>➔</span>
+                  {isPinInMumbai ? (
+                    <>
+                      <span>Save and proceed to slots</span>
+                      <span>➔</span>
+                    </>
+                  ) : (
+                    <span>Service was unavailable at this place, sorry for inconvenience!</span>
+                  )}
                 </button>
               </div>
 
@@ -634,13 +756,16 @@ export const AddressAndSlotWorkflow = ({
 
           {/* Date Selector Cards */}
           <div className="flex gap-2.5">
-            {DATES.map(item => {
+            {dynamicDates.map(item => {
               const isSelected = selectedDate === item.key;
               return (
                 <button
                   key={item.key}
                   type="button"
-                  onClick={() => setSelectedDate(item.key)}
+                  onClick={() => {
+                    setSelectedDate(item.key);
+                    setSlotErrorMsg('');
+                  }}
                   className={`flex-1 py-3 px-2 rounded-2xl border text-center transition flex flex-col items-center justify-center ${
                     isSelected
                       ? 'border-[#5932ea] bg-purple-50/70 text-purple-950 font-black ring-2 ring-purple-600/20'
@@ -663,25 +788,35 @@ export const AddressAndSlotWorkflow = ({
 
           {/* 3-Column Time Slot Grid */}
           <div className="grid grid-cols-3 gap-2 text-xs max-h-64 overflow-y-auto pr-1">
-            {TIME_SLOTS.map((slot, sIdx) => {
+            {ALL_TIME_SLOTS.map((slot, sIdx) => {
               const isSelected = selectedTimeSlot === slot.time;
+              const isToday = dynamicDates.find(d => d.key === selectedDate)?.isToday;
+              const isUnder30 = isSlotUnder30Min(slot, isToday);
+
               return (
                 <button
                   key={sIdx}
                   type="button"
                   onClick={() => {
+                    if (isUnder30) {
+                      setSlotErrorMsg('Please choose 30 min after of current time');
+                      return;
+                    }
+                    setSlotErrorMsg('');
                     setSelectedTimeSlot(slot.time);
                     setSlotSurgeFee(slot.surge);
                   }}
                   className={`py-2.5 px-2 rounded-2xl border text-center transition flex flex-col items-center justify-center relative ${
-                    isSelected
-                      ? 'border-[#5932ea] bg-[#5932ea] text-white font-black shadow-md shadow-purple-600/20'
-                      : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 font-bold'
+                    isUnder30
+                      ? 'border-slate-100 bg-slate-50/70 text-slate-400 opacity-50 cursor-pointer hover:bg-rose-50/50 hover:border-rose-200'
+                      : isSelected
+                        ? 'border-[#5932ea] bg-[#5932ea] text-white font-black shadow-md shadow-purple-600/20'
+                        : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 font-bold'
                   }`}
                 >
                   {slot.surge > 0 && (
                     <span className={`text-[8px] font-black px-1.5 py-0.2 rounded-full mb-0.5 ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-900'
+                      isSelected && !isUnder30 ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-900'
                     }`}>
                       + ₹{slot.surge}
                     </span>
@@ -692,12 +827,20 @@ export const AddressAndSlotWorkflow = ({
             })}
           </div>
 
+          {/* Error Message when user attempts slot under 30 minutes */}
+          {slotErrorMsg && (
+            <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{slotErrorMsg}</span>
+            </div>
+          )}
+
           {/* Bottom Proceed to Checkout CTA */}
           <div className="pt-2">
             <button
               type="button"
               onClick={handleFinalConfirm}
-              className="w-full py-4 rounded-2xl bg-slate-100 hover:bg-[#5932ea] hover:text-white text-slate-900 font-black text-xs transition-all active:scale-95 shadow-sm"
+              className="w-full py-4 rounded-2xl bg-slate-100 hover:bg-[#5932ea] hover:text-white text-slate-900 font-black text-xs transition-all active:scale-95 shadow-sm cursor-pointer"
             >
               Proceed to checkout
             </button>

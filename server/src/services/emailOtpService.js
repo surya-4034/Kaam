@@ -4,18 +4,23 @@ import { Resend } from 'resend';
 // In-memory Store for Email OTPs: email -> { otpCode, expiresAt }
 const emailOtpStore = new Map();
 
-// Initialize SMTP Transporter (Supports Hostinger & Gmail SMTP)
+// Initialize SMTP Transporter with connection pooling (Supports Hostinger & Gmail SMTP)
+let cachedTransporter = null;
+
 const getTransporter = () => {
-  const smtpUser = process.env.EMAIL_USER;
-  const smtpPass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.trim() : '';
+  if (cachedTransporter) return cachedTransporter;
+
+  const smtpUser = process.env.EMAIL_USER || process.env.SMTP_USER;
+  const smtpPass = (process.env.EMAIL_PASS || process.env.SMTP_PASS || '').replace(/^["']|["']$/g, '').trim();
 
   if (smtpUser && smtpPass) {
-    // If using custom domain / Hostinger mail (e.g. kaam@yors.online)
+    const port = Number(process.env.SMTP_PORT) || 465;
+    // Hostinger Mail (e.g. kaam@yors.online)
     if (smtpUser.includes('@yors.online') || smtpUser.includes('hostinger') || !smtpUser.endsWith('@gmail.com')) {
-      return nodemailer.createTransport({
-        host: 'smtp.hostinger.com',
-        port: 465,
-        secure: true, // SSL
+      cachedTransporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.hostinger.com',
+        port: port,
+        secure: port === 465, // SSL for 465, STARTTLS for 587
         auth: {
           user: smtpUser,
           pass: smtpPass,
@@ -23,17 +28,22 @@ const getTransporter = () => {
         tls: {
           rejectUnauthorized: false,
         },
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 20000,
       });
+      return cachedTransporter;
     }
 
     // Gmail SMTP Setup
-    return nodemailer.createTransport({
+    cachedTransporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: smtpUser,
         pass: smtpPass,
       },
     });
+    return cachedTransporter;
   }
   return null;
 };
@@ -123,6 +133,36 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
       };
     } catch (smtpErr) {
       console.error('❌ [HOSTINGER SMTP DISPATCH ERROR]:', smtpErr.message);
+      try {
+        console.log('🔄 Attempting fallback to port 587 STARTTLS for OTP...');
+        const cleanPass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/^["']|["']$/g, '').trim() : '';
+        const fallbackTransporter = nodemailer.createTransport({
+          host: 'smtp.hostinger.com',
+          port: 587,
+          secure: false,
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: cleanPass,
+          },
+          tls: { rejectUnauthorized: false }
+        });
+        const fbInfo = await fallbackTransporter.sendMail({
+          from: `"KAAM Support" <${process.env.EMAIL_USER}>`,
+          replyTo: process.env.EMAIL_USER,
+          to: cleanEmail,
+          subject: subjectText,
+          text: plainTextBody,
+          html: htmlBody,
+        });
+        console.log(`✅ [FALLBACK SMTP SUCCESS] OTP Delivered to ${cleanEmail}! Message ID: ${fbInfo.messageId}`);
+        return {
+          success: true,
+          email: cleanEmail,
+          message: `6-Digit Verification Code sent to ${cleanEmail}! Please check your email inbox.`
+        };
+      } catch (fbErr) {
+        console.error('❌ [FALLBACK SMTP ERROR]:', fbErr.message);
+      }
     }
   }
 
@@ -484,4 +524,289 @@ export const verifyEmailOtp = (email, inputOtp) => {
 
   emailOtpStore.delete(cleanEmail);
   return { valid: true };
+};
+
+/**
+ * Send Automated Email Notification to Client when Job is ACCEPTED or REJECTED
+ */
+export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
+  const cleanEmail = (clientEmail || '').toLowerCase().trim();
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    console.warn('⚠️ [JOB STATUS EMAIL]: Invalid client email provided:', clientEmail);
+    return { success: false, error: 'Invalid client email' };
+  }
+
+  const isAccepted = status === 'ACCEPTED';
+  const isRequested = status === 'REQUESTED';
+  const isCompleted = status === 'COMPLETED';
+
+  const partnerName = job.worker_name || 'Service Partner';
+  const partnerPhone = job.worker_phone || 'Available on KAAM App';
+  const categoryTitle = job.category_title || job.trade_title || 'Home Service';
+  const agreedFee = job.agreed_total_fee ? `₹${job.agreed_total_fee}` : 'Standard Rate';
+  const location = job.location_address || 'Registered Address';
+  const description = job.work_description || 'Service booking';
+  const clientName = job.client_name || 'Valued Customer';
+  const completionCode = job.completion_code || job.completionCode || '';
+
+  let subjectText = `Service Request Declined by Partner | KAAM`;
+  if (isAccepted) {
+    subjectText = `Booking Confirmed: ${partnerName} Accepted Your Request | KAAM`;
+  } else if (isRequested) {
+    subjectText = `Booking Request Placed: Waiting for Partner Confirmation | KAAM`;
+  } else if (isCompleted) {
+    subjectText = `Work Completed: Service Order Finished by ${partnerName} | KAAM`;
+  }
+
+  let plainTextBody = '';
+  let htmlBody = '';
+
+  if (isRequested) {
+    plainTextBody = `Hello ${clientName},\n\nYour booking request for "${categoryTitle}" has been placed and sent to ${partnerName}'s desk.\n\nStatus: ⏳ Waiting for confirmation\n\n📌 Request Summary:\n- Service Partner: ${partnerName}\n- Service Category: ${categoryTitle}\n- Total Agreed Fee: ${agreedFee}\n- Service Address: ${location}\n- Work Details: ${description}\n\nYou will receive an immediate confirmation email as soon as ${partnerName} confirms your booking!\n\nTrack your booking in real time: http://localhost:5174\n\nKAAM Support Team`;
+
+    htmlBody = `
+      <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
+        <div style="background-color: #d97706; padding: 16px 20px; border-radius: 12px; color: #ffffff; text-align: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: bold;">📋 Booking Request Placed!</h2>
+          <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.95;">Sent to partner desk • Waiting for confirmation</p>
+        </div>
+
+        <p style="font-size: 14px; margin-bottom: 12px;">Hello <strong>${clientName}</strong>,</p>
+        <p style="font-size: 14px; margin-bottom: 16px; line-height: 1.5;">
+          Your request for <strong style="color: #b45309;">${categoryTitle}</strong> has been successfully dispatched to <strong>${partnerName}</strong>.
+        </p>
+
+        <div style="background-color: #fef3c7; border: 1px solid #fde68a; padding: 12px 16px; border-radius: 10px; margin-bottom: 18px; display: flex; align-items: center;">
+          <span style="font-size: 14px; font-weight: bold; color: #92400e;">⏳ Current Status: Waiting for confirmation</span>
+        </div>
+
+        <div style="background-color: #ffffff; padding: 16px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 13px; line-height: 1.7; margin-bottom: 20px;">
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Service Category:</strong> <span style="background-color: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 6px; font-weight: bold;">${categoryTitle}</span></p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Service Partner:</strong> ${partnerName}</p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Estimated Fee:</strong> <strong style="color: #15803d; font-size: 15px;">${agreedFee}</strong></p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Address:</strong> ${location}</p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Work Scope:</strong> ${description}</p>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 20px;">
+          <a href="http://localhost:5174" style="background-color: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
+            Track in My Requests ➔
+          </a>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">KAAM Automated Service Dispatch • Support Email: kaam@yors.online</p>
+      </div>
+    `;
+  } else if (isAccepted) {
+    plainTextBody = `Hello ${clientName},\n\nGreat news! Your job request for "${categoryTitle}" has been ACCEPTED by ${partnerName}.\n\n🔑 YOUR WORK COMPLETION VERIFICATION CODE: ${completionCode}\n(Please provide this 6-digit code to ${partnerName} ONLY after the work has been completed at your doorstep. The partner needs this code to mark the job completed.)\n\n📌 Booking Details:\n- Partner: ${partnerName}\n- Contact: ${partnerPhone}\n- Service Category: ${categoryTitle}\n- Agreed Fee: ${agreedFee}\n- Location: ${location}\n- Details: ${description}\n\nThank you for choosing KAAM Platform!\nKAAM Support Team`;
+
+    htmlBody = `
+      <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
+        <div style="background-color: #059669; padding: 16px 20px; border-radius: 12px; color: #ffffff; text-align: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: bold;">✅ Booking Confirmed!</h2>
+          <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.95;">Your Service Partner is on the way</p>
+        </div>
+
+        <p style="font-size: 14px; margin-bottom: 16px;">Hello <strong>${clientName}</strong>,</p>
+        <p style="font-size: 14px; margin-bottom: 16px; line-height: 1.5;">
+          Your request for <strong style="color: #059669;">${categoryTitle}</strong> has been <strong>ACCEPTED</strong> by <strong>${partnerName}</strong>.
+        </p>
+
+        <!-- Prominent Work Completion Code Box -->
+        ${completionCode ? `
+        <div style="background-color: #f0fdf4; border: 2px dashed #16a34a; padding: 20px; border-radius: 14px; margin-bottom: 20px; text-align: center;">
+          <p style="font-size: 11px; text-transform: uppercase; font-weight: bold; color: #15803d; margin: 0 0 6px 0; letter-spacing: 1px;">
+            🔑 Your Work Completion Code
+          </p>
+          <div style="font-size: 34px; font-family: monospace; font-weight: 900; color: #15803d; letter-spacing: 8px; margin: 8px 0;">
+            ${completionCode}
+          </div>
+          <p style="font-size: 12px; color: #166534; margin: 8px 0 0 0; line-height: 1.5;">
+            Share this 6-digit confirmation code with <strong>${partnerName}</strong> <em>ONLY after the work has been completed</em> at your place. The partner will enter this code into their app to finalize the job.
+          </p>
+        </div>
+        ` : ''}
+
+        <div style="background-color: #d1fae5; border: 1px solid #a7f3d0; padding: 12px 16px; border-radius: 10px; margin-bottom: 18px;">
+          <span style="font-size: 14px; font-weight: bold; color: #065f46;">🟢 Status: Booking Confirmed • Partner on the way</span>
+        </div>
+
+        <div style="background-color: #ffffff; padding: 16px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 13px; line-height: 1.7; margin-bottom: 20px;">
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Service Category:</strong> <span style="background-color: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 6px; font-weight: bold;">${categoryTitle}</span></p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Service Partner:</strong> ${partnerName}</p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Partner Phone:</strong> <a href="tel:${partnerPhone}" style="color: #0284c7; font-weight: bold; text-decoration: none;">${partnerPhone}</a></p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Agreed Payout:</strong> <strong style="color: #15803d; font-size: 15px;">${agreedFee}</strong></p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Location:</strong> ${location}</p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Work Description:</strong> ${description}</p>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 20px;">
+          <a href="http://localhost:5174" style="background-color: #059669; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
+            Open KAAM Client Desk ➔
+          </a>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">KAAM Automated Service Dispatch • Support Email: kaam@yors.online</p>
+      </div>
+    `;
+  } else if (isCompleted) {
+    plainTextBody = `Hello ${clientName},\n\nGreat news! Your service job for "${categoryTitle}" has been COMPLETED by ${partnerName}!\n\n📌 Completion Summary:\n- Service: ${categoryTitle}\n- Partner: ${partnerName}\n- Contact: ${partnerPhone}\n- Total Agreed Fee: ${agreedFee}\n- Location: ${location}\n- Status: ✅ VERIFIED & COMPLETED\n\nThank you for choosing KAAM Platform!\nKAAM Support Team`;
+
+    htmlBody = `
+      <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
+        <div style="background-color: #15803d; padding: 18px 20px; border-radius: 12px; color: #ffffff; text-align: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: bold;">🎉 Work Completed Successfully!</h2>
+          <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.95;">Verified with client completion code</p>
+        </div>
+
+        <p style="font-size: 14px; margin-bottom: 16px;">Hello <strong>${clientName}</strong>,</p>
+        <p style="font-size: 14px; margin-bottom: 16px; line-height: 1.5;">
+          Your service request for <strong style="color: #15803d;">${categoryTitle}</strong> has been marked as <strong>COMPLETED</strong> by your verified service partner <strong>${partnerName}</strong>.
+        </p>
+
+        <div style="background-color: #dcfce7; border: 1px solid #86efac; padding: 12px 16px; border-radius: 10px; margin-bottom: 18px;">
+          <span style="font-size: 14px; font-weight: bold; color: #166534;">🟢 Status: Work Done & Code Verified</span>
+        </div>
+
+        <div style="background-color: #ffffff; padding: 16px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 13px; line-height: 1.7; margin-bottom: 20px;">
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Service:</strong> <span style="background-color: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 6px; font-weight: bold;">${categoryTitle}</span></p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Service Partner:</strong> ${partnerName}</p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Partner Phone:</strong> <a href="tel:${partnerPhone}" style="color: #0284c7; font-weight: bold; text-decoration: none;">${partnerPhone}</a></p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Total Fee:</strong> <strong style="color: #15803d; font-size: 15px;">${agreedFee}</strong></p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Location:</strong> ${location}</p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Work Scope:</strong> ${description}</p>
+        </div>
+
+        <p style="font-size: 13px; color: #475569; text-align: center; margin-bottom: 20px;">
+          Thank you for choosing KAAM Platform! We hope you enjoyed the service.
+        </p>
+
+        <div style="text-align: center; margin-bottom: 20px;">
+          <a href="http://localhost:5174" style="background-color: #15803d; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
+            Book Another Service on KAAM ➔
+          </a>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">KAAM Automated Service Dispatch • Support Email: kaam@yors.online</p>
+      </div>
+    `;
+  } else {
+    plainTextBody = `Hello ${clientName},\n\nWe regret to inform you that your request for "${categoryTitle}" was DECLINED by ${partnerName} as they are currently unavailable for this schedule.\n\n📌 Request Details:\n- Category: ${categoryTitle}\n- Partner: ${partnerName}\n- Fee: ${agreedFee}\n\nYou can easily select another top-rated service partner on KAAM.\nVisit http://localhost:5174 to rebook.\n\nKAAM Support Team`;
+
+    htmlBody = `
+      <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
+        <div style="background-color: #ef4444; padding: 16px 20px; border-radius: 12px; color: #ffffff; text-align: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: bold;">❌ Request Declined</h2>
+          <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.95;">Partner is unavailable for this schedule</p>
+        </div>
+
+        <p style="font-size: 14px; margin-bottom: 16px;">Hello <strong>${clientName}</strong>,</p>
+        <p style="font-size: 14px; margin-bottom: 16px; line-height: 1.5;">
+          Your job request for <strong style="color: #dc2626;">${categoryTitle}</strong> was <strong>DECLINED</strong> by <strong>${partnerName}</strong>.
+        </p>
+
+        <div style="background-color: #fee2e2; border: 1px solid #fecaca; padding: 12px 16px; border-radius: 10px; margin-bottom: 18px;">
+          <span style="font-size: 14px; font-weight: bold; color: #991b1b;">🔴 Status: Request Declined by Partner</span>
+        </div>
+
+        <div style="background-color: #ffffff; padding: 16px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 13px; line-height: 1.7; margin-bottom: 20px;">
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Category Requested:</strong> ${categoryTitle}</p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Partner Name:</strong> ${partnerName}</p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Fee Amount:</strong> ${agreedFee}</p>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 20px;">
+          <a href="http://localhost:5174" style="background-color: #0284c7; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
+            Choose Another Service Partner ➔
+          </a>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">KAAM Automated Service Dispatch • Support Email: kaam@yors.online</p>
+      </div>
+    `;
+  }
+
+  console.log(`\n======================================================`);
+  console.log(`✉️  [DISPATCHING JOB ${status} EMAIL TO: ${cleanEmail}]`);
+  console.log(`SUBJECT: ${subjectText}`);
+  console.log(`======================================================\n`);
+
+  const transporter = getTransporter();
+
+  if (transporter) {
+    try {
+      const msgId = `<kaam-job-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}@yors.online>`;
+      const info = await transporter.sendMail({
+        from: `"KAAM Support" <${process.env.EMAIL_USER}>`,
+        replyTo: process.env.EMAIL_USER,
+        to: cleanEmail,
+        subject: subjectText,
+        text: plainTextBody,
+        html: htmlBody,
+        messageId: msgId,
+        headers: {
+          'X-Entity-Ref-ID': `${Date.now()}`
+        }
+      });
+      console.log(`✅ [JOB STATUS EMAIL SMTP SUCCESS] Delivered to ${cleanEmail}! MessageId: ${info.messageId}`);
+      return { success: true };
+    } catch (smtpErr) {
+      console.error('❌ [JOB STATUS EMAIL SMTP ERROR]:', smtpErr.message);
+
+      // Attempt fallback to port 587 STARTTLS
+      try {
+        console.log('🔄 Attempting fallback to port 587 STARTTLS...');
+        const cleanPass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/^["']|["']$/g, '').trim() : '';
+        const fallbackTransporter = nodemailer.createTransport({
+          host: 'smtp.hostinger.com',
+          port: 587,
+          secure: false,
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: cleanPass,
+          },
+          tls: { rejectUnauthorized: false }
+        });
+        const fbInfo = await fallbackTransporter.sendMail({
+          from: `"KAAM Support" <${process.env.EMAIL_USER}>`,
+          replyTo: process.env.EMAIL_USER,
+          to: cleanEmail,
+          subject: subjectText,
+          text: plainTextBody,
+          html: htmlBody,
+        });
+        console.log(`✅ [FALLBACK SMTP SUCCESS] Delivered to ${cleanEmail}! MessageId: ${fbInfo.messageId}`);
+        return { success: true };
+      } catch (fbErr) {
+        console.error('❌ [FALLBACK SMTP ERROR]:', fbErr.message);
+      }
+    }
+  }
+
+  // FALLBACK: Resend API
+  try {
+    console.log(`🔄 Attempting fallback to Resend API for job status email to ${cleanEmail}...`);
+    const resendResponse = await resend.emails.send({
+      from: 'KAAM Support <onboarding@resend.dev>',
+      to: [cleanEmail],
+      subject: subjectText,
+      text: plainTextBody,
+      html: htmlBody,
+    });
+
+    if (!resendResponse.error) {
+      console.log(`✅ [RESEND API SUCCESS] Delivered to ${cleanEmail}! Message ID: ${resendResponse.data?.id}`);
+      return { success: true };
+    } else {
+      console.warn(`⚠️ [RESEND RESTRICTION]:`, resendResponse.error.message);
+    }
+  } catch (err) {
+    console.error('❌ [RESEND API ERROR]:', err.message);
+  }
+
+  return { success: false, error: 'Email delivery failed' };
 };

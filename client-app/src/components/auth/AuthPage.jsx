@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, Lock, Mail, MapPin, Eye, EyeOff, Wrench, ShieldCheck, ArrowRight, CheckCircle2, KeyRound, ArrowLeft, Send } from 'lucide-react';
-import { auth, googleProvider } from '../../config/firebase';
+import { auth, googleProvider, browserPopupRedirectResolver } from '../../config/firebase';
+import { API_BASE_URL } from '../../config/api';
 import { signInWithPopup } from 'firebase/auth';
 
 export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }) => {
@@ -29,7 +30,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     email: '',
     password: '',
     confirmPassword: '',
-    locality: 'Sector 62, Noida',
+    locality: 'Andheri West, Mumbai',
     otpCode: '',
     newPassword: '',
     tradeCategory: 'plumber',
@@ -56,23 +57,62 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
 
     try {
       googleProvider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, googleProvider);
+      // Pass browserPopupRedirectResolver to ensure popup operation works reliably in all environments
+      const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
       if (result && result.user) {
+        googleUser = {
+          googleUid: result.user.uid,
+          email: result.user.email,
+          fullName: result.user.displayName || result.user.email.split('@')[0],
+          photoURL: result.user.photoURL,
+        };
       }
     } catch (fbErr) {
-      console.warn('Firebase popup notice / IndexedDB fallback activated:', fbErr.message || fbErr);
-      googleUser = {
-        googleUid: `g-user-${Date.now()}`,
-        email: 'sy623806@gmail.com',
-        fullName: 'Google User',
-        photoURL: null,
-      };
+      console.warn('Firebase popup notice:', fbErr.message || fbErr);
+      const rawMsg = (fbErr.message || '').toLowerCase();
+      if (fbErr.code === 'auth/popup-closed-by-user' || fbErr.code === 'auth/cancelled-popup-request') {
+        setErrorMessage('Google Sign-In popup was closed. Please try again.');
+      } else if (fbErr.code === 'auth/popup-blocked') {
+        setErrorMessage('Popup was blocked by your browser. Please allow popups for localhost and try again.');
+      } else if (fbErr.code === 'auth/unauthorized-domain') {
+        setErrorMessage('Firebase auth domain not authorized for localhost. Please check Firebase settings.');
+      } else if (rawMsg.includes('database is closing') || rawMsg.includes('closing/hidden') || rawMsg.includes('internal-error')) {
+        try {
+          await new Promise((r) => setTimeout(r, 500));
+          const retryResult = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
+          if (retryResult && retryResult.user) {
+            googleUser = {
+              googleUid: retryResult.user.uid,
+              email: retryResult.user.email,
+              fullName: retryResult.user.displayName || retryResult.user.email.split('@')[0],
+              photoURL: retryResult.user.photoURL,
+            };
+          }
+        } catch (retryErr) {
+          setErrorMessage('Sign-in session interrupted. Please try again or use Email Login below.');
+        }
+      } else {
+        setErrorMessage(fbErr.message || 'Google Sign-In failed. Please try again or use Email.');
+      }
+
+      if (!googleUser) {
+        setIsLoading(false);
+        setSuccessMessage('');
+        return;
+      }
+    }
+
+    if (!googleUser || !googleUser.email) {
+      setErrorMessage('Could not retrieve account details from Google. Please try again.');
+      setIsLoading(false);
+      setSuccessMessage('');
+      return;
     }
 
     try {
-      setSuccessMessage('Google Account Verified! Syncing with SQLite Database...');
+      setSuccessMessage('Google Account Verified! Syncing with Database...');
 
-      const syncRes = await fetch('http://localhost:5050/api/auth/google-sync', {
+      const syncRes = await fetch(`${API_BASE_URL}/api/auth/google-sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -94,28 +134,14 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
             localStorage.setItem('kaam_client_user', JSON.stringify(syncData.user));
           }
         }
-        setSuccessMessage(`Welcome ${syncData.user.fullName}! Account Verified & Database Saved.`);
+        setSuccessMessage(`Welcome ${syncData.user.fullName}! Logged in successfully.`);
         setTimeout(() => onLoginSuccess(syncData.user), 500);
       } else {
-        const fallbackUser = {
-          id: googleUser.googleUid,
-          fullName: googleUser.fullName,
-          email: googleUser.email,
-          role: isWorkerApp ? 'WORKER' : 'CLIENT',
-        };
-        setSuccessMessage(`Welcome ${fallbackUser.fullName}! Logging into account...`);
-        setTimeout(() => onLoginSuccess(fallbackUser), 500);
+        setErrorMessage(syncData.error || 'Failed to authenticate with database.');
       }
     } catch (error) {
       console.error('Google Sync Error:', error);
-      const directUser = {
-        id: googleUser ? googleUser.googleUid : `g-${Date.now()}`,
-        fullName: 'Google Account User',
-        email: 'sy623806@gmail.com',
-        role: isWorkerApp ? 'WORKER' : 'CLIENT',
-      };
-      setSuccessMessage(`Welcome ${directUser.fullName}! Logged in successfully.`);
-      setTimeout(() => onLoginSuccess(directUser), 500);
+      setErrorMessage('Server connection error. Please ensure backend services are running.');
     } finally {
       setIsLoading(false);
     }
@@ -133,7 +159,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     setSuccessMessage('');
 
     try {
-      const response = await fetch('http://localhost:5050/api/auth/send-email-otp', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/send-email-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email, context: 'SIGNUP' }),
@@ -166,7 +192,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     setErrorMessage('');
 
     try {
-      const response = await fetch('http://localhost:5050/api/auth/verify-email-otp', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/verify-email-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email, otpCode: emailOtpCode }),
@@ -208,7 +234,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     setErrorMessage('');
 
     try {
-      const response = await fetch('http://localhost:5050/api/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -264,7 +290,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     setErrorMessage('');
 
     try {
-      const response = await fetch('http://localhost:5050/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -308,7 +334,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     setSuccessMessage('');
 
     try {
-      const response = await fetch('http://localhost:5050/api/auth/forgot-password', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email }),
@@ -341,7 +367,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     setErrorMessage('');
 
     try {
-      const response = await fetch('http://localhost:5050/api/auth/verify-email-otp', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/verify-email-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email, otpCode: forgotOtpCode }),
@@ -380,7 +406,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     setErrorMessage('');
 
     try {
-      const response = await fetch('http://localhost:5050/api/auth/reset-password', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

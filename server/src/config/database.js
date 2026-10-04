@@ -45,12 +45,29 @@ export const initDb = () => {
       db.run(`ALTER TABLE users ADD COLUMN longitude REAL`, () => {});
       db.run(`ALTER TABLE worker_profiles ADD COLUMN latitude REAL`, () => {});
       db.run(`ALTER TABLE worker_profiles ADD COLUMN longitude REAL`, () => {});
-
+      db.run(`ALTER TABLE worker_profiles ADD COLUMN packages_json TEXT`, () => {});
+      db.run(`ALTER TABLE worker_profiles ADD COLUMN categories_json TEXT`, () => {});
+      db.run(`ALTER TABLE worker_profiles ADD COLUMN visiting_charge REAL DEFAULT 149`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN category_title TEXT`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN client_email TEXT`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN client_name TEXT`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN client_phone TEXT`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN worker_name TEXT`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN worker_phone TEXT`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN completion_code TEXT`, () => {});
+      db.run(`ALTER TABLE worker_bank_kyc ADD COLUMN upi_phone TEXT`, () => {});
+      db.run(`ALTER TABLE worker_bank_kyc ADD COLUMN kyc_verified INTEGER DEFAULT 1`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN time_slot TEXT`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN packages_json TEXT`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN worker_upi TEXT`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN worker_upi_phone TEXT`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN worker_upi_holder TEXT`, () => {});
       // Seed Master Admin User: ID: Surya-4034, Email: kaamadmin@gmail.com, Key: Sujal957#
       const adminPassHash = bcrypt.hashSync('Sujal957#', 10);
+
       db.run(`
-        INSERT OR REPLACE INTO users (id, phone, email, password_hash, role, full_name, is_active)
-        VALUES ('Surya-4034', '+91 99999 40340', 'kaamadmin@gmail.com', '${adminPassHash}', 'ADMIN', 'Surya Master Admin', 1)
+        INSERT OR REPLACE INTO users (id, phone, email, password_hash, role, full_name, onboarding_completed, is_active)
+        VALUES ('Surya-4034', '+91 99999 40340', 'kaamadmin@gmail.com', '${adminPassHash}', 'ADMIN', 'Surya Master Admin', 1, 1)
       `);
 
       // 2. Worker Profiles Table
@@ -63,13 +80,14 @@ export const initDb = () => {
           experience_years INTEGER DEFAULT 1,
           daily_rate REAL NOT NULL,
           hourly_rate REAL NOT NULL,
+          visiting_charge REAL DEFAULT 149,
           locality TEXT NOT NULL,
-          city TEXT DEFAULT 'Noida',
+          city TEXT,
           bio TEXT,
           is_available INTEGER DEFAULT 1,
           is_account_locked INTEGER DEFAULT 0,
           kyc_status TEXT CHECK(kyc_status IN ('PENDING', 'VERIFIED', 'REJECTED')) DEFAULT 'PENDING',
-          rating_average REAL DEFAULT 4.8,
+          rating_average REAL DEFAULT 5.0,
           completed_jobs_count INTEGER DEFAULT 0,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY(user_id) REFERENCES users(id)
@@ -115,6 +133,10 @@ export const initDb = () => {
           id TEXT PRIMARY KEY,
           client_id TEXT NOT NULL,
           worker_id TEXT NOT NULL,
+          category_title TEXT,
+          client_email TEXT,
+          client_name TEXT,
+          client_phone TEXT,
           work_description TEXT NOT NULL,
           location_address TEXT NOT NULL,
           start_date TEXT NOT NULL,
@@ -124,6 +146,7 @@ export const initDb = () => {
           platform_fee_amount REAL NOT NULL,
           worker_net_payout REAL NOT NULL,
           status TEXT CHECK(status IN ('REQUESTED', 'ACCEPTED', 'REJECTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')) DEFAULT 'REQUESTED',
+          completion_code TEXT,
           completed_at DATETIME,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY(client_id) REFERENCES users(id),
@@ -153,4 +176,7 @@ export const initDb = () => {
   });
 };
 
+export const getSQLiteDB = () => db;
+
 export default db;
+

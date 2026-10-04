@@ -4,6 +4,10 @@ import { generateToken } from '../middleware/auth.js';
 import { sendEmailOtp, verifyEmailOtp, sendAdminLoginAlertEmail, sendPasswordResetSuccessEmail, sendAdminForgotOtpEmail, sendAdminPasswordChangeConfirmationEmail } from '../services/emailOtpService.js';
 import User from '../models/User.js';
 import WorkerProfile from '../models/WorkerProfile.js';
+import { getPartnerModel, generatePartnerId } from '../models/PartnerModel.js';
+import { generateClientId } from '../models/ClientModel.js';
+import { isPartnerDbConnected, upsertUserToMongo, upsertPartnerToMongo, upsertClientToMongo, getMongoDb } from '../config/mongoose.js';
+import { resolveWorkerCoordinates } from '../services/redisSpatialService.js';
 
 export const register = (req, res) => {
   const { phone, email, password, role, fullName, tradeCategory, tradeTitle, dailyRate, hourlyRate, locality, bio } = req.body;
@@ -27,7 +31,18 @@ export const register = (req, res) => {
     const userId = `u-${Date.now()}`;
     const passwordHash = bcrypt.hashSync(password, 10);
     const normalizedRole = role.toUpperCase();
-    const userPhone = phone || `+91 ${Math.floor(6000000000 + Math.random() * 3999999999)}`;
+    
+    let userPhone = (phone || '').trim();
+    if (userPhone) {
+      const pDigits = userPhone.replace(/\D/g, '');
+      if (pDigits.length === 10) {
+        userPhone = `+91 ${pDigits}`;
+      } else if (pDigits.length === 12 && pDigits.startsWith('91')) {
+        userPhone = `+91 ${pDigits.slice(2)}`;
+      }
+    } else {
+      userPhone = `+91 ${Math.floor(6000000000 + Math.random() * 3999999999)}`;
+    }
 
     db.run(
       `INSERT INTO users (id, phone, email, password_hash, role, full_name) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -57,9 +72,13 @@ export const register = (req, res) => {
 
         if (normalizedRole === 'WORKER') {
           const workerId = `w-${Date.now()}`;
+          const partnerId = generatePartnerId();
+          const targetLocality = locality || 'Andheri West, Mumbai';
+          const geo = resolveWorkerCoordinates({ locality: targetLocality, city: 'Mumbai' }) || { lat: 19.0760, lng: 72.8777 };
+
           db.run(
-            `INSERT INTO worker_profiles (id, user_id, trade_category, trade_title, daily_rate, hourly_rate, locality, bio, kyc_status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'VERIFIED')`,
+            `INSERT INTO worker_profiles (id, user_id, trade_category, trade_title, daily_rate, hourly_rate, locality, city, bio, is_available, is_account_locked, kyc_status, rating_average, completed_jobs_count, latitude, longitude)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'Mumbai', ?, 1, 0, 'VERIFIED', 5.0, 0, ?, ?)`,
             [
               workerId,
               userId,
@@ -67,26 +86,65 @@ export const register = (req, res) => {
               tradeTitle || 'Skilled Trade Specialist',
               Number(dailyRate || 650),
               Number(hourlyRate || 120),
-              locality || 'Local City Area',
-              bio || 'Skilled local worker available for hire on kaam.'
+              targetLocality,
+              bio || 'Skilled Mumbai partner on kaam.',
+              geo.lat,
+              geo.lng
             ]
           );
 
-          WorkerProfile.findOneAndUpdate(
-            { id: workerId },
-            {
-              id: workerId,
-              user_id: userId,
-              trade_category: tradeCategory || 'plumber',
-              trade_title: tradeTitle || 'Skilled Trade Specialist',
-              daily_rate: Number(dailyRate || 650),
-              hourly_rate: Number(hourlyRate || 120),
-              locality: locality || 'Local City Area',
-              bio: bio || 'Skilled local worker available for hire on kaam.',
-              kyc_status: 'VERIFIED'
-            },
-            { upsert: true, returnDocument: 'after' }
-          ).catch(wErr => console.warn('[Mongo Worker Sync Note]', wErr.message));
+          if (isPartnerDbConnected()) {
+            try {
+              const Partner = getPartnerModel();
+              Partner.findOneAndUpdate(
+                { $or: [{ userId }, { email: cleanEmail }] },
+                {
+                  $set: {
+                    id: workerId,
+                    partnerId: partnerId,
+                    userId: userId,
+                    name: fullName,
+                    phone: userPhone,
+                    email: cleanEmail,
+                    tradeCategory: tradeCategory || 'plumber',
+                    tradeTitle: tradeTitle || 'Skilled Trade Specialist',
+                    locality: targetLocality,
+                    city: 'Mumbai',
+                    dailyRate: Number(dailyRate || 650),
+                    hourlyRate: Number(hourlyRate || 120),
+                    onboardingCompleted: false,
+                    isAvailable: true,
+                    completedJobsCount: 0,
+                    ratingAverage: 5.0,
+                    packages: [],
+                    bank: { holder: fullName, upi: `${userPhone}@paytm`, payoutMode: 'UPI Instant Payout' },
+                    location: { latitude: geo.lat, longitude: geo.lng }
+                  }
+                },
+                { upsert: true, new: true }
+              ).then(p => {
+                console.log(`🍃 [kaam_db MongoDB Atlas] Registered new Partner ${fullName} (${partnerId}) into partners collection!`);
+              }).catch(pErr => console.warn('[Partner Mongo Register Note]', pErr.message));
+            } catch (pErr) {
+              console.warn('[Partner Mongo Register Note]', pErr.message);
+            }
+          }
+        } else if (normalizedRole === 'CLIENT') {
+          const clientId = generateClientId();
+          upsertClientToMongo({
+            id: userId,
+            clientId: clientId,
+            userId: userId,
+            fullName: fullName,
+            name: fullName,
+            phone: userPhone,
+            email: cleanEmail,
+            locality: locality || 'Mumbai',
+            city: 'Mumbai',
+            state: 'Maharashtra',
+            onboardingCompleted: false
+          });
+          console.log(`🍃 [kaam_db MongoDB Atlas] Registered new Client ${fullName} (${clientId}) into clients collection!`);
         }
 
         const token = generateToken({ id: userId, phone: userPhone, email: cleanEmail, role: normalizedRole, fullName });
@@ -116,123 +174,197 @@ export const register = (req, res) => {
 
 export const login = (req, res) => {
   const { username, email, password } = req.body;
-  const loginId = (email || username || '').toLowerCase().trim();
+  const rawEmail = (email || username || '').trim();
 
-  if (!loginId || !password) {
+  if (!rawEmail || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
   }
 
-  db.get(
-    `SELECT * FROM users WHERE email = ? OR phone = ? OR LOWER(full_name) = LOWER(?)`,
-    [loginId, loginId, loginId],
-    (err, user) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (!user) return res.status(404).json({ error: 'Incorrect Email or Id. Account not found.' });
+  const cleanEmail = rawEmail.toLowerCase();
 
-      const passwordValid = bcrypt.compareSync(password, user.password_hash);
-      if (!passwordValid) return res.status(401).json({ error: 'Incorrect Password or Id.' });
+  const processUserLogin = (user) => {
+    if (!user) {
+      return res.status(404).json({ error: 'Account not found. Please check your email or register a new account.' });
+    }
 
-      const token = generateToken({
-        id: user.id,
-        phone: user.phone,
-        email: user.email,
-        role: user.role,
-        fullName: user.full_name,
+    const isGoogleAccount = (user.password_hash && user.password_hash.startsWith('google-')) ||
+                            (user.id && user.id.length === 28);
+    if (isGoogleAccount) {
+      return res.status(400).json({
+        error: "This account was created using Google Sign-In. Please click 'Sign in with Google'."
       });
+    }
 
-      const formattedUser = {
-        id: user.id,
-        fullName: user.full_name,
-        phone: user.phone,
-        secondaryPhone: user.secondary_phone || '',
-        email: user.email,
-        role: user.role,
-        locality: user.locality || '',
-        landmark: user.landmark || '',
-        state: user.state || 'Uttar Pradesh',
-        pincode: user.pincode || '',
-        address: user.address || '',
-        onboardingCompleted: Boolean(user.onboarding_completed)
-      };
+    let passwordValid = false;
+    try {
+      passwordValid = bcrypt.compareSync(password, user.password_hash);
+    } catch (bErr) {
+      console.warn('[Bcrypt verification note]', bErr.message);
+    }
 
-      if (user.role === 'WORKER') {
-        db.get(
-          `SELECT * FROM worker_profiles WHERE user_id = ? OR id = ?`,
-          [user.id, user.worker_profile_id || ''],
-          (wErr, wp) => {
-            if (!wp) {
-              return res.json({
-                message: 'Login successful.',
-                token,
-                user: formattedUser
-              });
-            }
+    if (!passwordValid) {
+      return res.status(401).json({ error: 'Incorrect password. Please verify your password and try again.' });
+    }
 
-            db.get(`SELECT * FROM worker_bank_kyc WHERE worker_id = ?`, [wp.id], (kErr, kyc) => {
-              db.all(`SELECT * FROM worker_portfolios WHERE worker_id = ?`, [wp.id], (pErr, portfolios) => {
-                db.get(`SELECT * FROM commission_dues_36h WHERE worker_id = ? AND status = 'PENDING'`, [wp.id], (dErr, dues) => {
-                  const workerObj = {
-                    id: wp.id,
-                    userId: user.id,
-                    name: user.full_name,
-                    phone: user.phone,
-                    email: user.email,
-                    tradeCategory: wp.trade_category,
-                    tradeTitle: wp.trade_title,
-                    locality: wp.locality,
-                    city: wp.city || 'Noida',
-                    dailyRate: wp.daily_rate,
-                    hourlyRate: wp.hourly_rate,
-                    bio: wp.bio,
-                    isAvailable: Boolean(wp.is_available),
-                    isAccountLocked: Boolean(wp.is_account_locked),
-                    kycStatus: wp.kyc_status,
-                    completedJobsCount: wp.completed_jobs_count,
-                    ratingAverage: wp.rating_average,
-                    bank: kyc ? {
-                      holder: kyc.account_holder_name,
-                      bankName: kyc.bank_name,
-                      account: kyc.account_number,
-                      ifsc: kyc.ifsc_code,
-                      upi: kyc.upi_id,
-                      govtIdType: kyc.govt_id_type,
-                      govtIdNumber: kyc.govt_id_number,
-                    } : null,
-                    portfolio: (portfolios || []).map(p => ({
-                      id: p.id,
-                      title: p.title,
-                      category: p.category_tag,
-                      url: p.image_url,
-                      description: p.description,
-                      date: p.created_at
-                    })),
-                    dues: dues ? {
-                      id: dues.id,
-                      jobId: dues.job_id,
-                      commissionAmount: dues.commission_amount,
-                      dueDate: dues.due_date,
-                      paymentQrUrl: dues.payment_qr_url,
-                      status: dues.status
-                    } : null
-                  };
+    const token = generateToken({
+      id: user.id,
+      phone: user.phone,
+      email: user.email,
+      role: user.role,
+      fullName: user.full_name,
+    });
 
-                  res.json({
-                    message: 'Login successful.',
-                    token,
-                    user: formattedUser,
-                    workerProfile: workerObj
+    const formattedUser = {
+      id: user.id,
+      fullName: user.full_name,
+      phone: user.phone,
+      secondaryPhone: user.secondary_phone || '',
+      email: user.email,
+      role: user.role,
+      locality: user.locality || '',
+      landmark: user.landmark || '',
+      state: user.state || 'Uttar Pradesh',
+      pincode: user.pincode || '',
+      address: user.address || '',
+      onboardingCompleted: Boolean(user.onboarding_completed)
+    };
+
+    if (user.role === 'WORKER') {
+      db.get(
+        `SELECT * FROM worker_profiles WHERE user_id = ? OR id = ?`,
+        [user.id, user.worker_profile_id || ''],
+        (wErr, wp) => {
+          if (!wp) {
+            return res.json({
+              message: 'Login successful.',
+              token,
+              user: formattedUser
+            });
+          }
+
+          db.get(`SELECT * FROM worker_bank_kyc WHERE worker_id = ?`, [wp.id], (kErr, kyc) => {
+            db.all(`SELECT * FROM worker_portfolios WHERE worker_id = ?`, [wp.id], (pErr, portfolios) => {
+              db.get(`SELECT * FROM commission_dues_36h WHERE worker_id = ? AND status = 'PENDING'`, [wp.id], (dErr, dues) => {
+                let pkgs = [];
+                let cats = [wp.trade_category || 'plumber'];
+                try { if (wp.packages_json) pkgs = JSON.parse(wp.packages_json); } catch (e) {}
+                try { if (wp.categories_json) cats = JSON.parse(wp.categories_json); } catch (e) {}
+                if (Array.isArray(pkgs)) {
+                  pkgs.forEach(p => {
+                    if (p.category && !cats.includes(p.category.toLowerCase())) {
+                      cats.push(p.category.toLowerCase());
+                    }
                   });
+                }
+                const workerObj = {
+                  id: wp.id,
+                  userId: user.id,
+                  name: user.full_name,
+                  phone: user.phone,
+                  email: user.email,
+                  tradeCategory: wp.trade_category,
+                  tradeTitle: wp.trade_title,
+                  locality: wp.locality || 'Andheri West, Mumbai',
+                  city: wp.city || 'Mumbai',
+                  dailyRate: wp.daily_rate,
+                  hourlyRate: wp.hourly_rate,
+                  bio: wp.bio,
+                  packages: pkgs,
+                  categories: cats,
+                  isAvailable: Boolean(wp.is_available),
+                  isAccountLocked: Boolean(wp.is_account_locked),
+                  kycStatus: wp.kyc_status,
+                  completedJobsCount: wp.completed_jobs_count,
+                  ratingAverage: wp.rating_average,
+                  bank: kyc ? {
+                    holder: kyc.account_holder_name,
+                    bankName: kyc.bank_name,
+                    account: kyc.account_number,
+                    ifsc: kyc.ifsc_code,
+                    upi: kyc.upi_id,
+                    govtIdType: kyc.govt_id_type,
+                    govtIdNumber: kyc.govt_id_number,
+                  } : null,
+                  portfolio: (portfolios || []).map(p => ({
+                    id: p.id,
+                    title: p.title,
+                    category: p.category_tag,
+                    url: p.image_url,
+                    description: p.description,
+                    date: p.created_at
+                  })),
+                  dues: dues ? {
+                    id: dues.id,
+                    jobId: dues.job_id,
+                    commissionAmount: dues.commission_amount,
+                    dueDate: dues.due_date,
+                    paymentQrUrl: dues.payment_qr_url,
+                    status: dues.status
+                  } : null
+                };
+
+                res.json({
+                  message: 'Login successful.',
+                  token,
+                  user: formattedUser,
+                  workerProfile: workerObj
                 });
               });
             });
+          });
+        }
+      );
+    } else {
+      res.json({
+        message: 'Login successful.',
+        token,
+        user: formattedUser
+      });
+    }
+  };
+
+  db.get(
+    `SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR id = ? OR LOWER(full_name) = LOWER(?)`,
+    [cleanEmail, rawEmail, cleanEmail],
+    (err, user) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (user) {
+        return processUserLogin(user);
+      }
+
+      // MongoDB Atlas Fallback if not found in SQLite
+      try {
+        User.findOne({ $or: [{ email: cleanEmail }, { id: rawEmail }] }).then(mUser => {
+          if (!mUser) {
+            return res.status(404).json({ error: 'Account not found. Please check your email or register a new account.' });
           }
-        );
-      } else {
-        res.json({
-          message: 'Login successful.',
-          token,
-          user: formattedUser
+          // Rehydrate into SQLite
+          db.run(
+            `INSERT OR REPLACE INTO users (id, phone, email, password_hash, role, full_name) VALUES (?, ?, ?, ?, ?, ?)`,
+            [mUser.id, mUser.phone, mUser.email, mUser.password_hash, mUser.role, mUser.full_name],
+            () => {
+              processUserLogin({
+                id: mUser.id,
+                phone: mUser.phone,
+                email: mUser.email,
+                password_hash: mUser.password_hash,
+                role: mUser.role,
+                full_name: mUser.full_name,
+                secondary_phone: mUser.secondary_phone,
+                locality: mUser.locality,
+                landmark: mUser.landmark,
+                state: mUser.state,
+                pincode: mUser.pincode,
+                address: mUser.address,
+                onboarding_completed: mUser.onboarding_completed
+              });
+            }
+          );
+        }).catch(() => {
+          return res.status(404).json({ error: 'Account not found. Please check your credentials.' });
         });
+      } catch (mErr) {
+        return res.status(404).json({ error: 'Account not found. Please check your credentials.' });
       }
     }
   );
@@ -264,6 +396,35 @@ export const googleSync = (req, res) => {
 
       if (existingUser.role === 'WORKER') {
         db.get(`SELECT * FROM worker_profiles WHERE user_id = ?`, [existingUser.id], (wErr, wp) => {
+          let workerData = null;
+          if (wp) {
+            let pkgs = [];
+            let cats = [wp.trade_category || 'plumber'];
+            try { if (wp.packages_json) pkgs = JSON.parse(wp.packages_json); } catch (e) {}
+            try { if (wp.categories_json) cats = JSON.parse(wp.categories_json); } catch (e) {}
+            if (Array.isArray(pkgs)) {
+              pkgs.forEach(p => {
+                if (p.category && !cats.includes(p.category.toLowerCase())) {
+                  cats.push(p.category.toLowerCase());
+                }
+              });
+            }
+            workerData = {
+              ...wp,
+              name: existingUser.full_name,
+              phone: existingUser.phone,
+              tradeCategory: wp.trade_category,
+              tradeTitle: wp.trade_title,
+              dailyRate: wp.daily_rate,
+              hourlyRate: wp.hourly_rate,
+              locality: wp.locality || 'Andheri West, Mumbai',
+              city: wp.city || 'Mumbai',
+              packages: pkgs,
+              categories: cats,
+              isAvailable: Boolean(wp.is_available),
+              onboardingCompleted: Boolean(wp.trade_category || pkgs.length)
+            };
+          }
           return res.json({
             message: 'Google Sign-In successful.',
             token,
@@ -274,8 +435,9 @@ export const googleSync = (req, res) => {
               role: existingUser.role,
               fullName: existingUser.full_name,
               photoURL: photoURL || null,
-              workerProfile: wp || null
-            }
+              workerProfile: workerData
+            },
+            workerProfile: workerData
           });
         });
       } else {
@@ -297,7 +459,7 @@ export const googleSync = (req, res) => {
       const newUserId = googleUid || `u-${Date.now()}`;
       const defaultName = fullName || cleanEmail.split('@')[0];
       const uniquePhone = `+91 ${Math.floor(6000000000 + Math.random() * 3999999999)}`;
-      const randomPassHash = bcrypt.hashSync(`google-${Date.now()}`, 10);
+      const randomPassHash = `google-oauth-${googleUid || Date.now()}`;
 
       db.run(
         `INSERT INTO users (id, phone, email, password_hash, role, full_name) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -308,11 +470,36 @@ export const googleSync = (req, res) => {
             return res.status(500).json({ error: iErr.message });
           }
 
+          let newWorkerObj = null;
           if (userRole === 'WORKER') {
             const workerId = `w-${Date.now()}`;
+            const targetLocality = locality || 'Andheri West, Mumbai';
+            const geo = resolveWorkerCoordinates({ locality: targetLocality, city: 'Mumbai' }) || { lat: 19.0760, lng: 72.8777 };
+
+            newWorkerObj = {
+              id: workerId,
+              userId: newUserId,
+              name: defaultName,
+              phone: uniquePhone,
+              email: cleanEmail,
+              tradeCategory: tradeCategory || 'plumber',
+              tradeTitle: tradeTitle || 'Google Verified Worker Specialist',
+              dailyRate: Number(dailyRate || 650),
+              hourlyRate: 120,
+              visitingCharge: 149,
+              locality: targetLocality,
+              city: 'Mumbai',
+              packages: [],
+              categories: [tradeCategory || 'plumber'],
+              isAvailable: true,
+              completedJobsCount: 0,
+              ratingAverage: 5.0,
+              onboardingCompleted: false
+            };
+
             db.run(
-              `INSERT INTO worker_profiles (id, user_id, trade_category, trade_title, daily_rate, hourly_rate, locality, bio, kyc_status)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'VERIFIED')`,
+              `INSERT INTO worker_profiles (id, user_id, trade_category, trade_title, daily_rate, hourly_rate, locality, city, bio, is_available, is_account_locked, kyc_status, rating_average, completed_jobs_count, latitude, longitude)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'Mumbai', ?, 1, 0, 'VERIFIED', 5.0, 0, ?, ?)`,
               [
                 workerId,
                 newUserId,
@@ -320,9 +507,10 @@ export const googleSync = (req, res) => {
                 tradeTitle || 'Google Verified Worker Specialist',
                 Number(dailyRate || 650),
                 120,
-                locality || 'Local City Area',
+                targetLocality,
                 'Verified worker account via Google OAuth.',
-                'VERIFIED'
+                geo.lat,
+                geo.lng
               ]
             );
           }
@@ -337,8 +525,10 @@ export const googleSync = (req, res) => {
               email: cleanEmail,
               role: userRole,
               fullName: defaultName,
-              photoURL: photoURL || null
-            }
+              photoURL: photoURL || null,
+              workerProfile: newWorkerObj
+            },
+            workerProfile: newWorkerObj
           });
         }
       );
@@ -618,8 +808,63 @@ export const updateUserProfile = (req, res) => {
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
 
-      db.get(`SELECT id, full_name, phone, secondary_phone, email, role, locality, landmark, state, pincode, address, onboarding_completed FROM users WHERE id = ?`, [targetId], (uErr, user) => {
+      db.get(`SELECT id, full_name, phone, secondary_phone, email, role, locality, landmark, state, pincode, address, onboarding_completed, latitude, longitude FROM users WHERE id = ?`, [targetId], (uErr, user) => {
         if (uErr || !user) return res.status(404).json({ error: 'User profile not found.' });
+
+        // Auto-sync user update to MongoDB Atlas
+        upsertUserToMongo({
+          id: user.id,
+          fullName: user.full_name,
+          phone: user.phone,
+          secondaryPhone: user.secondary_phone,
+          email: user.email,
+          role: user.role,
+          locality: user.locality,
+          landmark: user.landmark,
+          state: user.state,
+          pincode: user.pincode,
+          address: user.address,
+          onboardingCompleted: Boolean(user.onboarding_completed)
+        });
+
+        // Mirror to specialized client or partner collection
+        if (user.role === 'CLIENT') {
+          upsertClientToMongo({
+            id: user.id,
+            userId: user.id,
+            fullName: user.full_name,
+            name: user.full_name,
+            phone: user.phone,
+            secondaryPhone: user.secondary_phone,
+            email: user.email,
+            locality: user.locality || 'Mumbai',
+            landmark: user.landmark || '',
+            state: user.state || 'Maharashtra',
+            pincode: user.pincode || '',
+            address: user.address || '',
+            savedAddresses: user.address ? [{
+              label: 'Default Address',
+              address: user.address,
+              locality: user.locality || '',
+              landmark: user.landmark || '',
+              city: 'Mumbai',
+              state: user.state || 'Maharashtra',
+              pincode: user.pincode || '',
+              isDefault: true,
+              coordinates: (user.latitude && user.longitude) ? { lat: user.latitude, lng: user.longitude } : undefined
+            }] : [],
+            onboardingCompleted: Boolean(user.onboarding_completed)
+          });
+        } else if (user.role === 'WORKER') {
+          upsertPartnerToMongo({
+            userId: user.id,
+            name: user.full_name,
+            phone: user.phone,
+            email: user.email,
+            locality: user.locality,
+            address: user.address
+          });
+        }
 
         res.json({
           message: 'Profile details updated successfully in database.',
@@ -657,6 +902,18 @@ export const deleteAccount = (req, res) => {
     db.run(`DELETE FROM users WHERE id = ?`, [userId], function (err) {
       if (err) return res.status(500).json({ error: err.message });
 
+      // Clean up from MongoDB Atlas collections
+      try {
+        const mongo = getMongoDb();
+        if (mongo) {
+          mongo.collection('users').deleteOne({ id: userId });
+          mongo.collection('partners').deleteOne({ $or: [{ userId }, { id: userId }] });
+          mongo.collection('clients').deleteOne({ $or: [{ userId }, { id: userId }] });
+        }
+      } catch (mDelErr) {
+        console.warn('[Mongo Delete Sync Note]', mDelErr.message);
+      }
+
       res.json({
         success: true,
         message: 'Your account has been permanently deleted from KAAM platform database.'
@@ -685,6 +942,15 @@ export const updateUserLocation = (req, res) => {
 
       // If user is a worker, also update worker_profiles table
       db.run(`UPDATE worker_profiles SET latitude = ?, longitude = ? WHERE user_id = ?`, [lat, lng, userId], () => {});
+
+      // Sync updated coordinates to MongoDB Atlas
+      db.get(`SELECT role FROM users WHERE id = ?`, [userId], (rErr, rRow) => {
+        if (rRow?.role === 'CLIENT') {
+          upsertClientToMongo({ userId, location: { latitude: lat, longitude: lng } });
+        } else if (rRow?.role === 'WORKER') {
+          upsertPartnerToMongo({ userId, location: { latitude: lat, longitude: lng } });
+        }
+      });
 
       res.json({
         success: true,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../config/api';
 import { Users, ShieldCheck, Lock, Unlock, CheckCircle, XCircle, DollarSign, Activity, RefreshCw, HardHat, UserCheck, Search, AlertTriangle, ChevronRight, ArrowLeft } from 'lucide-react';
 
 export const AdminDashboard = ({ onBackToSite }) => {
@@ -22,17 +23,17 @@ export const AdminDashboard = ({ onBackToSite }) => {
     setIsLoading(true);
     try {
       // 1. Fetch Stats
-      const statsRes = await fetch('http://localhost:5050/api/admin/stats');
+      const statsRes = await fetch(`${API_BASE_URL}/api/admin/stats`);
       const statsData = await statsRes.json();
       if (statsRes.ok) setStats(statsData);
 
       // 2. Fetch Users
-      const usersRes = await fetch('http://localhost:5050/api/admin/users');
+      const usersRes = await fetch(`${API_BASE_URL}/api/admin/users`);
       const usersData = await usersRes.json();
       if (usersRes.ok) setUsers(usersData.users || []);
 
       // 3. Fetch KYC Queue
-      const kycRes = await fetch('http://localhost:5050/api/admin/kyc/pending');
+      const kycRes = await fetch(`${API_BASE_URL}/api/admin/kyc/pending`);
       const kycData = await kycRes.json();
       if (kycRes.ok) setKycQueue(kycData.queue || []);
     } catch (err) {
@@ -49,7 +50,7 @@ export const AdminDashboard = ({ onBackToSite }) => {
   // Handle Account Lock/Unlock Toggle
   const handleToggleLock = async (userId) => {
     try {
-      const res = await fetch(`http://localhost:5050/api/admin/users/${userId}/toggle-lock`, { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/toggle-lock`, { method: 'POST' });
       const data = await res.json();
       setActionMessage(data.message || 'Account lock status updated.');
       fetchAdminData();
@@ -62,7 +63,7 @@ export const AdminDashboard = ({ onBackToSite }) => {
   // Handle KYC Approval
   const handleApproveKyc = async (workerId) => {
     try {
-      const res = await fetch(`http://localhost:5050/api/admin/kyc/${workerId}/approve`, { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/api/admin/kyc/${workerId}/approve`, { method: 'POST' });
       const data = await res.json();
       setActionMessage(data.message || 'KYC Approved successfully.');
       fetchAdminData();
@@ -75,7 +76,7 @@ export const AdminDashboard = ({ onBackToSite }) => {
   // Handle KYC Rejection
   const handleRejectKyc = async (workerId) => {
     try {
-      const res = await fetch(`http://localhost:5050/api/admin/kyc/${workerId}/reject`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/kyc/${workerId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: 'Aadhaar ID image not clear' })

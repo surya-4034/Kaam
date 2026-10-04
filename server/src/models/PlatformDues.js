@@ -1,14 +1,37 @@
 import mongoose from 'mongoose';
+import { getMongoDb } from '../config/mongoose.js';
 
-const platformDuesSchema = new mongoose.Schema({
+export const platformDuesSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
-  worker_id: { type: String, required: true },
-  job_id: { type: String, required: true },
-  commission_amount: { type: Number, required: true },
-  due_date: { type: Date, required: true },
-  payment_qr_url: { type: String },
-  status: { type: String, enum: ['PENDING', 'PAID', 'OVERDUE_LOCKED'], default: 'PENDING' },
-  created_at: { type: Date, default: Date.now }
-}, { timestamps: true });
+  workerId: { type: String, required: true, index: true },
+  jobId: { type: String, required: true, index: true },
+  commissionAmount: { type: Number, required: true },
+  dueDate: { type: Date, required: true },
+  paymentQrUrl: { type: String, default: '' },
+  status: { type: String, enum: ['PENDING', 'PAID', 'OVERDUE_LOCKED'], default: 'PENDING', index: true },
+  paidAt: { type: Date, default: null },
+  paymentTransactionRef: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+}, { timestamps: true, bufferCommands: false });
 
-export default mongoose.models.PlatformDues || mongoose.model('PlatformDues', platformDuesSchema);
+export const getPlatformDuesModel = () => {
+  const db = getMongoDb();
+  if (db) {
+    return db.models.PlatformDues || db.model('PlatformDues', platformDuesSchema, 'platform_dues');
+  }
+  return mongoose.models.PlatformDues || mongoose.model('PlatformDues', platformDuesSchema, 'platform_dues');
+};
+
+const ProxyPlatformDues = new Proxy({}, {
+  get(target, prop) {
+    const model = getPlatformDuesModel();
+    if (typeof model[prop] === 'function') {
+      return model[prop].bind(model);
+    }
+    return model[prop];
+  }
+});
+
+export default ProxyPlatformDues;
+

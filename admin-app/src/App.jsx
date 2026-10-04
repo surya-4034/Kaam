@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from './config/api';
 import { Users, ShieldCheck, Lock, Unlock, CheckCircle, XCircle, DollarSign, Activity, RefreshCw, HardHat, UserCheck, Search, AlertTriangle, LogOut, KeyRound, User, Home, Briefcase, Clock, ArrowLeft, Send, Eye, EyeOff, Building2 } from 'lucide-react';
 
 export default function App() {
@@ -82,7 +83,7 @@ export default function App() {
     });
 
     try {
-      const res = await fetch(`http://localhost:5050/api/admin/clients/${client.id}`);
+      const res = await fetch(`${API_BASE_URL}/api/admin/clients/${client.id}`);
       const data = await res.json();
       if (res.ok && data.client) {
         setSelectedClientModal(prev => ({
@@ -101,19 +102,19 @@ export default function App() {
   const fetchAdminData = async () => {
     setIsLoading(true);
     try {
-      const statsRes = await fetch('http://localhost:5050/api/admin/stats');
+      const statsRes = await fetch(`${API_BASE_URL}/api/admin/stats`);
       const statsData = await statsRes.json();
       if (statsRes.ok) setStats(statsData);
 
-      const usersRes = await fetch('http://localhost:5050/api/admin/users');
+      const usersRes = await fetch(`${API_BASE_URL}/api/admin/users`);
       const usersData = await usersRes.json();
       if (usersRes.ok) setUsers(usersData.users || []);
 
-      const kycRes = await fetch('http://localhost:5050/api/admin/kyc/pending');
+      const kycRes = await fetch(`${API_BASE_URL}/api/admin/kyc/pending`);
       const kycData = await kycRes.json();
       if (kycRes.ok) setKycQueue(kycData.queue || []);
 
-      const duesRes = await fetch('http://localhost:5050/api/admin/dues/audit');
+      const duesRes = await fetch(`${API_BASE_URL}/api/admin/dues/audit`);
       const duesData = await duesRes.json();
       if (duesRes.ok) setDuesAudit(duesData.dues || []);
     } catch (err) {
@@ -141,7 +142,7 @@ export default function App() {
     setIsSubmittingLogin(true);
 
     try {
-      const res = await fetch('http://localhost:5050/api/auth/admin-login', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/admin-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -174,7 +175,7 @@ export default function App() {
     setAdminSuccessMessage('');
 
     try {
-      const res = await fetch('http://localhost:5050/api/auth/admin-forgot-password', { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/api/auth/admin-forgot-password`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         setAuthViewState('FORGOT_CODE');
@@ -200,7 +201,7 @@ export default function App() {
     setLoginError('');
 
     try {
-      const res = await fetch('http://localhost:5050/api/auth/admin-verify-code', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/admin-verify-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ otpCode: secretCode }),
@@ -234,7 +235,7 @@ export default function App() {
     setLoginError('');
 
     try {
-      const res = await fetch('http://localhost:5050/api/auth/admin-reset-password', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/admin-reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newPassword: newAdminPassword }),
@@ -278,7 +279,7 @@ export default function App() {
   // Toggle Lock/Unlock User Account
   const handleToggleLock = async (userId) => {
     try {
-      const res = await fetch(`http://localhost:5050/api/admin/users/${userId}/toggle-lock`, { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/toggle-lock`, { method: 'POST' });
       const data = await res.json();
       setActionMessage(data.message || 'Account lock status updated.');
       fetchAdminData();
@@ -291,7 +292,7 @@ export default function App() {
   // Toggle User Active Status (Block / Activate)
   const handleToggleStatus = async (userId) => {
     try {
-      const res = await fetch(`http://localhost:5050/api/admin/users/${userId}/toggle-status`, { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/toggle-status`, { method: 'POST' });
       const data = await res.json();
       setActionMessage(data.message || 'User status updated.');
       fetchAdminData();
@@ -304,7 +305,7 @@ export default function App() {
   // Approve Worker KYC
   const handleApproveKyc = async (workerId) => {
     try {
-      const res = await fetch(`http://localhost:5050/api/admin/kyc/${workerId}/approve`, { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/api/admin/kyc/${workerId}/approve`, { method: 'POST' });
       const data = await res.json();
       setActionMessage(data.message || 'Worker KYC & Bank Account Approved!');
       fetchAdminData();
@@ -317,7 +318,7 @@ export default function App() {
   // Reject Worker KYC
   const handleRejectKyc = async (workerId) => {
     try {
-      const res = await fetch(`http://localhost:5050/api/admin/kyc/${workerId}/reject`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/kyc/${workerId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: 'Aadhaar ID image not clear' })
@@ -908,7 +909,7 @@ export default function App() {
                     <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-black tracking-wider border-b border-slate-800">
                       <tr>
                         <th className="px-6 py-4">Worker Name & ID</th>
-                        <th className="px-6 py-4">Trade & Daily Wage Rate</th>
+                        <th className="px-6 py-4">Trade & Visiting Fee</th>
                         <th className="px-6 py-4">Phone & Locality</th>
                         <th className="px-6 py-4">KYC Badge Status</th>
                         <th className="px-6 py-4">Account Lock State</th>
@@ -939,7 +940,7 @@ export default function App() {
 
                             <td className="px-6 py-4 space-y-0.5">
                               <p className="font-bold text-amber-400 text-xs">{worker.trade_title || 'Skilled Trade Specialist'}</p>
-                              <p className="text-[11px] text-slate-400 font-mono">₹{worker.daily_rate || 650}/day • ₹{worker.daily_rate ? Math.round(worker.daily_rate/8) : 80}/hr</p>
+                              <p className="text-[11px] text-slate-400 font-mono">Visiting: ₹{worker.visiting_charge || worker.visitingCharge || 149}</p>
                             </td>
 
                             <td className="px-6 py-4 space-y-0.5">

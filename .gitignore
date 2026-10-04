@@ -1,6 +1,14 @@
 node_modules
 dist
 .DS_Store
+._*
 *.log
 .env
 .env.local
+*.sqlite
+*.sqlite3
+*.db
+*.zip
+.vscode
+.idea
+
