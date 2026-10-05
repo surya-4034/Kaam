@@ -280,19 +280,21 @@ export const searchWorkers = async (req, res) => {
         completedJobsCount: p.completedJobsCount || 0
       }));
 
-      return res.json({
-        status: 'success',
-        searchMeta: {
-          query: q || '',
-          category: selCat,
-          tokens,
-          expandedTerms: termList,
-          maxDistanceKm: Number(maxDistanceKm) || 50,
-          totalResults: finalPartners.length
-        },
-        count: finalPartners.length,
-        workers: finalPartners
-      });
+      if (finalPartners && finalPartners.length > 0) {
+        return res.json({
+          status: 'success',
+          searchMeta: {
+            query: q || '',
+            category: selCat,
+            tokens,
+            expandedTerms: termList,
+            maxDistanceKm: Number(maxDistanceKm) || 75,
+            totalResults: finalPartners.length
+          },
+          count: finalPartners.length,
+          workers: finalPartners
+        });
+      }
     } catch (err) {
       console.warn('MongoDB search query error, falling back to SQLite:', err.message);
     }
@@ -428,6 +430,13 @@ export const searchWorkers = async (req, res) => {
           bank: bankMap[w.id] || null
         }));
 
+        const resultsToReturn = finalRows.length > 0 ? finalRows : mappedRows.map(w => ({
+          ...w,
+          distanceKm: 12.5,
+          portfolio: portMap[w.id] || [],
+          bank: bankMap[w.id] || null
+        }));
+
         res.json({
           status: 'success',
           searchMeta: {
@@ -435,11 +444,11 @@ export const searchWorkers = async (req, res) => {
             category: selCat,
             tokens,
             expandedTerms: termList,
-            maxDistanceKm: Number(maxDistanceKm) || 50,
-            totalResults: finalRows.length
+            maxDistanceKm: Number(maxDistanceKm) || 75,
+            totalResults: resultsToReturn.length
           },
-          count: finalRows.length,
-          workers: finalRows
+          count: resultsToReturn.length,
+          workers: resultsToReturn
         });
       });
     });

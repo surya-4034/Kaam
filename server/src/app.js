@@ -7,6 +7,7 @@ import duesRoutes from './routes/duesRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import mapsRoutes from './routes/mapsRoutes.js';
 import spatialRoutes from './routes/spatialRoutes.js';
+import { isMongoConnected } from './config/mongoose.js';
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
     platform: 'kaam API Backend',
+    mongoConnected: isMongoConnected(),
     timestamp: new Date().toISOString()
   });
 });
