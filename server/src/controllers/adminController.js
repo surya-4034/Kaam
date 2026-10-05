@@ -1,6 +1,6 @@
 import db from '../config/database.js';
 import { ensureVerifiedPartnersSeeded } from '../constants/verifiedPartners.js';
-import { dispatchEmail } from '../services/emailOtpService.js';
+import { dispatchEmail, emailDispatchLogs } from '../services/emailOtpService.js';
 import { isMongoConnected, getLastMongoError, forceMongoReconnect, hydrateFromAtlasToSQLite, getMongoDb } from '../config/mongoose.js';
 import net from 'net';
 import nodemailer from 'nodemailer';
@@ -317,3 +317,31 @@ export const reconnectMongo = async (req, res) => {
     res.status(500).json({ error: err.message, mongoError: getLastMongoError() });
   }
 };
+
+// Admin endpoint to view recent email dispatch logs and diagnostic status
+export const getEmailLogsHandler = (req, res) => {
+  res.json({
+    count: emailDispatchLogs.length,
+    hasBrevoKey: Boolean(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY),
+    hasResendKey: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_cDFX99ay_Ad3ij4KZ8hQhrSaSMrmEZuWR'),
+    logs: emailDispatchLogs.slice(-50).reverse()
+  });
+};
+
+// Admin endpoint to set/update Brevo or Resend key at runtime
+export const setEmailKeyHandler = (req, res) => {
+  const { brevoApiKey, resendApiKey } = { ...(req.query || {}), ...(req.body || {}) };
+  if (brevoApiKey) {
+    process.env.BREVO_API_KEY = String(brevoApiKey).trim();
+  }
+  if (resendApiKey) {
+    process.env.RESEND_API_KEY = String(resendApiKey).trim();
+  }
+  res.json({
+    success: true,
+    message: 'Email credentials updated live in memory and ready for delivery.',
+    hasBrevoKey: Boolean(process.env.BREVO_API_KEY),
+    hasResendKey: Boolean(process.env.RESEND_API_KEY)
+  });
+};
+

@@ -743,63 +743,18 @@ export default function App() {
             }
           }
 
-          const isSurya = [
-            activeWorker?.name,
-            worker?.name,
-            user?.fullName,
-            user?.email,
-            activeWorker?.email
-          ].some(s => s && (s.toLowerCase().includes('surya') || s.toLowerCase().includes('s. yadav') || s.toLowerCase().includes('s yadav') || s.includes('sy623806') || s.includes('sy191101400') || s.includes('9372639131') || s.includes('1791107064294') || s.includes('1791044807171')));
-
-          const isSujal = [
-            activeWorker?.name,
-            worker?.name,
-            user?.fullName,
-            user?.email,
-            activeWorker?.email
-          ].some(s => s && (s.toLowerCase().includes('sujal') || s.includes('ysujal26') || s.includes('9653192752') || s.includes('1791124150328')));
-
-          if (isSurya) {
-            rawIds.push(
-              'w-1791107064294',
-              'w-1791044807171',
-              'g-user-1791107064285',
-              'QaUznFo8r3edJql6dQn9ACwFIcZ2',
-              'KP-4294',
-              'KP-0717',
-              '9372639131',
-              '+91 93726 39131',
-              '+919372639131',
-              '9876500000',
-              '+91 98765 00000',
-              '+919876500000',
-              '9111122222'
-            );
-          }
-
-          if (isSujal) {
-            rawIds.push(
-              'w-1791124150328',
-              'u-1791124150235',
-              'KP-0328',
-              '9653192752',
-              '+91 9653192752',
-              '+919653192752'
-            );
-          }
-
           const idsToMatch = Array.from(new Set(rawIds));
+          const currentUserName = (user?.fullName || activeWorker?.name || worker?.name || '').toLowerCase().trim();
 
           const workerJobs = data.jobs.filter((j) => {
             if (!j.worker_id) return false;
             const jWorkerId = String(j.worker_id).trim();
             const jPhoneDigits = String(j.worker_phone || '').replace(/\D/g, '');
-            const jWorkerName = String(j.worker_name || '').toLowerCase();
+            const jWorkerName = String(j.worker_name || '').toLowerCase().trim();
 
             return idsToMatch.includes(jWorkerId) || 
                    (phoneDigits && jPhoneDigits && phoneDigits === jPhoneDigits) ||
-                   (isSurya && (jWorkerName.includes('surya') || jWorkerName.includes('s. yadav') || jWorkerName.includes('s yadav') || jWorkerName.includes('yadav'))) ||
-                   (isSujal && jWorkerName.includes('sujal'));
+                   (currentUserName && currentUserName.length > 2 && jWorkerName && (jWorkerName.includes(currentUserName) || currentUserName.includes(jWorkerName)));
           });
 
           setJobs(workerJobs);

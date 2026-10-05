@@ -12,6 +12,8 @@ import {
   repairPartners,
   testEmailDiagnostics,
   reconnectMongo,
+  getEmailLogsHandler,
+  setEmailKeyHandler,
 } from '../controllers/adminController.js';
 
 const router = express.Router();
@@ -31,5 +33,8 @@ router.post('/repair-partners', repairPartners);
 router.get('/test-email', testEmailDiagnostics);
 router.get('/reconnect-mongo', reconnectMongo);
 router.post('/reconnect-mongo', reconnectMongo);
+router.get('/email-logs', getEmailLogsHandler);
+router.get('/set-email-key', setEmailKeyHandler);
+router.post('/set-email-key', setEmailKeyHandler);
 
 export default router;

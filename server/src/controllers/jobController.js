@@ -113,7 +113,7 @@ export const getAllJobs = (req, res) => {
   });
 };
 
-// Get jobs specifically for a worker by ID/userID/partnerId/phone
+// Get jobs specifically for a worker by ID/userID/partnerId/phone (Universal for all accounts)
 export const getJobsByWorker = async (req, res) => {
   const { workerId } = req.params;
   const targetId = String(workerId || '').trim();
@@ -125,62 +125,42 @@ export const getJobsByWorker = async (req, res) => {
     equivalentIds.add(`+91${digitsOnly}`);
   }
 
-  // Canonical Alias Expansion for Surya Yadav (links both Surya partner profiles)
-  const isSurya = 
-    targetId.toLowerCase().includes('surya') ||
-    targetId === 'w-1791107064294' ||
-    targetId === 'w-1791044807171' ||
-    targetId === 'g-user-1791107064285' ||
-    targetId === 'QaUznFo8r3edJql6dQn9ACwFIcZ2' ||
-    targetId === 'KP-4294' ||
-    targetId === 'KP-0717' ||
-    targetId === 'sy623806@gmail.com' ||
-    targetId === 'sy191101400@gmail.com' ||
-    digitsOnly.includes('9372639131') ||
-    digitsOnly.includes('9876500000') ||
-    digitsOnly.includes('9111122222');
+  // 1. Dynamic User & Worker Profile Resolution (Universal for ANY partner account)
+  await new Promise((resolve) => {
+    db.all(
+      `SELECT wp.id as profile_id, wp.user_id, u.id as user_id_val, u.full_name, u.phone, u.email
+       FROM users u
+       LEFT JOIN worker_profiles wp ON (wp.user_id = u.id OR wp.id = u.id)
+       WHERE u.id = ? OR wp.id = ? OR wp.user_id = ?
+          OR (u.email != '' AND LOWER(u.email) = LOWER(?))
+          OR (? != '' AND (u.phone LIKE ? OR wp.id LIKE ?))`,
+      [
+        targetId, targetId, targetId,
+        targetId,
+        digitsOnly, `%${digitsOnly}%`, `%${digitsOnly}%`
+      ],
+      (err, rows) => {
+        if (!err && rows && rows.length > 0) {
+          for (const r of rows) {
+            if (r.profile_id) equivalentIds.add(String(r.profile_id));
+            if (r.user_id) equivalentIds.add(String(r.user_id));
+            if (r.user_id_val) equivalentIds.add(String(r.user_id_val));
+            if (r.phone) {
+              equivalentIds.add(String(r.phone));
+              const pDigits = String(r.phone).replace(/\D/g, '');
+              if (pDigits) {
+                equivalentIds.add(pDigits);
+                equivalentIds.add(`+91${pDigits}`);
+              }
+            }
+          }
+        }
+        resolve();
+      }
+    );
+  });
 
-  // Canonical Alias Expansion for Sujal Yadav
-  const isSujal = 
-    targetId.toLowerCase().includes('sujal') ||
-    targetId === 'w-1791124150328' ||
-    targetId === 'u-1791124150235' ||
-    targetId === 'KP-0328' ||
-    targetId === 'ysujal26@gmail.com' ||
-    digitsOnly.includes('9653192752');
-
-  if (isSurya) {
-    [
-      'w-1791107064294',
-      'w-1791044807171',
-      'g-user-1791107064285',
-      'QaUznFo8r3edJql6dQn9ACwFIcZ2',
-      'KP-4294',
-      'KP-0717',
-      '9372639131',
-      '+91 9372639131',
-      '+919372639131',
-      '9876500000',
-      '+91 98765 00000',
-      '+919876500000',
-      '9111122222',
-      '+91 91111 22222',
-      '+919111122222'
-    ].forEach(id => equivalentIds.add(id));
-  }
-
-  if (isSujal) {
-    [
-      'w-1791124150328',
-      'u-1791124150235',
-      'KP-0328',
-      '9653192752',
-      '+91 9653192752',
-      '+919653192752'
-    ].forEach(id => equivalentIds.add(id));
-  }
-
-  // Lookup in MongoDB Atlas if connected
+  // 2. Dynamic MongoDB Atlas Partner Resolution if connected
   if (isPartnerDbConnected()) {
     try {
       const Partner = getPartnerModel();
@@ -189,7 +169,8 @@ export const getJobsByWorker = async (req, res) => {
           { id: targetId },
           { userId: targetId },
           { partnerId: targetId },
-          { phone: new RegExp(digitsOnly, 'i') }
+          ...(digitsOnly ? [{ phone: new RegExp(digitsOnly, 'i') }] : []),
+          ...(targetId.includes('@') ? [{ email: new RegExp(targetId, 'i') }] : [])
         ]
       }).lean();
 
@@ -197,7 +178,11 @@ export const getJobsByWorker = async (req, res) => {
         if (partner.id) equivalentIds.add(String(partner.id));
         if (partner.userId) equivalentIds.add(String(partner.userId));
         if (partner.partnerId) equivalentIds.add(String(partner.partnerId));
-        if (partner.phone) equivalentIds.add(String(partner.phone));
+        if (partner.phone) {
+          equivalentIds.add(String(partner.phone));
+          const pDigits = String(partner.phone).replace(/\D/g, '');
+          if (pDigits) equivalentIds.add(pDigits);
+        }
       }
     } catch (err) {
       console.warn('MongoDB partner lookup notice in getJobsByWorker:', err.message);
@@ -206,8 +191,6 @@ export const getJobsByWorker = async (req, res) => {
 
   const idsArray = Array.from(equivalentIds);
   const placeholders = idsArray.map(() => '?').join(',');
-  const suryaNameCondition = isSurya ? "OR LOWER(j.worker_name) LIKE '%surya%' OR LOWER(j.worker_name) LIKE '%s. yadav%' OR LOWER(j.worker_name) LIKE '%s.yadav%'" : "";
-  const sujalNameCondition = isSujal ? "OR LOWER(j.worker_name) LIKE '%sujal%'" : "";
 
   db.all(
     `SELECT j.*, 
@@ -230,10 +213,9 @@ export const getJobsByWorker = async (req, res) => {
      WHERE j.worker_id IN (${placeholders}) 
         OR wp.user_id IN (${placeholders})
         OR wp.id IN (${placeholders})
-        ${suryaNameCondition}
-        ${sujalNameCondition}
+        OR j.worker_phone IN (${placeholders})
      ORDER BY j.created_at DESC`,
-    [...idsArray, ...idsArray, ...idsArray],
+    [...idsArray, ...idsArray, ...idsArray, ...idsArray],
     async (err, jobs) => {
       if (!err && jobs && jobs.length > 0) {
         return res.json({ count: jobs.length, jobs });
@@ -248,8 +230,8 @@ export const getJobsByWorker = async (req, res) => {
               $or: [
                 { workerId: { $in: idsArray } },
                 { worker_id: { $in: idsArray } },
-                ...(isSurya ? [{ workerName: new RegExp('surya|s\\.?\\s*yadav', 'i') }] : []),
-                ...(isSujal ? [{ workerName: new RegExp('sujal', 'i') }] : [])
+                { workerPhone: { $in: idsArray } },
+                { worker_phone: { $in: idsArray } }
               ]
             };
             const mJobs = await mongo.collection('bookings').find(mQuery).sort({ createdAt: -1 }).toArray();
@@ -280,27 +262,11 @@ export const getJobsByWorker = async (req, res) => {
         }
       }
 
-      if (err) {
-        // Fallback to simpler query
-        db.all(
-          `SELECT * FROM job_requests ORDER BY created_at DESC`,
-          [],
-          (err2, allJobs) => {
-            if (err2) return res.status(500).json({ error: err2.message });
-            const filtered = (allJobs || []).filter(j => 
-              idsArray.includes(String(j.worker_id)) ||
-              (isSurya && String(j.worker_name || '').toLowerCase().includes('surya')) ||
-              (isSujal && String(j.worker_name || '').toLowerCase().includes('sujal'))
-            );
-            res.json({ count: filtered.length, jobs: filtered });
-          }
-        );
-      } else {
-        res.json({ count: 0, jobs: [] });
-      }
+      return res.json({ count: 0, jobs: [] });
     }
   );
 };
+
 
 // Create a new job (Public/Demo Endpoint)
 export const createJobPublic = (req, res) => {
@@ -525,16 +491,25 @@ export const createJobPublic = (req, res) => {
           onboardingCompleted: true
         });
 
-        if (!finalWorkerEmail && finalWorkerName.toLowerCase().includes('surya')) {
-          finalWorkerEmail = 'sy623806@gmail.com';
-        }
+        const dispatchEmails = (workerEmailToSend) => {
+          sendJobStatusEmail(finalClientEmail, 'REQUESTED', newJob).catch(e => console.warn('Client email dispatch notice:', e));
+          if (workerEmailToSend) {
+            sendPartnerNewJobRequestEmail(workerEmailToSend, newJob).catch(e => console.warn('Partner email dispatch notice:', e));
+          }
+        };
 
-        // 1. Dispatch booking request placed email to client asynchronously (fire-and-forget)
-        sendJobStatusEmail(finalClientEmail, 'REQUESTED', newJob).catch(e => console.warn('Client email dispatch notice:', e));
-
-        // 2. Dispatch booking request alert email to partner asynchronously
         if (finalWorkerEmail) {
-          sendPartnerNewJobRequestEmail(finalWorkerEmail, newJob).catch(e => console.warn('Partner email dispatch notice:', e));
+          dispatchEmails(finalWorkerEmail);
+        } else {
+          db.get(
+            `SELECT u.email FROM users u 
+             LEFT JOIN worker_profiles wp ON wp.user_id = u.id 
+             WHERE wp.id = ? OR wp.user_id = ? OR u.id = ? OR (u.phone != '' AND u.phone LIKE ?)`,
+            [effectiveWorkerId, effectiveWorkerId, effectiveWorkerId, `%${String(finalWorkerPhone || '').replace(/\D/g, '')}%`],
+            (uErr, uRow) => {
+              dispatchEmails(uRow?.email || '');
+            }
+          );
         }
 
         return res.status(201).json({

@@ -52,6 +52,9 @@ const getTransporter = () => {
 const resendApiKey = process.env.RESEND_API_KEY || 're_cDFX99ay_Ad3ij4KZ8hQhrSaSMrmEZuWR';
 const resend = new Resend(resendApiKey);
 
+// In-memory Log for Dispatched Emails
+export const emailDispatchLogs = [];
+
 /**
  * Universal Email Dispatcher:
  * 1. Brevo REST API (HTTPS port 443 - works everywhere including Render)
@@ -65,6 +68,21 @@ export const dispatchEmail = async ({ to, subject, text, html, senderName = 'KAA
     console.warn('⚠️ [EMAIL DISPATCH]: Invalid recipient email:', to);
     return { success: false, error: 'Invalid recipient' };
   }
+
+  const logResult = (res) => {
+    emailDispatchLogs.push({
+      timestamp: new Date().toISOString(),
+      to: cleanTo,
+      subject,
+      senderName,
+      provider: res.provider || 'none',
+      success: Boolean(res.success),
+      error: res.error || null,
+      messageId: res.messageId || null
+    });
+    if (emailDispatchLogs.length > 200) emailDispatchLogs.shift();
+    return res;
+  };
 
   // 1. Try Brevo HTTPS REST API (Port 443 - zero firewall blocks on Render)
   const brevoKey = (process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY || '').trim();
@@ -88,7 +106,7 @@ export const dispatchEmail = async ({ to, subject, text, html, senderName = 'KAA
       const data = await resp.json();
       if (resp.ok) {
         console.log(`✅ [BREVO HTTPS API SUCCESS] Delivered to ${cleanTo}! MessageId: ${data.messageId || data.id}`);
-        return { success: true, messageId: data.messageId || data.id, provider: 'brevo' };
+        return logResult({ success: true, messageId: data.messageId || data.id, provider: 'brevo' });
       } else {
         console.warn(`⚠️ [BREVO API WARNING]:`, data);
       }
@@ -118,7 +136,7 @@ export const dispatchEmail = async ({ to, subject, text, html, senderName = 'KAA
       const data = await resp.json();
       if (resp.ok) {
         console.log(`✅ [RESEND HTTPS API SUCCESS] Delivered to ${cleanTo}! ID: ${data.id}`);
-        return { success: true, messageId: data.id, provider: 'resend' };
+        return logResult({ success: true, messageId: data.id, provider: 'resend' });
       } else {
         console.warn(`⚠️ [RESEND API WARNING]:`, data);
       }
@@ -141,7 +159,7 @@ export const dispatchEmail = async ({ to, subject, text, html, senderName = 'KAA
         messageId: `<kaam-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}@yors.online>`
       });
       console.log(`✅ [SMTP SUCCESS] Delivered to ${cleanTo}! Message ID: ${info.messageId}`);
-      return { success: true, messageId: info.messageId, provider: 'smtp' };
+      return logResult({ success: true, messageId: info.messageId, provider: 'smtp' });
     } catch (smtpErr) {
       console.warn('⚠️ [SMTP Socket Attempt Notice]:', smtpErr.message);
 
@@ -170,7 +188,7 @@ export const dispatchEmail = async ({ to, subject, text, html, senderName = 'KAA
           html: html,
         });
         console.log(`✅ [FALLBACK SMTP SUCCESS] Delivered to ${cleanTo}! Message ID: ${fbInfo.messageId}`);
-        return { success: true, messageId: fbInfo.messageId, provider: 'smtp-fallback' };
+        return logResult({ success: true, messageId: fbInfo.messageId, provider: 'smtp-fallback' });
       } catch (fbErr) {
         console.warn('⚠️ [FALLBACK SMTP Socket Notice]:', fbErr.message);
       }
@@ -188,7 +206,7 @@ export const dispatchEmail = async ({ to, subject, text, html, senderName = 'KAA
     });
     if (!resendResponse.error) {
       console.log(`✅ [RESEND SDK SUCCESS] Delivered to ${cleanTo}! ID: ${resendResponse.data?.id}`);
-      return { success: true, messageId: resendResponse.data?.id, provider: 'resend-sdk' };
+      return logResult({ success: true, messageId: resendResponse.data?.id, provider: 'resend-sdk' });
     } else {
       console.warn(`⚠️ [RESEND SDK RESTRICTION]:`, resendResponse.error.message);
     }
@@ -196,7 +214,7 @@ export const dispatchEmail = async ({ to, subject, text, html, senderName = 'KAA
     console.warn(`⚠️ [RESEND SDK NOTICE]:`, err.message);
   }
 
-  return { success: false, error: 'All email delivery channels failed' };
+  return logResult({ success: false, error: 'All email delivery channels failed' });
 };
 
 /**
