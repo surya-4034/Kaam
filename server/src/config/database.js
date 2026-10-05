@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import { ensureVerifiedPartnersSeeded } from '../constants/verifiedPartners.js';
+import { SEED_BOOKINGS } from '../constants/seedBookings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -230,15 +231,65 @@ export const initDb = () => {
         VALUES ('Surya-4034', '+91 99999 40340', 'kaamadmin@gmail.com', '${adminPassHash}', 'ADMIN', 'Surya Master Admin', 1, 1)
       `);
 
-      // Ensure real platform verified workers exist on all cloud deployments
+      // Ensure real platform verified workers and seed bookings exist on all cloud deployments
       db.run("SELECT 1", async () => {
         try {
           await ensureVerifiedPartnersSeeded(db);
         } catch (sErr) {
           console.warn('⚠️ [Verified Partners Seed Warning]', sErr.message);
         }
+        try {
+          await ensureSeedBookingsSeeded(db);
+        } catch (bErr) {
+          console.warn('⚠️ [Seed Bookings Warning]', bErr.message);
+        }
         resolve(db);
       });
+    });
+  });
+};
+
+export const ensureSeedBookingsSeeded = async (database) => {
+  return new Promise((resolve) => {
+    database.get('SELECT COUNT(*) as count FROM job_requests', [], (err, row) => {
+      if (!err && row && row.count > 0) return resolve();
+      
+      const stmt = database.prepare(`
+        INSERT OR IGNORE INTO job_requests 
+        (id, client_id, worker_id, category_title, client_email, client_name, client_phone, worker_name, worker_phone, work_description, location_address, start_date, duration_days, agreed_total_fee, payment_mode, platform_fee_amount, worker_net_payout, status, completion_code, time_slot, packages_json, worker_upi, worker_upi_phone, worker_upi_holder, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const b of (SEED_BOOKINGS || [])) {
+        stmt.run([
+          b.id || b.jobId,
+          b.clientId || 'u-client-1042',
+          b.workerId || 'w-1791107064294',
+          b.tradeCategory || b.categoryTitle || 'General Service',
+          b.clientEmail || 'client@kaam.com',
+          b.clientName || 'Customer',
+          b.clientPhone || '',
+          b.workerName || 'Verified Partner',
+          b.workerPhone || '+91 98765 43210',
+          b.workDescription || 'Service Booking',
+          b.locationAddress || 'Mumbai',
+          b.startDate || (b.createdAt ? new Date(b.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+          b.durationDays || 1,
+          Number(b.agreedTotalFee || 500),
+          b.paymentMode || 'DIRECT_CASH',
+          Number(b.platformFeeAmount || Math.round((b.agreedTotalFee || 500) * 0.08)),
+          Number(b.workerNetPayout || ((b.agreedTotalFee || 500) - Math.round((b.agreedTotalFee || 500) * 0.08))),
+          b.status || 'REQUESTED',
+          b.completionCode || '',
+          b.timeSlot || null,
+          JSON.stringify(Array.isArray(b.packages) ? b.packages : []),
+          b.workerUpi || null,
+          b.workerUpiPhone || null,
+          b.workerUpiHolder || null,
+          b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString()
+        ]);
+      }
+      stmt.finalize(() => resolve());
     });
   });
 };
