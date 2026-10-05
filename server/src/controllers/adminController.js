@@ -1,5 +1,6 @@
 import db from '../config/database.js';
 import { ensureVerifiedPartnersSeeded } from '../constants/verifiedPartners.js';
+import { dispatchEmail } from '../services/emailOtpService.js';
 import net from 'net';
 import nodemailer from 'nodemailer';
 
@@ -239,19 +240,20 @@ export const repairPartners = async (req, res) => {
 
 // Admin diagnostic endpoint to test real email deliverability and SMTP TCP ports
 export const testEmailDiagnostics = async (req, res) => {
-  const targetEmail = req.query.email || 'kaam@yors.online';
+  const targetEmail = req.query.email || 'sy623806@gmail.com';
   const results = {
     smtpUser: process.env.EMAIL_USER,
     hasPass: Boolean(process.env.EMAIL_PASS),
     passLength: (process.env.EMAIL_PASS || '').length,
+    hasBrevoKey: Boolean(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY),
+    hasResendKey: Boolean(process.env.RESEND_API_KEY),
     port465Tcp: 'testing',
     port587Tcp: 'testing',
-    smtpVerify: 'pending',
-    sendTest: 'pending'
+    dispatchResult: null
   };
 
   const testTcp = (port) => new Promise((resolve) => {
-    const socket = net.createConnection({ host: 'smtp.hostinger.com', port, timeout: 4000 });
+    const socket = net.createConnection({ host: 'smtp.hostinger.com', port, timeout: 3000 });
     socket.on('connect', () => {
       socket.destroy();
       resolve('CONNECTED');
@@ -268,34 +270,24 @@ export const testEmailDiagnostics = async (req, res) => {
   results.port465Tcp = await testTcp(465);
   results.port587Tcp = await testTcp(587);
 
-  const cleanPass = (process.env.EMAIL_PASS || '').replace(/^["']|["']$/g, '').trim();
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.hostinger.com',
-    port: 465,
-    secure: true,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: cleanPass
-    },
-    tls: { rejectUnauthorized: false },
-    connectionTimeout: 5000,
-    greetingTimeout: 5000,
-    socketTimeout: 5000
-  });
-
+  // Test full email dispatch (HTTP API + SMTP fallback)
   try {
-    await transporter.verify();
-    results.smtpVerify = 'SUCCESS';
-    const info = await transporter.sendMail({
-      from: `"KAAM Diagnostic" <${process.env.EMAIL_USER}>`,
+    const outcome = await dispatchEmail({
       to: targetEmail,
-      subject: 'KAAM Email Diagnostics Test',
-      text: 'Test email from KAAM live server.'
+      subject: `KAAM Email Diagnostics Test - ${new Date().toLocaleTimeString('en-IN')}`,
+      text: `Hello,\n\nThis is a live test email from KAAM Server to verify real email delivery to ${targetEmail}.\nTimestamp: ${new Date().toISOString()}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #0284c7; margin-top: 0;">KAAM Email Deliverability Test</h2>
+          <p>This email confirms that the KAAM email notification system is working and successfully delivered to <strong>${targetEmail}</strong>.</p>
+          <p style="font-size: 12px; color: #64748b;">Timestamp: ${new Date().toISOString()}</p>
+        </div>
+      `,
+      senderName: 'KAAM Diagnostic'
     });
-    results.sendTest = `SUCCESS: ${info.messageId}`;
-  } catch (err) {
-    results.smtpVerify = `FAILED: ${err.message}`;
-    results.sendTest = 'SKIPPED';
+    results.dispatchResult = outcome;
+  } catch (dErr) {
+    results.dispatchResult = { success: false, error: dErr.message };
   }
 
   res.json(results);

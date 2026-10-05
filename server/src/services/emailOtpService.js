@@ -53,6 +53,153 @@ const resendApiKey = process.env.RESEND_API_KEY || 're_cDFX99ay_Ad3ij4KZ8hQhrSaS
 const resend = new Resend(resendApiKey);
 
 /**
+ * Universal Email Dispatcher:
+ * 1. Brevo REST API (HTTPS port 443 - works everywhere including Render)
+ * 2. Resend REST API (HTTPS port 443)
+ * 3. Hostinger / Gmail SMTP (ports 465 / 587 - works locally / VPS)
+ * 4. Fallback Resend SDK call
+ */
+export const dispatchEmail = async ({ to, subject, text, html, senderName = 'KAAM Support' }) => {
+  const cleanTo = (to || '').toLowerCase().trim();
+  if (!cleanTo || !cleanTo.includes('@')) {
+    console.warn('⚠️ [EMAIL DISPATCH]: Invalid recipient email:', to);
+    return { success: false, error: 'Invalid recipient' };
+  }
+
+  // 1. Try Brevo HTTPS REST API (Port 443 - zero firewall blocks on Render)
+  const brevoKey = (process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY || '').trim();
+  if (brevoKey) {
+    try {
+      const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'api-key': brevoKey,
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: senderName, email: process.env.EMAIL_USER || 'kaam@yors.online' },
+          to: [{ email: cleanTo }],
+          subject: subject,
+          htmlContent: html,
+          textContent: text
+        })
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        console.log(`✅ [BREVO HTTPS API SUCCESS] Delivered to ${cleanTo}! MessageId: ${data.messageId || data.id}`);
+        return { success: true, messageId: data.messageId || data.id, provider: 'brevo' };
+      } else {
+        console.warn(`⚠️ [BREVO API WARNING]:`, data);
+      }
+    } catch (bErr) {
+      console.error('❌ [BREVO API ERROR]:', bErr.message);
+    }
+  }
+
+  // 2. Try Resend HTTPS REST API (Port 443)
+  const resendKey = (process.env.RESEND_API_KEY || '').trim();
+  if (resendKey && resendKey !== 're_cDFX99ay_Ad3ij4KZ8hQhrSaSMrmEZuWR') {
+    try {
+      const resp = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: `${senderName} <onboarding@resend.dev>`,
+          to: [cleanTo],
+          subject: subject,
+          html: html,
+          text: text
+        })
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        console.log(`✅ [RESEND HTTPS API SUCCESS] Delivered to ${cleanTo}! ID: ${data.id}`);
+        return { success: true, messageId: data.id, provider: 'resend' };
+      } else {
+        console.warn(`⚠️ [RESEND API WARNING]:`, data);
+      }
+    } catch (rErr) {
+      console.error('❌ [RESEND API ERROR]:', rErr.message);
+    }
+  }
+
+  // 3. Try Hostinger / Gmail SMTP Transporter
+  const transporter = getTransporter();
+  if (transporter) {
+    try {
+      const info = await transporter.sendMail({
+        from: `"${senderName}" <${process.env.EMAIL_USER}>`,
+        replyTo: process.env.EMAIL_USER,
+        to: cleanTo,
+        subject: subject,
+        text: text,
+        html: html,
+        messageId: `<kaam-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}@yors.online>`
+      });
+      console.log(`✅ [SMTP SUCCESS] Delivered to ${cleanTo}! Message ID: ${info.messageId}`);
+      return { success: true, messageId: info.messageId, provider: 'smtp' };
+    } catch (smtpErr) {
+      console.warn('⚠️ [SMTP Socket Attempt Notice]:', smtpErr.message);
+
+      // Attempt fallback to port 587 STARTTLS
+      try {
+        const cleanPass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/^["']|["']$/g, '').trim() : '';
+        const fallbackTransporter = nodemailer.createTransport({
+          host: 'smtp.hostinger.com',
+          port: 587,
+          secure: false,
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: cleanPass,
+          },
+          tls: { rejectUnauthorized: false },
+          connectionTimeout: 4000,
+          greetingTimeout: 4000,
+          socketTimeout: 5000
+        });
+        const fbInfo = await fallbackTransporter.sendMail({
+          from: `"${senderName}" <${process.env.EMAIL_USER}>`,
+          replyTo: process.env.EMAIL_USER,
+          to: cleanTo,
+          subject: subject,
+          text: text,
+          html: html,
+        });
+        console.log(`✅ [FALLBACK SMTP SUCCESS] Delivered to ${cleanTo}! Message ID: ${fbInfo.messageId}`);
+        return { success: true, messageId: fbInfo.messageId, provider: 'smtp-fallback' };
+      } catch (fbErr) {
+        console.warn('⚠️ [FALLBACK SMTP Socket Notice]:', fbErr.message);
+      }
+    }
+  }
+
+  // 4. Fallback Resend SDK call
+  try {
+    const resendResponse = await resend.emails.send({
+      from: `${senderName} <onboarding@resend.dev>`,
+      to: [cleanTo],
+      subject: subject,
+      text: text,
+      html: html,
+    });
+    if (!resendResponse.error) {
+      console.log(`✅ [RESEND SDK SUCCESS] Delivered to ${cleanTo}! ID: ${resendResponse.data?.id}`);
+      return { success: true, messageId: resendResponse.data?.id, provider: 'resend-sdk' };
+    } else {
+      console.warn(`⚠️ [RESEND SDK RESTRICTION]:`, resendResponse.error.message);
+    }
+  } catch (err) {
+    console.warn(`⚠️ [RESEND SDK NOTICE]:`, err.message);
+  }
+
+  return { success: false, error: 'All email delivery channels failed' };
+};
+
+/**
  * Generate and send a REAL 6-digit Email Verification OTP code with Context-Specific Email Content
  * @param {string} email 
  * @param {string} context - 'SIGNUP' | 'LOGIN' | 'RESET_PASSWORD'
@@ -106,88 +253,13 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
   console.log(`🔑 6-DIGIT VERIFICATION CODE: [ ${generatedOtp} ]`);
   console.log(`======================================================\n`);
 
-  const transporter = getTransporter();
-
-  // PRIMARY PATH: Hostinger Domain SMTP (Sends to ANY email address in the world)
-  if (transporter) {
-    try {
-      const info = await transporter.sendMail({
-        from: `"KAAM Support" <${process.env.EMAIL_USER}>`,
-        replyTo: process.env.EMAIL_USER,
-        to: cleanEmail,
-        subject: subjectText,
-        text: plainTextBody,
-        html: htmlBody,
-        messageId: `<kaam-otp-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}@yors.online>`,
-        envelope: {
-          from: process.env.EMAIL_USER,
-          to: cleanEmail
-        }
-      });
-
-      console.log(`✅ [HOSTINGER SMTP SUCCESS] Delivered with context "${context}" to ${cleanEmail}! Message ID: ${info.messageId}`);
-      return {
-        success: true,
-        email: cleanEmail,
-        message: `6-Digit Verification Code sent to ${cleanEmail}! Please check your email inbox.`
-      };
-    } catch (smtpErr) {
-      console.error('❌ [HOSTINGER SMTP DISPATCH ERROR]:', smtpErr.message);
-      try {
-        console.log('🔄 Attempting fallback to port 587 STARTTLS for OTP...');
-        const cleanPass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/^["']|["']$/g, '').trim() : '';
-        const fallbackTransporter = nodemailer.createTransport({
-          host: 'smtp.hostinger.com',
-          port: 587,
-          secure: false,
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: cleanPass,
-          },
-          tls: { rejectUnauthorized: false },
-          connectionTimeout: 4000,
-          greetingTimeout: 4000,
-          socketTimeout: 5000
-        });
-        const fbInfo = await fallbackTransporter.sendMail({
-          from: `"KAAM Support" <${process.env.EMAIL_USER}>`,
-          replyTo: process.env.EMAIL_USER,
-          to: cleanEmail,
-          subject: subjectText,
-          text: plainTextBody,
-          html: htmlBody,
-        });
-        console.log(`✅ [FALLBACK SMTP SUCCESS] OTP Delivered to ${cleanEmail}! Message ID: ${fbInfo.messageId}`);
-        return {
-          success: true,
-          email: cleanEmail,
-          otpCode: generatedOtp,
-          message: `6-Digit Verification Code sent to ${cleanEmail}! Please check your email inbox.`
-        };
-      } catch (fbErr) {
-        console.error('❌ [FALLBACK SMTP ERROR]:', fbErr.message);
-      }
-    }
-  }
-
-  // FALLBACK PATH: Resend API (Used if SMTP server is unavailable)
-  try {
-    const resendResponse = await resend.emails.send({
-      from: 'KAAM Verification <onboarding@resend.dev>',
-      to: [cleanEmail],
-      subject: subjectText,
-      text: plainTextBody,
-      html: htmlBody,
-    });
-
-    if (!resendResponse.error) {
-      console.log(`✅ [RESEND API SUCCESS] Delivered with context "${context}" to ${cleanEmail}! Message ID: ${resendResponse.data?.id}`);
-    } else {
-      console.warn(`⚠️ [RESEND RESTRICTION]:`, resendResponse.error.message);
-    }
-  } catch (err) {
-    console.error('❌ [RESEND API ERROR]:', err);
-  }
+  await dispatchEmail({
+    to: cleanEmail,
+    subject: subjectText,
+    text: plainTextBody,
+    html: htmlBody,
+    senderName: 'KAAM Verification'
+  });
 
   return {
     success: true,
@@ -748,78 +820,82 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
   console.log(`SUBJECT: ${subjectText}`);
   console.log(`======================================================\n`);
 
-  const transporter = getTransporter();
+  const res = await dispatchEmail({
+    to: cleanEmail,
+    subject: subjectText,
+    text: plainTextBody,
+    html: htmlBody,
+    senderName: 'KAAM Support'
+  });
 
-  if (transporter) {
-    try {
-      const msgId = `<kaam-job-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}@yors.online>`;
-      const info = await transporter.sendMail({
-        from: `"KAAM Support" <${process.env.EMAIL_USER}>`,
-        replyTo: process.env.EMAIL_USER,
-        to: cleanEmail,
-        subject: subjectText,
-        text: plainTextBody,
-        html: htmlBody,
-        messageId: msgId,
-        headers: {
-          'X-Entity-Ref-ID': `${Date.now()}`
-        }
-      });
-      console.log(`✅ [JOB STATUS EMAIL SMTP SUCCESS] Delivered to ${cleanEmail}! MessageId: ${info.messageId}`);
-      return { success: true };
-    } catch (smtpErr) {
-      console.error('❌ [JOB STATUS EMAIL SMTP ERROR]:', smtpErr.message);
-
-      // Attempt fallback to port 587 STARTTLS
-      try {
-        console.log('🔄 Attempting fallback to port 587 STARTTLS...');
-        const cleanPass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/^["']|["']$/g, '').trim() : '';
-        const fallbackTransporter = nodemailer.createTransport({
-          host: 'smtp.hostinger.com',
-          port: 587,
-          secure: false,
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: cleanPass,
-          },
-          tls: { rejectUnauthorized: false }
-        });
-        const fbInfo = await fallbackTransporter.sendMail({
-          from: `"KAAM Support" <${process.env.EMAIL_USER}>`,
-          replyTo: process.env.EMAIL_USER,
-          to: cleanEmail,
-          subject: subjectText,
-          text: plainTextBody,
-          html: htmlBody,
-        });
-        console.log(`✅ [FALLBACK SMTP SUCCESS] Delivered to ${cleanEmail}! MessageId: ${fbInfo.messageId}`);
-        return { success: true };
-      } catch (fbErr) {
-        console.error('❌ [FALLBACK SMTP ERROR]:', fbErr.message);
-      }
-    }
-  }
-
-  // FALLBACK: Resend API
-  try {
-    console.log(`🔄 Attempting fallback to Resend API for job status email to ${cleanEmail}...`);
-    const resendResponse = await resend.emails.send({
-      from: 'KAAM Support <onboarding@resend.dev>',
-      to: [cleanEmail],
-      subject: subjectText,
-      text: plainTextBody,
-      html: htmlBody,
-    });
-
-    if (!resendResponse.error) {
-      console.log(`✅ [RESEND API SUCCESS] Delivered to ${cleanEmail}! Message ID: ${resendResponse.data?.id}`);
-      return { success: true };
-    } else {
-      console.warn(`⚠️ [RESEND RESTRICTION]:`, resendResponse.error.message);
-    }
-  } catch (err) {
-    console.error('❌ [RESEND API ERROR]:', err.message);
-  }
-
-  return { success: false, error: 'Email delivery failed' };
+  return res;
 };
+
+/**
+ * Send Automated Email Notification to Partner when a New Job is REQUESTED
+ */
+export const sendPartnerNewJobRequestEmail = async (partnerEmail, job = {}) => {
+  const cleanEmail = (partnerEmail || '').toLowerCase().trim();
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    console.warn('⚠️ [PARTNER JOB REQUEST EMAIL]: Invalid partner email provided:', partnerEmail);
+    return { success: false, error: 'Invalid partner email' };
+  }
+
+  const partnerName = job.worker_name || 'Service Partner';
+  const clientName = job.client_name || 'Homeowner';
+  const clientPhone = job.client_phone || 'Available on KAAM App';
+  const categoryTitle = job.category_title || job.trade_title || 'Home Service';
+  const agreedFee = job.agreed_total_fee ? `₹${job.agreed_total_fee}` : 'Standard Rate';
+  const location = job.location_address || 'Mumbai';
+  const description = job.work_description || 'Service booking';
+  const timeSlot = job.time_slot ? ` (${job.time_slot})` : '';
+
+  const subjectText = `🔔 New Booking Request from ${clientName} (${categoryTitle}) | KAAM Partner`;
+
+  const plainTextBody = `Hello ${partnerName},\n\nYou have received a new booking request on KAAM!\n\n📌 Request Summary:\n- Customer: ${clientName}\n- Contact: ${clientPhone}\n- Service Category: ${categoryTitle}\n- Total Agreed Fee: ${agreedFee}\n- Service Location: ${location}\n- Work Scope: ${description}${timeSlot}\n\nPlease open your partner desk now to ACCEPT or DECLINE this request:\nhttps://kaam-partner.yors.online\n\nKAAM Partner Support Team`;
+
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
+      <div style="background-color: #0284c7; padding: 16px 20px; border-radius: 12px; color: #ffffff; text-align: center; margin-bottom: 20px;">
+        <h2 style="margin: 0; font-size: 20px; font-weight: bold;">🔔 New Booking Request!</h2>
+        <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.95;">Action Required: Accept on Partner Desk</p>
+      </div>
+
+      <p style="font-size: 14px; margin-bottom: 12px;">Hello <strong>${partnerName}</strong>,</p>
+      <p style="font-size: 14px; margin-bottom: 16px; line-height: 1.5;">
+        You have received a new customer booking request for <strong style="color: #0284c7;">${categoryTitle}</strong> from <strong>${clientName}</strong>.
+      </p>
+
+      <div style="background-color: #e0f2fe; border: 1px solid #bae6fd; padding: 12px 16px; border-radius: 10px; margin-bottom: 18px;">
+        <span style="font-size: 14px; font-weight: bold; color: #0369a1;">⏳ Status: New Incoming Request Waiting for You</span>
+      </div>
+
+      <div style="background-color: #ffffff; padding: 16px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 13px; line-height: 1.7; margin-bottom: 20px;">
+        <p style="margin: 4px 0;"><strong style="color: #475569;">Customer Name:</strong> ${clientName}</p>
+        <p style="margin: 4px 0;"><strong style="color: #475569;">Customer Phone:</strong> <a href="tel:${clientPhone}" style="color: #0284c7; font-weight: bold; text-decoration: none;">${clientPhone}</a></p>
+        <p style="margin: 4px 0;"><strong style="color: #475569;">Service Category:</strong> <span style="background-color: #f1f5f9; color: #0f172a; padding: 2px 8px; border-radius: 6px; font-weight: bold;">${categoryTitle}</span></p>
+        <p style="margin: 4px 0;"><strong style="color: #475569;">Agreed Payout:</strong> <strong style="color: #15803d; font-size: 16px;">${agreedFee}</strong></p>
+        <p style="margin: 4px 0;"><strong style="color: #475569;">Service Address:</strong> ${location}</p>
+        <p style="margin: 4px 0;"><strong style="color: #475569;">Work Details:</strong> ${description}${timeSlot}</p>
+      </div>
+
+      <div style="text-align: center; margin-bottom: 20px;">
+        <a href="https://kaam-partner.yors.online" style="background-color: #f59e0b; color: #0f172a; padding: 13px 28px; border-radius: 10px; text-decoration: none; font-weight: 900; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
+          Open Partner Desk & Accept Request ➔
+        </a>
+      </div>
+
+      <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+      <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">KAAM Automated Service Dispatch • Support Email: kaam@yors.online</p>
+    </div>
+  `;
+
+  return dispatchEmail({
+    to: cleanEmail,
+    subject: subjectText,
+    text: plainTextBody,
+    html: htmlBody,
+    senderName: 'KAAM Partner Dispatch'
+  });
+};
+
