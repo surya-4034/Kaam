@@ -206,7 +206,7 @@ export const getJobsByWorker = async (req, res) => {
 
   const idsArray = Array.from(equivalentIds);
   const placeholders = idsArray.map(() => '?').join(',');
-  const suryaNameCondition = isSurya ? "OR LOWER(j.worker_name) LIKE '%surya%'" : "";
+  const suryaNameCondition = isSurya ? "OR LOWER(j.worker_name) LIKE '%surya%' OR LOWER(j.worker_name) LIKE '%s. yadav%' OR LOWER(j.worker_name) LIKE '%s.yadav%'" : "";
   const sujalNameCondition = isSujal ? "OR LOWER(j.worker_name) LIKE '%sujal%'" : "";
 
   db.all(
@@ -248,7 +248,7 @@ export const getJobsByWorker = async (req, res) => {
               $or: [
                 { workerId: { $in: idsArray } },
                 { worker_id: { $in: idsArray } },
-                ...(isSurya ? [{ workerName: new RegExp('surya', 'i') }] : []),
+                ...(isSurya ? [{ workerName: new RegExp('surya|s\\.?\\s*yadav', 'i') }] : []),
                 ...(isSujal ? [{ workerName: new RegExp('sujal', 'i') }] : [])
               ]
             };

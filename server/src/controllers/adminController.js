@@ -1,6 +1,7 @@
 import db from '../config/database.js';
 import { ensureVerifiedPartnersSeeded } from '../constants/verifiedPartners.js';
 import { dispatchEmail } from '../services/emailOtpService.js';
+import { isMongoConnected, getLastMongoError, forceMongoReconnect, hydrateFromAtlasToSQLite, getMongoDb } from '../config/mongoose.js';
 import net from 'net';
 import nodemailer from 'nodemailer';
 
@@ -291,4 +292,28 @@ export const testEmailDiagnostics = async (req, res) => {
   }
 
   res.json(results);
+};
+
+// Admin diagnostic endpoint to trigger immediate MongoDB Atlas reconnect and SQLite hydration
+export const reconnectMongo = async (req, res) => {
+  try {
+    await forceMongoReconnect();
+    await hydrateFromAtlasToSQLite();
+    const mongo = getMongoDb();
+    let atlasBookingsCount = 0;
+    if (mongo) {
+      atlasBookingsCount = await mongo.collection('bookings').countDocuments();
+    }
+    db.get('SELECT COUNT(*) as count FROM job_requests', [], (err, row) => {
+      res.json({
+        success: isMongoConnected(),
+        mongoConnected: isMongoConnected(),
+        mongoError: getLastMongoError(),
+        atlasBookingsCount,
+        sqliteBookingsCount: row ? row.count : 0
+      });
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message, mongoError: getLastMongoError() });
+  }
 };

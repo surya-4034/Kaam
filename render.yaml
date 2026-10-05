@@ -22,4 +22,4 @@ services:
       - key: EMAIL_PASS
         value: "Aa065405#"
       - key: MONGO_URI
-        value: mongodb+srv://sujal:Sujal957@cluster0.0yxyzl6.mongodb.net/kaam_db?retryWrites=true&w=majority&appName=Cluster0
+        value: mongodb://sujal:Sujal957@ac-kgra4ds-shard-00-00.0yxyzl6.mongodb.net:27017,ac-kgra4ds-shard-00-01.0yxyzl6.mongodb.net:27017,ac-kgra4ds-shard-00-02.0yxyzl6.mongodb.net:27017/kaam_db?ssl=true&authSource=admin&replicaSet=atlas-joqohk-shard-0

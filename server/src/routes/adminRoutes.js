@@ -11,6 +11,7 @@ import {
   getClientDetails,
   repairPartners,
   testEmailDiagnostics,
+  reconnectMongo,
 } from '../controllers/adminController.js';
 
 const router = express.Router();
@@ -28,5 +29,7 @@ router.get('/stats', getPlatformStats);
 router.get('/repair-partners', repairPartners);
 router.post('/repair-partners', repairPartners);
 router.get('/test-email', testEmailDiagnostics);
+router.get('/reconnect-mongo', reconnectMongo);
+router.post('/reconnect-mongo', reconnectMongo);
 
 export default router;

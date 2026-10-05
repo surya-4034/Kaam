@@ -12,10 +12,18 @@ try {
 let mongoDbConnection = null;
 let isConnected = false;
 let isSyncing = false;
+let lastMongoError = null;
+let reconnectTimer = null;
+
+const DIRECT_SHARD_URI = "mongodb://sujal:Sujal957@ac-kgra4ds-shard-00-00.0yxyzl6.mongodb.net:27017,ac-kgra4ds-shard-00-01.0yxyzl6.mongodb.net:27017,ac-kgra4ds-shard-00-02.0yxyzl6.mongodb.net:27017/kaam_db?ssl=true&authSource=admin&replicaSet=atlas-joqohk-shard-0";
 
 // 1. Primary connection to unified database 'kaam_db'
 export const connectMongoDB = async () => {
-  let envURI = process.env.MONGO_URI || "mongodb+srv://sujal:Sujal957@cluster0.0yxyzl6.mongodb.net/kaam_db?retryWrites=true&w=majority&appName=Cluster0";
+  if (isConnected && mongoDbConnection && mongoDbConnection.readyState === 1) {
+    return { mongoDbConnection, partnerDbConnection: mongoDbConnection, clientDbConnection: mongoDbConnection };
+  }
+
+  let envURI = process.env.MONGO_URI || DIRECT_SHARD_URI;
 
   // Normalize URI to target kaam_db
   if (envURI.includes('/kaam_partner_db') || envURI.includes('/kaam_client_db')) {
@@ -25,9 +33,9 @@ export const connectMongoDB = async () => {
   }
 
   const connectionOptions = {
-    serverSelectionTimeoutMS: 5000,
+    serverSelectionTimeoutMS: 15000,
     socketTimeoutMS: 45000,
-    connectTimeoutMS: 10000,
+    connectTimeoutMS: 15000,
     maxPoolSize: 10,
     minPoolSize: 2,
     bufferCommands: false
@@ -36,42 +44,71 @@ export const connectMongoDB = async () => {
   try {
     mongoDbConnection = await mongoose.createConnection(envURI, connectionOptions).asPromise();
     isConnected = true;
+    lastMongoError = null;
     console.log('🍃 [kaam MongoDB Atlas] Successfully connected to unified database: kaam_db');
     triggerBackgroundSync();
   } catch (err) {
-    if (err.message.includes('querySrv') || err.message.includes('ECONNREFUSED')) {
-      const fallbackURI = "mongodb://sujal:Sujal957@ac-kgra4ds-shard-00-00.0yxyzl6.mongodb.net:27017,ac-kgra4ds-shard-00-01.0yxyzl6.mongodb.net:27017,ac-kgra4ds-shard-00-02.0yxyzl6.mongodb.net:27017/kaam_db?ssl=true&authSource=admin&replicaSet=atlas-joqohk-shard-0";
+    lastMongoError = err.message;
+    console.warn('⚠️ [kaam MongoDB Atlas Notice] Primary connection attempt failed:', err.message);
+
+    // Unconditional fallback to Direct Shard replicaSet URI
+    if (envURI !== DIRECT_SHARD_URI) {
       try {
-        mongoDbConnection = await mongoose.createConnection(fallbackURI, connectionOptions).asPromise();
+        console.log('🍃 [kaam MongoDB Atlas] Connecting via Direct Shard replicaSet...');
+        mongoDbConnection = await mongoose.createConnection(DIRECT_SHARD_URI, connectionOptions).asPromise();
         isConnected = true;
-        console.log('🍃 [kaam MongoDB Atlas] Connected to kaam_db via Direct Shard replicaSet');
+        lastMongoError = null;
+        console.log('🍃 [kaam MongoDB Atlas] Successfully connected to kaam_db via Direct Shard replicaSet');
         triggerBackgroundSync();
       } catch (fErr) {
-        console.warn('⚠️ [kaam MongoDB Atlas Notice] Network access requires whitelisting your IP in Atlas:', fErr.message);
+        lastMongoError = `Primary: ${err.message} | ShardFallback: ${fErr.message}`;
+        console.warn('⚠️ [kaam MongoDB Atlas Notice] Direct shard connection notice:', fErr.message);
       }
-    } else {
-      console.warn('⚠️ [kaam MongoDB Atlas Notice] Network access requires whitelisting your IP in Atlas:', err.message);
     }
   }
 
   if (mongoDbConnection) {
     mongoDbConnection.on('disconnected', () => {
       isConnected = false;
-      console.log('🍃 [kaam MongoDB Atlas] Connection disconnected.');
+      console.log('🍃 [kaam MongoDB Atlas] Connection disconnected. Scheduling reconnect...');
+      scheduleReconnect();
     });
     mongoDbConnection.on('reconnected', () => {
       isConnected = true;
+      lastMongoError = null;
       console.log('🍃 [kaam MongoDB Atlas] Reconnected to kaam_db.');
       triggerBackgroundSync();
     });
     mongoDbConnection.on('error', (e) => {
       isConnected = false;
+      lastMongoError = e.message;
+      console.warn('⚠️ [kaam MongoDB Atlas Socket Error]:', e.message);
+      scheduleReconnect();
     });
+  } else {
+    scheduleReconnect();
   }
 
   return { mongoDbConnection, partnerDbConnection: mongoDbConnection, clientDbConnection: mongoDbConnection };
 };
 
+const scheduleReconnect = () => {
+  if (reconnectTimer || isConnected) return;
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null;
+    if (!isConnected) {
+      console.log('🔄 [kaam MongoDB Atlas] Attempting automatic reconnection...');
+      await connectMongoDB().catch(() => {});
+    }
+  }, 10000);
+};
+
+export const forceMongoReconnect = async () => {
+  isConnected = false;
+  return await connectMongoDB();
+};
+
+export const getLastMongoError = () => lastMongoError;
 export const getMongoDb = () => mongoDbConnection;
 export const getPartnerDb = () => mongoDbConnection;
 export const getClientDb = () => mongoDbConnection;

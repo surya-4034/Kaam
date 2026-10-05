@@ -749,7 +749,7 @@ export default function App() {
             user?.fullName,
             user?.email,
             activeWorker?.email
-          ].some(s => s && (s.toLowerCase().includes('surya') || s.includes('sy623806') || s.includes('sy191101400') || s.includes('9372639131') || s.includes('1791107064294') || s.includes('1791044807171')));
+          ].some(s => s && (s.toLowerCase().includes('surya') || s.toLowerCase().includes('s. yadav') || s.toLowerCase().includes('s yadav') || s.includes('sy623806') || s.includes('sy191101400') || s.includes('9372639131') || s.includes('1791107064294') || s.includes('1791044807171')));
 
           const isSujal = [
             activeWorker?.name,
@@ -768,7 +768,7 @@ export default function App() {
               'KP-4294',
               'KP-0717',
               '9372639131',
-              '+91 9372639131',
+              '+91 93726 39131',
               '+919372639131',
               '9876500000',
               '+91 98765 00000',
@@ -798,7 +798,7 @@ export default function App() {
 
             return idsToMatch.includes(jWorkerId) || 
                    (phoneDigits && jPhoneDigits && phoneDigits === jPhoneDigits) ||
-                   (isSurya && jWorkerName.includes('surya')) ||
+                   (isSurya && (jWorkerName.includes('surya') || jWorkerName.includes('s. yadav') || jWorkerName.includes('s yadav') || jWorkerName.includes('yadav'))) ||
                    (isSujal && jWorkerName.includes('sujal'));
           });
 
