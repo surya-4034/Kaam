@@ -263,13 +263,17 @@ export default function App() {
 
   // Exact Mumbai Geographic Range Availability Checks (Based strictly on selected city/locality/GPS)
   const UNAVAILABLE_MESSAGE = 'Service was unavailable at this place, sorry for inconvenience!';
-  const cityAvailability = isMumbaiLocation(selectedCity, clientCoords);
+  const cityAvailability = isMumbaiLocation(selectedCity);
   const isServiceAvailable = cityAvailability.isAvailable;
 
   const handleDetectClientLocation = async () => {
     setIsDetectingLocation(true);
     const coords = await getCurrentClientLocation();
-    setClientCoords(coords);
+    if (coords && coords.isMumbai) {
+      setClientCoords({ lat: coords.lat, lng: coords.lng });
+    } else {
+      setClientCoords({ lat: 19.0760, lng: 72.8777 });
+    }
     setIsDetectingLocation(false);
   };
 
@@ -295,7 +299,7 @@ export default function App() {
   const [bookingForm, setBookingForm] = useState({
     name: user?.fullName || 'Verma Family (Homeowner)',
     phone: user?.phone || '+91 98111 00223',
-    address: user?.address || 'Sector 63, Noida',
+    address: user?.address || 'Andheri West, Mumbai',
     description: 'Fix CPVC pipe fitting & bathroom tap replacement.',
     paymentMode: 'DIRECT_CASH',
   });
@@ -337,23 +341,45 @@ export default function App() {
       if (selectedCategory && selectedCategory !== 'all') params.append('category', selectedCategory);
       if (searchQuery) params.append('q', searchQuery);
       if (maxBudget) params.append('maxBudget', maxBudget);
-      if (clientCoords?.lat) params.append('lat', clientCoords.lat);
-      if (clientCoords?.lng) params.append('lng', clientCoords.lng);
+      const latToSend = clientCoords?.lat || 19.0760;
+      const lngToSend = clientCoords?.lng || 72.8777;
+      params.append('lat', latToSend);
+      params.append('lng', lngToSend);
       params.append('city', 'Mumbai');
-      params.append('maxDistanceKm', searchRadiusKm);
+      params.append('maxDistanceKm', searchRadiusKm || 75);
 
       targetUrl += params.toString();
 
-      const res = await fetch(targetUrl);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.status === 'unavailable' || data.isMumbai === false) {
-          setDbWorkers([]);
-          return;
+      let workersList = [];
+      try {
+        const res = await fetch(targetUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.workers && Array.isArray(data.workers) && data.workers.length > 0) {
+            workersList = data.workers;
+          }
         }
+      } catch (sErr) {
+        console.warn('Search API notice:', sErr.message);
+      }
 
-        if (data.workers && Array.isArray(data.workers)) {
-          const mapped = data.workers.map((w, idx) => ({
+      // Robust fallback: if search returned 0 workers, fetch all registered workers from /api/workers
+      if (workersList.length === 0) {
+        try {
+          const fbRes = await fetch(`${API_BASE_URL}/api/workers`);
+          if (fbRes.ok) {
+            const fbData = await fbRes.json();
+            if (fbData.workers && Array.isArray(fbData.workers)) {
+              workersList = fbData.workers;
+            }
+          }
+        } catch (fbErr) {
+          console.warn('Fallback workers API notice:', fbErr.message);
+        }
+      }
+
+      if (workersList.length > 0) {
+        const mapped = workersList.map((w, idx) => ({
             id: w.id || `w-${idx}`,
             name: w.name || 'Master Craftsman',
             phone: w.phone || '+91 98765 43210',
@@ -456,6 +482,7 @@ export default function App() {
     } catch (e) {}
     setUser(null);
     localStorage.removeItem('kaam_client_user');
+    localStorage.removeItem('kaam_client_token');
     localStorage.removeItem('kaam_token');
     localStorage.removeItem('kaam_user');
     setActiveTab('browse');

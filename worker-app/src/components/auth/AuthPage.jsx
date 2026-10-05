@@ -300,6 +300,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = true, initialMode = 'SI
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
+          role: 'WORKER'
         }),
       });
 

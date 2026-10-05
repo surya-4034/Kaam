@@ -119,26 +119,33 @@ export const searchWorkers = async (req, res) => {
   const { category, q, locality, city, maxBudget, minRating, lat, lng, maxDistanceKm } = req.query;
 
   // 1. Mumbai Whole-City Geographic Range Check
-  const parsedLat = Number(lat);
-  const parsedLng = Number(lng);
+  let clientLatToUse = Number(lat);
+  let clientLngToUse = Number(lng);
   const requestedLocation = `${city || ''} ${locality || ''}`.trim();
 
-  if (requestedLocation || (!isNaN(parsedLat) && !isNaN(parsedLng) && parsedLat !== 0 && parsedLng !== 0)) {
-    const isMumbai = isWithinMumbaiRange(parsedLat, parsedLng, requestedLocation);
-    if (!isMumbai) {
-      return res.json({
-        status: 'unavailable',
-        isMumbai: false,
-        message: 'Service was unavailable at this place, sorry for inconvenience!',
-        searchMeta: {
-          query: q || '',
-          category: category || 'all',
-          isAvailable: false
-        },
-        count: 0,
-        workers: []
-      });
-    }
+  // If user explicitly requested an outside location (like Delhi, Noida, etc.)
+  const outsideIndicators = ['noida', 'delhi', 'gurgaon', 'gurugram', 'faridabad', 'ghaziabad', 'pune', 'bengaluru', 'bangalore', 'hyderabad', 'lucknow', 'kanpur', 'patna', 'gaya', 'kolkata', 'chennai', 'ahmedabad', 'jaipur'];
+  const isExplicitlyOutside = outsideIndicators.some(ind => requestedLocation.toLowerCase().includes(ind) && !requestedLocation.toLowerCase().includes('mumbai') && !requestedLocation.toLowerCase().includes('thane'));
+
+  if (isExplicitlyOutside) {
+    return res.json({
+      status: 'unavailable',
+      isMumbai: false,
+      message: 'Service was unavailable at this place, sorry for inconvenience!',
+      searchMeta: {
+        query: q || '',
+        category: category || 'all',
+        isAvailable: false
+      },
+      count: 0,
+      workers: []
+    });
+  }
+
+  // If coordinates are outside MMR or missing, default to Central Mumbai coordinates for browsing
+  if (isNaN(clientLatToUse) || isNaN(clientLngToUse) || clientLatToUse === 0 || clientLngToUse === 0 || !isWithinMumbaiRange(clientLatToUse, clientLngToUse, requestedLocation)) {
+    clientLatToUse = 19.0760;
+    clientLngToUse = 72.8777;
   }
 
   // 2. Pre-Processing & Tokenization
@@ -258,7 +265,7 @@ export const searchWorkers = async (req, res) => {
         .sort({ isAvailable: -1, ratingAverage: -1, completedJobsCount: -1 })
         .lean();
 
-      const finalPartners = filterAndSortByDistance(rawPartners, lat, lng, maxDistanceKm || 50).map(p => ({
+      const finalPartners = filterAndSortByDistance(rawPartners, clientLatToUse, clientLngToUse, maxDistanceKm || 75).map(p => ({
         ...p,
         tradeCategory: p.tradeCategory || 'plumber',
         tradeTitle: p.tradeTitle || 'Skilled Trade Specialist',
@@ -401,9 +408,6 @@ export const searchWorkers = async (req, res) => {
         });
       }
 
-      const clientLatToUse = lat || 19.0760;
-      const clientLngToUse = lng || 72.8777;
-
       db.all(`SELECT * FROM worker_bank_kyc`, [], (kErr, allKyc) => {
         const bankMap = {};
         if (!kErr && Array.isArray(allKyc)) {
@@ -418,7 +422,7 @@ export const searchWorkers = async (req, res) => {
           });
         }
 
-        const finalRows = filterAndSortByDistance(mappedRows, clientLatToUse, clientLngToUse, maxDistanceKm || 50).map(w => ({
+        const finalRows = filterAndSortByDistance(mappedRows, clientLatToUse, clientLngToUse, maxDistanceKm || 75).map(w => ({
           ...w,
           portfolio: portMap[w.id] || [],
           bank: bankMap[w.id] || null

@@ -239,10 +239,8 @@ export const syncAllToMongo = async () => {
       db.all(`
         SELECT u.* 
         FROM users u 
-        WHERE u.role != 'ADMIN'
-           OR u.role = 'CLIENT' 
-           OR u.id IN (SELECT DISTINCT client_id FROM job_requests)
-           OR u.email IN (SELECT DISTINCT client_email FROM job_requests)
+        WHERE u.role = 'CLIENT' 
+           OR (u.role != 'WORKER' AND u.role != 'ADMIN' AND u.id IN (SELECT DISTINCT client_id FROM job_requests))
       `, [], async (err, clientUsers) => {
         if (err || !clientUsers) return resolve();
         try {

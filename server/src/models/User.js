@@ -3,7 +3,7 @@ import { getMongoDb } from '../config/mongoose.js';
 
 export const userSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
-  phone: { type: String, required: true, unique: true },
+  phone: { type: String, required: true, index: true },
   email: { type: String, sparse: true, index: true },
   password_hash: { type: String, required: true },
   role: { type: String, enum: ['CLIENT', 'WORKER', 'ADMIN'], required: true, index: true },

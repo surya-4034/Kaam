@@ -253,11 +253,10 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
       if (response.ok) {
         setSuccessMessage('Account Created Successfully! Directing to dashboard...');
         if (data.token) {
+          localStorage.setItem('kaam_client_token', data.token);
+          localStorage.setItem('kaam_client_user', JSON.stringify(data.user));
           localStorage.setItem('kaam_token', data.token);
           localStorage.setItem('kaam_user', JSON.stringify(data.user));
-          if (!isWorkerApp) {
-            localStorage.setItem('kaam_client_user', JSON.stringify(data.user));
-          }
         }
         setTimeout(() => onLoginSuccess(data.user), 1000);
       } else {
@@ -296,6 +295,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
+          role: isWorkerApp ? 'WORKER' : 'CLIENT'
         }),
       });
 
@@ -304,11 +304,10 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
       if (response.ok) {
         setSuccessMessage('Login Successful! Directing to account dashboard...');
         if (data.token) {
+          localStorage.setItem('kaam_client_token', data.token);
+          localStorage.setItem('kaam_client_user', JSON.stringify(data.user));
           localStorage.setItem('kaam_token', data.token);
           localStorage.setItem('kaam_user', JSON.stringify(data.user));
-          if (!isWorkerApp) {
-            localStorage.setItem('kaam_client_user', JSON.stringify(data.user));
-          }
         }
         setTimeout(() => onLoginSuccess(data.user), 800);
       } else {

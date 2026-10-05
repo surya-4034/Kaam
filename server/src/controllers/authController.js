@@ -18,19 +18,20 @@ export const register = (req, res) => {
 
   const cleanEmail = email.toLowerCase().trim();
 
-  // Strict Unique Email Check
-  db.get(`SELECT id, email FROM users WHERE email = ?`, [cleanEmail], (checkErr, existingUser) => {
+  const normalizedRole = role.toUpperCase();
+
+  // Role-Scoped Unique Email Check (Allows separate accounts for Client and Worker platforms)
+  db.get(`SELECT id, email, role FROM users WHERE email = ? AND role = ?`, [cleanEmail, normalizedRole], (checkErr, existingUser) => {
     if (checkErr) return res.status(500).json({ error: checkErr.message });
 
     if (existingUser) {
       return res.status(409).json({
-        error: `An account already exists with ${cleanEmail}. Please log in instead of creating a new account.`
+        error: `A ${normalizedRole.toLowerCase()} account already exists with ${cleanEmail}. Please log in instead of creating a new account.`
       });
     }
 
     const userId = `u-${Date.now()}`;
     const passwordHash = bcrypt.hashSync(password, 10);
-    const normalizedRole = role.toUpperCase();
     
     let userPhone = (phone || '').trim();
     if (userPhone) {
@@ -49,8 +50,8 @@ export const register = (req, res) => {
       [userId, userPhone, cleanEmail, passwordHash, normalizedRole, fullName],
       function (err) {
         if (err) {
-          if (err.message.includes('UNIQUE') || err.message.includes('users.email')) {
-            return res.status(409).json({ error: `An account already exists with ${cleanEmail}. Please log in instead.` });
+          if (err.message.includes('UNIQUE')) {
+            return res.status(409).json({ error: `A ${normalizedRole.toLowerCase()} account already exists with ${cleanEmail}. Please log in instead.` });
           }
           return res.status(500).json({ error: err.message });
         }
@@ -249,8 +250,9 @@ export const register = (req, res) => {
 };
 
 export const login = (req, res) => {
-  const { username, email, password } = req.body;
+  const { username, email, password, role } = req.body;
   const rawEmail = (email || username || '').trim();
+  const requestedRole = role ? role.toUpperCase() : null;
 
   if (!rawEmail || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
@@ -458,18 +460,108 @@ export const login = (req, res) => {
     }
   };
 
-  db.get(
-    `SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR id = ? OR LOWER(full_name) = LOWER(?)`,
-    [cleanEmail, rawEmail, cleanEmail],
-    (err, user) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (user) {
-        return processUserLogin(user);
-      }
+  const querySql = requestedRole
+    ? `SELECT * FROM users WHERE (LOWER(email) = LOWER(?) OR id = ?) AND role = ?`
+    : `SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR id = ? OR LOWER(full_name) = LOWER(?)`;
+  const queryParams = requestedRole ? [cleanEmail, rawEmail, requestedRole] : [cleanEmail, rawEmail, cleanEmail];
 
+  db.get(querySql, queryParams, (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (user) {
+      return processUserLogin(user);
+    }
+
+    // If requestedRole was specified and not found, check if user exists under another role
+    if (requestedRole) {
+      db.get(
+        `SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR id = ?`,
+        [cleanEmail, rawEmail],
+        (otherErr, otherUser) => {
+          if (otherUser) {
+            let passwordValid = false;
+            try {
+              passwordValid = bcrypt.compareSync(password, otherUser.password_hash);
+            } catch (bErr) {}
+
+            if (!passwordValid) {
+              return res.status(401).json({ error: 'Incorrect password. Please verify your password and try again.' });
+            }
+
+            // Valid password for existing user, provision account for the requested platform role!
+            if (requestedRole === 'WORKER') {
+              const newWorkerUserId = `u-${Date.now()}`;
+              const workerId = `w-${Date.now()}`;
+              const partnerId = generatePartnerId();
+              const targetLocality = otherUser.locality || 'Andheri West, Mumbai';
+              const geo = resolveWorkerCoordinates({ locality: targetLocality, city: 'Mumbai' }) || { lat: 19.0760, lng: 72.8777 };
+
+              db.run(
+                `INSERT INTO users (id, phone, email, password_hash, role, full_name, locality, state, address) VALUES (?, ?, ?, ?, 'WORKER', ?, ?, ?, ?)`,
+                [newWorkerUserId, otherUser.phone, cleanEmail, otherUser.password_hash, otherUser.full_name, targetLocality, otherUser.state || 'Maharashtra', otherUser.address || targetLocality],
+                function (insErr) {
+                  db.run(
+                    `INSERT INTO worker_profiles (id, user_id, trade_category, trade_title, daily_rate, hourly_rate, locality, city, bio, is_available, is_account_locked, kyc_status, rating_average, completed_jobs_count, latitude, longitude)
+                     VALUES (?, ?, 'plumber', 'Skilled Trade Specialist', 650, 120, ?, 'Mumbai', 'Skilled Mumbai partner on kaam.', 1, 0, 'VERIFIED', 5.0, 0, ?, ?)`,
+                    [workerId, newWorkerUserId, targetLocality, geo.lat, geo.lng],
+                    () => {
+                      processUserLogin({
+                        id: newWorkerUserId,
+                        phone: otherUser.phone,
+                        email: cleanEmail,
+                        password_hash: otherUser.password_hash,
+                        role: 'WORKER',
+                        full_name: otherUser.full_name,
+                        locality: targetLocality,
+                        state: 'Maharashtra',
+                        address: targetLocality,
+                        onboarding_completed: 0
+                      });
+                    }
+                  );
+                }
+              );
+              return;
+            } else if (requestedRole === 'CLIENT') {
+              const newClientUserId = `u-${Date.now()}`;
+              db.run(
+                `INSERT INTO users (id, phone, email, password_hash, role, full_name, locality, state, address) VALUES (?, ?, ?, ?, 'CLIENT', ?, ?, ?, ?)`,
+                [newClientUserId, otherUser.phone, cleanEmail, otherUser.password_hash, otherUser.full_name, otherUser.locality || 'Mumbai', otherUser.state || 'Maharashtra', otherUser.address || 'Mumbai'],
+                function (insErr) {
+                  processUserLogin({
+                    id: newClientUserId,
+                    phone: otherUser.phone,
+                    email: cleanEmail,
+                    password_hash: otherUser.password_hash,
+                    role: 'CLIENT',
+                    full_name: otherUser.full_name,
+                    locality: otherUser.locality || 'Mumbai',
+                    state: 'Maharashtra',
+                    address: otherUser.address || 'Mumbai',
+                    onboarding_completed: 0
+                  });
+                }
+              );
+              return;
+            }
+          }
+
+          // Fallback to MongoDB
+          handleMongoFallback();
+        }
+      );
+      return;
+    }
+
+    handleMongoFallback();
+
+    function handleMongoFallback() {
       // MongoDB Atlas Fallback if not found in SQLite
       try {
-        User.findOne({ $or: [{ email: cleanEmail }, { id: rawEmail }] }).then(mUser => {
+        const mongoQuery = requestedRole
+          ? { $and: [{ $or: [{ email: cleanEmail }, { id: rawEmail }] }, { role: requestedRole }] }
+          : { $or: [{ email: cleanEmail }, { id: rawEmail }] };
+
+        User.findOne(mongoQuery).then(mUser => {
           if (!mUser) {
             return res.status(404).json({ error: 'Account not found. Please check your email or register a new account.' });
           }
@@ -502,7 +594,7 @@ export const login = (req, res) => {
         return res.status(404).json({ error: 'Account not found. Please check your credentials.' });
       }
     }
-  );
+  });
 };
 
 // Google OAuth Sync: Find or create user on backend database when signing in via Google
@@ -516,7 +608,9 @@ export const googleSync = (req, res) => {
   const cleanEmail = email.toLowerCase().trim();
   const userRole = role ? role.toUpperCase() : 'CLIENT';
 
-  db.get(`SELECT * FROM users WHERE email = ? OR id = ?`, [cleanEmail, googleUid || ''], (err, existingUser) => {
+  const accountId = googleUid ? `${googleUid}_${userRole.toLowerCase()}` : '';
+
+  db.get(`SELECT * FROM users WHERE (email = ? OR id = ? OR id = ?) AND role = ?`, [cleanEmail, accountId, googleUid || '', userRole], (err, existingUser) => {
     if (err) return res.status(500).json({ error: err.message });
 
     if (existingUser) {
@@ -649,8 +743,8 @@ export const googleSync = (req, res) => {
         });
       }
     } else {
-      // Create new user in SQLite and MongoDB Atlas
-      const newUserId = googleUid || `u-${Date.now()}`;
+      // Create new user in SQLite and MongoDB Atlas (role-scoped ID ensures separate Client and Worker accounts)
+      const newUserId = googleUid ? `${googleUid}_${userRole.toLowerCase()}` : `u-${Date.now()}`;
       const defaultName = fullName || cleanEmail.split('@')[0];
       const uniquePhone = `+91 ${Math.floor(6000000000 + Math.random() * 3999999999)}`;
       const randomPassHash = `google-oauth-${googleUid || Date.now()}`;

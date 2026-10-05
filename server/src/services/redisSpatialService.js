@@ -56,10 +56,10 @@ const partnerTelemetryStore = new Map();
 
 // Mumbai City & Metropolitan Region (MMR) Complete Geographic Coverage Bounding Box
 export const MUMBAI_BOUNDING_BOX = {
-  minLat: 18.880,
-  maxLat: 19.340,
-  minLng: 72.750,
-  maxLng: 73.120
+  minLat: 18.700,
+  maxLat: 19.550,
+  minLng: 72.650,
+  maxLng: 73.400
 };
 
 /**
@@ -89,16 +89,16 @@ export const isWithinMumbaiRange = (lat, lng, addressText = '') => {
       'pune', 'bengaluru', 'bangalore', 'hyderabad', 'lucknow', 'kanpur',
       'patna', 'gaya', 'kolkata', 'chennai', 'ahmedabad', 'jaipur'
     ];
-    if (outsideCities.some(city => clean.includes(city) && !clean.includes('mumbai') && !clean.includes('bombay'))) {
+    if (outsideCities.some(city => clean.includes(city) && !clean.includes('mumbai') && !clean.includes('bombay') && !clean.includes('thane'))) {
       return false;
     }
 
-    // Check PIN codes (400xxx, 401xxx)
-    if (/\b40[01]\d{3}\b/.test(clean)) {
+    // Check PIN codes (400xxx, 401xxx, 421xxx for MMR)
+    if (/\b(40[01]\d{3}|421\d{3})\b/.test(clean)) {
       return true;
     }
 
-    // Check Mumbai neighborhoods keywords (covering all zones of Mumbai)
+    // Check Mumbai neighborhoods keywords (covering all zones of Mumbai & MMR)
     const mumbaiKeywords = [
       'mumbai', 'bombay', 'bandra', 'andheri', 'borivali', 'dadar', 'kurla', 'colaba', 'powai',
       'juhu', 'goregaon', 'malad', 'kandivali', 'dahisar', 'ghatkopar', 'mulund', 'bhandup',
@@ -108,7 +108,8 @@ export const isWithinMumbaiRange = (lat, lng, addressText = '') => {
       'kharghar', 'airoli', 'ghansoli', 'kopar khairane', 'mira road', 'bhayandar', 'kalyan',
       'dombivli', 'fort', 'nariman point', 'marine drive', 'churchgate', 'cst', 'prabhadevi',
       'matunga', 'pali hill', 'versova', 'lokhandwala', 'oshiwara', 'jogeshwari', 'bkc',
-      'bandra kurla complex', 'hiranandani', 'kanjurmarg', 'ghodbunder', 'majiwada'
+      'bandra kurla complex', 'hiranandani', 'kanjurmarg', 'ghodbunder', 'majiwada',
+      'ulhasnagar', 'badlapur', 'ambernath', 'panvel', 'vasai', 'virar', 'kalwa', 'mumbra', 'bhiwandi', 'titwala'
     ];
 
     if (mumbaiKeywords.some(kw => clean.includes(kw))) {
@@ -211,6 +212,18 @@ export const CITY_LOCALITY_GEOCODE = {
   'bhayandar': { lat: 19.3015, lng: 72.8520 },
   'kalyan': { lat: 19.2437, lng: 73.1355 },
   'dombivli': { lat: 19.2184, lng: 73.0867 },
+  'ulhasnagar': { lat: 19.2215, lng: 73.1645 },
+  'badlapur': { lat: 19.1667, lng: 73.2667 },
+  'ambernath': { lat: 19.2000, lng: 73.1833 },
+  'panvel': { lat: 18.9894, lng: 73.1175 },
+  'vasai': { lat: 19.3919, lng: 72.8397 },
+  'virar': { lat: 19.4564, lng: 72.8006 },
+  'kalwa': { lat: 19.1983, lng: 72.9967 },
+  'mumbra': { lat: 19.1905, lng: 73.0228 },
+  'bhiwandi': { lat: 19.2967, lng: 73.0631 },
+  'titwala': { lat: 19.3000, lng: 73.2100 },
+  'thane east': { lat: 19.1870, lng: 72.9730 },
+  'g.n.rd': { lat: 19.2183, lng: 72.9781 },
 
   // Base fallback
   'mumbai': { lat: 19.0760, lng: 72.8777 },

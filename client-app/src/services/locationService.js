@@ -14,10 +14,10 @@ export const DEFAULT_CLIENT_LOCATION = {
 
 // Entire Mumbai Metropolitan Region (MMR) Contiguous Geographic Bounding Box
 export const MUMBAI_BOUNDING_BOX = {
-  minLat: 18.880,
-  maxLat: 19.340,
-  minLng: 72.750,
-  maxLng: 73.120
+  minLat: 18.700,
+  maxLat: 19.550,
+  minLng: 72.650,
+  maxLng: 73.400
 };
 
 // Known Mumbai Neighborhoods & Regions for quick navigation
@@ -49,10 +49,15 @@ export const MUMBAI_LOCATIONS = [
   { name: 'Mulund West', lat: 19.1726, lng: 72.9565, zone: 'Eastern Suburbs' },
   // Extended MMR
   { name: 'Thane West', lat: 19.2183, lng: 72.9781, zone: 'Thane & Navi Mumbai' },
+  { name: 'Thane East', lat: 19.1870, lng: 72.9730, zone: 'Thane & Navi Mumbai' },
+  { name: 'Kalyan', lat: 19.2437, lng: 73.1355, zone: 'Thane & Navi Mumbai' },
+  { name: 'Dombivli', lat: 19.2184, lng: 73.0867, zone: 'Thane & Navi Mumbai' },
+  { name: 'Ulhasnagar', lat: 19.2215, lng: 73.1645, zone: 'Thane & Navi Mumbai' },
   { name: 'Vashi (Navi Mumbai)', lat: 19.0771, lng: 72.9986, zone: 'Thane & Navi Mumbai' },
   { name: 'Nerul (Navi Mumbai)', lat: 19.0330, lng: 73.0160, zone: 'Thane & Navi Mumbai' },
   { name: 'Kharghar (Navi Mumbai)', lat: 19.0470, lng: 73.0690, zone: 'Thane & Navi Mumbai' },
   { name: 'Mira Road', lat: 19.2812, lng: 72.8561, zone: 'Thane & Navi Mumbai' },
+  { name: 'Panvel', lat: 18.9894, lng: 73.1175, zone: 'Thane & Navi Mumbai' },
   // Outside Cities (Provided to test and verify boundary enforcement)
   { name: 'Delhi NCR (Outside Mumbai)', lat: 28.6139, lng: 77.2090, zone: 'Outside Operating Zone' },
   { name: 'Noida, UP (Outside Mumbai)', lat: 28.5355, lng: 77.3910, zone: 'Outside Operating Zone' },
@@ -83,7 +88,49 @@ export const CITY_COORDINATES = {
 export const isMumbaiLocation = (textOrAddress = '', coords = null) => {
   const UNAVAILABLE_MSG = 'Service was unavailable at this place, sorry for inconvenience!';
 
-  // 1. Check coordinates if valid non-zero numbers provided
+  // 1. Check text string first (address, city name, locality)
+  if (textOrAddress && typeof textOrAddress === 'string') {
+    const clean = textOrAddress.toLowerCase().trim();
+
+    // Check explicit non-Mumbai markers
+    if (clean.includes('outside mumbai') || clean.includes('outside operating zone')) {
+      return { isAvailable: false, message: UNAVAILABLE_MSG };
+    }
+
+    const outsideIndicators = [
+      'noida', 'delhi', 'gurgaon', 'gurugram', 'faridabad', 'ghaziabad',
+      'pune', 'bengaluru', 'bangalore', 'hyderabad', 'lucknow',
+      'kanpur', 'patna', 'gaya', 'kolkata', 'chennai', 'ahmedabad', 'jaipur'
+    ];
+    if (outsideIndicators.some(ind => clean.includes(ind) && !clean.includes('mumbai') && !clean.includes('bombay') && !clean.includes('thane'))) {
+      return { isAvailable: false, message: UNAVAILABLE_MSG };
+    }
+
+    // Check PIN codes (400xxx, 401xxx, 421xxx for MMR)
+    if (/\b(40[01]\d{3}|421\d{3})\b/.test(clean)) {
+      return { isAvailable: true };
+    }
+
+    // Check Mumbai neighborhoods keywords (covering all zones of Mumbai & MMR)
+    const mumbaiKeywords = [
+      'mumbai', 'bombay', 'bandra', 'andheri', 'borivali', 'dadar', 'kurla', 'colaba', 'powai',
+      'juhu', 'goregaon', 'malad', 'kandivali', 'dahisar', 'ghatkopar', 'mulund', 'bhandup',
+      'chembur', 'vikhroli', 'santacruz', 'vile parle', 'worli', 'lower parel', 'mahim', 'byculla',
+      'charni road', 'grant road', 'parel', 'sion', 'wadala', 'sewri', 'antop hill', 'trombay',
+      'govandi', 'mankhurd', 'thane', 'navi mumbai', 'vashi', 'nerul', 'seawoods', 'belapur',
+      'kharghar', 'airoli', 'ghansoli', 'kopar khairane', 'mira road', 'bhayandar', 'kalyan',
+      'dombivli', 'fort', 'nariman point', 'marine drive', 'churchgate', 'cst', 'prabhadevi',
+      'matunga', 'pali hill', 'versova', 'lokhandwala', 'oshiwara', 'jogeshwari', 'bkc',
+      'bandra kurla complex', 'hiranandani', 'kanjurmarg', 'ghodbunder', 'majiwada',
+      'ulhasnagar', 'badlapur', 'ambernath', 'panvel', 'vasai', 'virar', 'kalwa', 'mumbra', 'bhiwandi', 'titwala'
+    ];
+
+    if (mumbaiKeywords.some(kw => clean.includes(kw))) {
+      return { isAvailable: true };
+    }
+  }
+
+  // 2. Check coordinates if valid non-zero numbers provided
   if (coords && typeof coords === 'object') {
     const lat = Number(coords.lat || coords.latitude);
     const lng = Number(coords.lng || coords.longitude);
@@ -99,47 +146,6 @@ export const isMumbaiLocation = (textOrAddress = '', coords = null) => {
         return { isAvailable: true };
       }
       return { isAvailable: false, message: UNAVAILABLE_MSG };
-    }
-  }
-
-  // 2. Check text string (address, city name, locality)
-  if (textOrAddress && typeof textOrAddress === 'string') {
-    const clean = textOrAddress.toLowerCase().trim();
-
-    // Check explicit non-Mumbai markers
-    if (clean.includes('outside mumbai') || clean.includes('outside operating zone')) {
-      return { isAvailable: false, message: UNAVAILABLE_MSG };
-    }
-
-    const outsideIndicators = [
-      'noida', 'delhi', 'gurgaon', 'gurugram', 'faridabad', 'ghaziabad',
-      'pune', 'bengaluru', 'bangalore', 'hyderabad', 'lucknow',
-      'kanpur', 'patna', 'gaya', 'kolkata', 'chennai', 'ahmedabad', 'jaipur'
-    ];
-    if (outsideIndicators.some(ind => clean.includes(ind) && !clean.includes('mumbai') && !clean.includes('bombay'))) {
-      return { isAvailable: false, message: UNAVAILABLE_MSG };
-    }
-
-    // Check PIN codes (400xxx, 401xxx)
-    if (/\b40[01]\d{3}\b/.test(clean)) {
-      return { isAvailable: true };
-    }
-
-    // Check Mumbai neighborhoods keywords (covering the entire region)
-    const mumbaiKeywords = [
-      'mumbai', 'bombay', 'bandra', 'andheri', 'borivali', 'dadar', 'kurla', 'colaba', 'powai',
-      'juhu', 'goregaon', 'malad', 'kandivali', 'dahisar', 'ghatkopar', 'mulund', 'bhandup',
-      'chembur', 'vikhroli', 'santacruz', 'vile parle', 'worli', 'lower parel', 'mahim', 'byculla',
-      'charni road', 'grant road', 'parel', 'sion', 'wadala', 'sewri', 'antop hill', 'trombay',
-      'govandi', 'mankhurd', 'thane', 'navi mumbai', 'vashi', 'nerul', 'seawoods', 'belapur',
-      'kharghar', 'airoli', 'ghansoli', 'kopar khairane', 'mira road', 'bhayandar', 'kalyan',
-      'dombivli', 'fort', 'nariman point', 'marine drive', 'churchgate', 'cst', 'prabhadevi',
-      'matunga', 'pali hill', 'versova', 'lokhandwala', 'oshiwara', 'jogeshwari', 'bkc',
-      'bandra kurla complex', 'hiranandani', 'kanjurmarg', 'ghodbunder', 'majiwada'
-    ];
-
-    if (mumbaiKeywords.some(kw => clean.includes(kw))) {
-      return { isAvailable: true };
     }
   }
 

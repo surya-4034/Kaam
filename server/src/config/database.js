@@ -12,12 +12,12 @@ const db = new sqlite3.Database(dbPath);
 export const initDb = () => {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
-      // 1. Users Table
+      // 1. Users Table (Role-scoped accounts: allows separate Client and Worker accounts per email)
       db.run(`
         CREATE TABLE IF NOT EXISTS users (
           id TEXT PRIMARY KEY,
-          phone TEXT UNIQUE NOT NULL,
-          email TEXT UNIQUE,
+          phone TEXT NOT NULL,
+          email TEXT,
           password_hash TEXT NOT NULL,
           role TEXT CHECK(role IN ('CLIENT', 'WORKER', 'ADMIN')) NOT NULL,
           full_name TEXT NOT NULL,
@@ -29,9 +29,55 @@ export const initDb = () => {
           address TEXT,
           onboarding_completed INTEGER DEFAULT 0,
           is_active INTEGER DEFAULT 1,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          latitude REAL,
+          longitude REAL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(email, role)
         )
       `);
+
+      // Safe migration for existing databases with single-column unique constraint on email
+      db.all("PRAGMA index_list('users')", (idxErr, indices) => {
+        if (!idxErr && Array.isArray(indices)) {
+          const hasSingleEmailUnique = indices.some(idx => idx.unique === 1 && idx.name.includes('autoindex_users_2'));
+          // If legacy single-column unique index exists, migrate to composite UNIQUE(email, role)
+          if (hasSingleEmailUnique) {
+            db.serialize(() => {
+              db.run('PRAGMA foreign_keys = OFF');
+              db.run(`
+                CREATE TABLE IF NOT EXISTS users_v2 (
+                  id TEXT PRIMARY KEY,
+                  phone TEXT NOT NULL,
+                  email TEXT,
+                  password_hash TEXT NOT NULL,
+                  role TEXT CHECK(role IN ('CLIENT', 'WORKER', 'ADMIN')) NOT NULL,
+                  full_name TEXT NOT NULL,
+                  secondary_phone TEXT,
+                  locality TEXT,
+                  landmark TEXT,
+                  state TEXT,
+                  pincode TEXT,
+                  address TEXT,
+                  onboarding_completed INTEGER DEFAULT 0,
+                  is_active INTEGER DEFAULT 1,
+                  latitude REAL,
+                  longitude REAL,
+                  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                  UNIQUE(email, role)
+                )
+              `);
+              db.run(`
+                INSERT OR IGNORE INTO users_v2 
+                SELECT id, phone, email, password_hash, role, full_name, secondary_phone, locality, landmark, state, pincode, address, onboarding_completed, is_active, latitude, longitude, created_at 
+                FROM users
+              `);
+              db.run('DROP TABLE IF EXISTS users');
+              db.run('ALTER TABLE users_v2 RENAME TO users');
+              db.run('PRAGMA foreign_keys = ON');
+            });
+          }
+        }
+      });
 
       // Migration for existing databases: Add columns safely if not present
       db.run(`ALTER TABLE users ADD COLUMN secondary_phone TEXT`, () => {});
