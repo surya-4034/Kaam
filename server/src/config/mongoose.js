@@ -588,6 +588,55 @@ export const hydrateFromAtlasToSQLite = async () => {
         });
       }
     }
+
+    // 3. Hydrate Bookings from Atlas into SQLite (Never lose booking requests across Render restarts)
+    const bCols = [mongo.collection('bookings'), clientDb.collection('bookings')];
+    const seenBookingIds = new Set();
+
+    for (const bCol of bCols) {
+      const atlasBookings = await bCol.find({}).toArray();
+      for (const b of atlasBookings) {
+        const jobId = b.id || b.jobId;
+        if (!jobId || seenBookingIds.has(jobId)) continue;
+        seenBookingIds.add(jobId);
+
+        await new Promise(r => {
+          db.run(
+            `INSERT OR IGNORE INTO job_requests 
+             (id, client_id, worker_id, worker_name, worker_phone, category_title, client_email, client_name, client_phone, work_description, location_address, start_date, duration_days, agreed_total_fee, payment_mode, platform_fee_amount, worker_net_payout, status, completion_code, time_slot, packages_json, worker_upi, worker_upi_phone, worker_upi_holder, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              jobId,
+              b.clientId || 'u-client-1042',
+              b.workerId || 'w-1791107064294',
+              b.workerName || 'Verified Partner',
+              b.workerPhone || '+91 98765 43210',
+              b.tradeCategory || b.categoryTitle || 'General Service',
+              b.clientEmail || 'client@kaam.com',
+              b.clientName || 'Customer',
+              b.clientPhone || '',
+              b.workDescription || 'Service Booking',
+              b.locationAddress || 'Mumbai',
+              b.startDate || (b.createdAt ? new Date(b.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+              b.durationDays || 1,
+              Number(b.agreedTotalFee || 500),
+              b.paymentMode || 'DIRECT_CASH',
+              Number(b.platformFeeAmount || Math.round((b.agreedTotalFee || 500) * 0.08)),
+              Number(b.workerNetPayout || ((b.agreedTotalFee || 500) - Math.round((b.agreedTotalFee || 500) * 0.08))),
+              b.status || 'REQUESTED',
+              b.completionCode || '',
+              b.timeSlot || null,
+              JSON.stringify(Array.isArray(b.packages) ? b.packages : []),
+              b.workerUpi || null,
+              b.workerUpiPhone || null,
+              b.workerUpiHolder || null,
+              b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString()
+            ],
+            () => r()
+          );
+        });
+      }
+    }
   } catch (hErr) {
     console.warn('[Hydrate Atlas Notice]', hErr.message);
   }

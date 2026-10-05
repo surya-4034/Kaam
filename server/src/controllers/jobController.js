@@ -1,6 +1,6 @@
 import db from '../config/database.js';
 import { sendJobStatusEmail, sendPartnerNewJobRequestEmail } from '../services/emailOtpService.js';
-import { isPartnerDbConnected, upsertBookingToMongo, upsertDuesToMongo, upsertClientToMongo } from '../config/mongoose.js';
+import { isPartnerDbConnected, getMongoDb, upsertBookingToMongo, upsertDuesToMongo, upsertClientToMongo } from '../config/mongoose.js';
 import { getPartnerModel } from '../models/PartnerModel.js';
 import { isWithinMumbaiRange } from '../services/redisSpatialService.js';
 import { CANONICAL_VERIFIED_PARTNERS } from '../constants/verifiedPartners.js';
@@ -59,15 +59,56 @@ export const getAllJobs = (req, res) => {
 
   query += ` ORDER BY j.created_at DESC`;
 
-  db.all(query, params, (err, jobs) => {
+  db.all(query, params, async (err, jobs) => {
+    if (!err && jobs && jobs.length > 0) {
+      return res.json({ count: jobs.length, jobs });
+    }
+
+    // Direct MongoDB Atlas fallback if SQLite returned 0 jobs
+    if (isPartnerDbConnected()) {
+      try {
+        const mongo = getMongoDb();
+        if (mongo) {
+          const mQuery = {};
+          if (clientId) mQuery.$or = [{ clientId }, { id: clientId }];
+          if (clientEmail) mQuery.clientEmail = new RegExp(clientEmail, 'i');
+          if (workerId) mQuery.$or = [{ workerId }, { worker_id: workerId }];
+
+          const mBookings = await mongo.collection('bookings').find(mQuery).sort({ createdAt: -1 }).toArray();
+          if (mBookings && mBookings.length > 0) {
+            const mapped = mBookings.map(b => ({
+              id: b.id || b.jobId,
+              client_id: b.clientId,
+              worker_id: b.workerId,
+              worker_name: b.workerName || 'Verified Partner',
+              worker_phone: b.workerPhone || '+91 98765 43210',
+              client_name: b.clientName || 'Customer',
+              client_email: b.clientEmail || '',
+              client_phone: b.clientPhone || '',
+              category_title: b.categoryTitle || b.tradeCategory || 'Home Service',
+              work_description: b.workDescription || '',
+              location_address: b.locationAddress || 'Mumbai',
+              agreed_total_fee: Number(b.agreedTotalFee || 500),
+              payment_mode: b.paymentMode || 'DIRECT_CASH',
+              status: b.status || 'REQUESTED',
+              completion_code: b.completionCode || '',
+              created_at: b.createdAt
+            }));
+            return res.json({ count: mapped.length, jobs: mapped });
+          }
+        }
+      } catch (mErr) {
+        console.warn('MongoDB fallback notice in getAllJobs:', mErr.message);
+      }
+    }
+
     if (err) {
-      // Fallback to simple query if joins fail
       db.all(`SELECT * FROM job_requests ORDER BY created_at DESC`, [], (err2, simpleJobs) => {
         if (err2) return res.status(500).json({ error: err2.message });
         return res.json({ count: simpleJobs.length, jobs: simpleJobs });
       });
     } else {
-      res.json({ count: jobs.length, jobs });
+      res.json({ count: 0, jobs: [] });
     }
   });
 };
@@ -193,7 +234,52 @@ export const getJobsByWorker = async (req, res) => {
         ${sujalNameCondition}
      ORDER BY j.created_at DESC`,
     [...idsArray, ...idsArray, ...idsArray],
-    (err, jobs) => {
+    async (err, jobs) => {
+      if (!err && jobs && jobs.length > 0) {
+        return res.json({ count: jobs.length, jobs });
+      }
+
+      // Direct MongoDB Atlas fallback if SQLite returned 0 jobs
+      if (isPartnerDbConnected()) {
+        try {
+          const mongo = getMongoDb();
+          if (mongo) {
+            const mQuery = {
+              $or: [
+                { workerId: { $in: idsArray } },
+                { worker_id: { $in: idsArray } },
+                ...(isSurya ? [{ workerName: new RegExp('surya', 'i') }] : []),
+                ...(isSujal ? [{ workerName: new RegExp('sujal', 'i') }] : [])
+              ]
+            };
+            const mJobs = await mongo.collection('bookings').find(mQuery).sort({ createdAt: -1 }).toArray();
+            if (mJobs && mJobs.length > 0) {
+              const mapped = mJobs.map(b => ({
+                id: b.id || b.jobId,
+                client_id: b.clientId,
+                worker_id: b.workerId,
+                worker_name: b.workerName || 'Verified Partner',
+                worker_phone: b.workerPhone || '+91 98765 43210',
+                client_name: b.clientName || 'Customer',
+                client_email: b.clientEmail || '',
+                client_phone: b.clientPhone || '',
+                category_title: b.categoryTitle || b.tradeCategory || 'Home Service',
+                work_description: b.workDescription || '',
+                location_address: b.locationAddress || 'Mumbai',
+                agreed_total_fee: Number(b.agreedTotalFee || 500),
+                payment_mode: b.paymentMode || 'DIRECT_CASH',
+                status: b.status || 'REQUESTED',
+                completion_code: b.completionCode || '',
+                created_at: b.createdAt
+              }));
+              return res.json({ count: mapped.length, jobs: mapped });
+            }
+          }
+        } catch (mErr) {
+          console.warn('MongoDB fallback notice in getJobsByWorker:', mErr.message);
+        }
+      }
+
       if (err) {
         // Fallback to simpler query
         db.all(
@@ -210,7 +296,7 @@ export const getJobsByWorker = async (req, res) => {
           }
         );
       } else {
-        res.json({ count: jobs.length, jobs });
+        res.json({ count: 0, jobs: [] });
       }
     }
   );
