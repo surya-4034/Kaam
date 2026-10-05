@@ -442,16 +442,21 @@ export default function App() {
         } else {
           setDbWorkers([]);
         }
+      } catch (err) {
+        console.warn('Backend workers endpoint offline:', err.message);
       }
-    } catch (err) {
-      console.warn('Backend workers endpoint offline:', err.message);
-    }
   };
 
   const fetchJobsFromAPI = async () => {
     if (!user) return;
     try {
-      const res = await fetch(API_URL);
+      const qParams = new URLSearchParams();
+      if (user.id) qParams.append('clientId', user.id);
+      if (user.email) qParams.append('clientEmail', user.email);
+      if (user.phone) qParams.append('clientPhone', user.phone);
+
+      const targetUrl = qParams.toString() ? `${API_URL}?${qParams.toString()}` : API_URL;
+      const res = await fetch(targetUrl);
       if (res.ok) {
         const data = await res.json();
         setJobs(data.jobs || []);
@@ -1263,15 +1268,36 @@ export default function App() {
                 </button>
               </div>
 
-              {jobs.length === 0 ? (
-                <div className="bg-white p-12 rounded-3xl text-center space-y-3 text-slate-400 border border-slate-200">
-                  <Briefcase className="w-12 h-12 text-slate-300 mx-auto" />
-                  <p className="text-sm font-bold text-slate-700">No active bookings yet.</p>
-                  <p className="text-xs text-slate-500">Explore services and select a verified tradesperson to book.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {jobs.map((j) => {
+              {(() => {
+                const displayJobs = jobs.filter((j) => {
+                  if (!user) return true;
+                  const uId = String(user.id || '').trim();
+                  const uEmail = String(user.email || '').toLowerCase().trim();
+                  const uPhone = String(user.phone || '').replace(/\D/g, '');
+                  const jClientId = String(j.client_id || j.clientId || '').trim();
+                  const jClientEmail = String(j.client_email || j.clientEmail || '').toLowerCase().trim();
+                  const jClientPhone = String(j.client_phone || j.clientPhone || '').replace(/\D/g, '');
+
+                  return (
+                    (uId && jClientId === uId) ||
+                    (uEmail && jClientEmail && uEmail === jClientEmail) ||
+                    (uPhone && jClientPhone && uPhone === jClientPhone)
+                  );
+                });
+
+                if (displayJobs.length === 0) {
+                  return (
+                    <div className="bg-white p-12 rounded-3xl text-center space-y-3 text-slate-400 border border-slate-200">
+                      <Briefcase className="w-12 h-12 text-slate-300 mx-auto" />
+                      <p className="text-sm font-bold text-slate-700">No active bookings yet.</p>
+                      <p className="text-xs text-slate-500">Explore services and select a verified tradesperson to book.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-4">
+                    {displayJobs.map((j) => {
                     const workerName = j.worker_name || j.workerName || 'Verified Service Partner';
                     const tradeTitle = j.trade_title || j.tradeTitle || 'Home Service Professional';
                     const workerPhone = j.worker_phone || j.workerPhone || '+91 98765 43210';
@@ -1471,8 +1497,9 @@ export default function App() {
                     );
                   })}
                 </div>
-              )}
-            </div>
+              );
+            })()}
+          </div>
           ) : (
             <>
               {/* SECTION 1: VERIFIED TRADESPERSON CARDS & SEARCH RESULTS (PRIMARY TOP VIEW) */}

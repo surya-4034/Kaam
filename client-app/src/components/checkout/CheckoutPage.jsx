@@ -306,11 +306,12 @@ export const CheckoutPage = ({
         const data = await res.json();
         onBookingComplete(data.job || payload);
       } else {
-        onBookingComplete(payload);
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || errData.message || 'Failed to place booking. Please try again.');
       }
     } catch (e) {
-      console.warn('Job submitted offline mode fallback:', e);
-      onBookingComplete(payload);
+      console.warn('Job submission error:', e);
+      alert('Unable to reach server. Please check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }

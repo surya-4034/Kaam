@@ -1,5 +1,7 @@
 import db from '../config/database.js';
 import { ensureVerifiedPartnersSeeded } from '../constants/verifiedPartners.js';
+import net from 'net';
+import nodemailer from 'nodemailer';
 
 // Get All Users List (Clients & Workers)
 export const getAllUsers = (req, res) => {
@@ -233,4 +235,68 @@ export const repairPartners = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+};
+
+// Admin diagnostic endpoint to test real email deliverability and SMTP TCP ports
+export const testEmailDiagnostics = async (req, res) => {
+  const targetEmail = req.query.email || 'kaam@yors.online';
+  const results = {
+    smtpUser: process.env.EMAIL_USER,
+    hasPass: Boolean(process.env.EMAIL_PASS),
+    passLength: (process.env.EMAIL_PASS || '').length,
+    port465Tcp: 'testing',
+    port587Tcp: 'testing',
+    smtpVerify: 'pending',
+    sendTest: 'pending'
+  };
+
+  const testTcp = (port) => new Promise((resolve) => {
+    const socket = net.createConnection({ host: 'smtp.hostinger.com', port, timeout: 4000 });
+    socket.on('connect', () => {
+      socket.destroy();
+      resolve('CONNECTED');
+    });
+    socket.on('timeout', () => {
+      socket.destroy();
+      resolve('TIMEOUT_BLOCKED');
+    });
+    socket.on('error', (err) => {
+      resolve(`ERROR: ${err.message}`);
+    });
+  });
+
+  results.port465Tcp = await testTcp(465);
+  results.port587Tcp = await testTcp(587);
+
+  const cleanPass = (process.env.EMAIL_PASS || '').replace(/^["']|["']$/g, '').trim();
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.hostinger.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: cleanPass
+    },
+    tls: { rejectUnauthorized: false },
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 5000
+  });
+
+  try {
+    await transporter.verify();
+    results.smtpVerify = 'SUCCESS';
+    const info = await transporter.sendMail({
+      from: `"KAAM Diagnostic" <${process.env.EMAIL_USER}>`,
+      to: targetEmail,
+      subject: 'KAAM Email Diagnostics Test',
+      text: 'Test email from KAAM live server.'
+    });
+    results.sendTest = `SUCCESS: ${info.messageId}`;
+  } catch (err) {
+    results.smtpVerify = `FAILED: ${err.message}`;
+    results.sendTest = 'SKIPPED';
+  }
+
+  res.json(results);
 };

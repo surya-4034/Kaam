@@ -10,6 +10,7 @@ import {
   getPlatformStats,
   getClientDetails,
   repairPartners,
+  testEmailDiagnostics,
 } from '../controllers/adminController.js';
 
 const router = express.Router();
@@ -26,5 +27,6 @@ router.get('/dues/audit', getDuesAudit);
 router.get('/stats', getPlatformStats);
 router.get('/repair-partners', repairPartners);
 router.post('/repair-partners', repairPartners);
+router.get('/test-email', testEmailDiagnostics);
 
 export default router;

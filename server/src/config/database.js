@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 
 const dbPath = path.resolve(__dirname, '../../kaam_database.sqlite');
 const db = new sqlite3.Database(dbPath);
+db.run('PRAGMA foreign_keys = OFF;');
 db.on('error', (err) => {
   console.warn('⚠️ [SQLite Runtime Notice]', err.message);
 });
@@ -77,7 +78,7 @@ export const initDb = () => {
               `);
               db.run('DROP TABLE IF EXISTS users');
               db.run('ALTER TABLE users_v2 RENAME TO users');
-              db.run('PRAGMA foreign_keys = ON');
+              db.run('PRAGMA foreign_keys = OFF');
             });
           }
         }
@@ -174,9 +175,7 @@ export const initDb = () => {
           worker_upi_phone TEXT,
           worker_upi_holder TEXT,
           completed_at DATETIME,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY(client_id) REFERENCES users(id),
-          FOREIGN KEY(worker_id) REFERENCES worker_profiles(id)
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `);
 
@@ -190,9 +189,7 @@ export const initDb = () => {
           due_expires_at DATETIME NOT NULL,
           status TEXT CHECK(status IN ('PENDING', 'PAID', 'OVERDUE', 'LOCKED')) DEFAULT 'PENDING',
           paid_at DATETIME,
-          payment_transaction_ref TEXT,
-          FOREIGN KEY(job_id) REFERENCES job_requests(id),
-          FOREIGN KEY(worker_id) REFERENCES worker_profiles(id)
+          payment_transaction_ref TEXT
         )
       `);
 
