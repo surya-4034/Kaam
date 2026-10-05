@@ -8,6 +8,9 @@ const __dirname = path.dirname(__filename);
 
 const dbPath = path.resolve(__dirname, '../../kaam_database.sqlite');
 const db = new sqlite3.Database(dbPath);
+db.on('error', (err) => {
+  console.warn('⚠️ [SQLite Runtime Notice]', err.message);
+});
 
 export const initDb = () => {
   return new Promise((resolve, reject) => {
@@ -226,7 +229,8 @@ export const initDb = () => {
             db.run(`INSERT OR IGNORE INTO users (id, phone, email, password_hash, role, full_name, onboarding_completed, is_active) VALUES
               ('QaUznFo8r3edJql6dQn9ACwFIcZ2', '+91 91111 22222', 'sy191101400@gmail.com', 'google-oauth-QaUznFo8r3edJql6dQn9ACwFIcZ2', 'WORKER', 'S. Yadav (Updated)', 1, 1),
               ('g-user-1791107064285', '+91 98765 00000', 'sy623806@gmail.com', 'google-oauth-g-user-1791107064285', 'WORKER', 'Surya Yadav (Pro)', 1, 1),
-              ('u-1791124150235', '+91 9653192752', 'ysujal26@gmail.com', '$2a$10$a0sJcufIb4h9PbEfIrZToejjiGJ35s6Fk8.nQq1.5FeZdEBUD.sNi', 'WORKER', 'sujal yadav', 1, 1)
+              ('u-1791124150235', '+91 9653192752', 'ysujal26@gmail.com', '$2a$10$a0sJcufIb4h9PbEfIrZToejjiGJ35s6Fk8.nQq1.5FeZdEBUD.sNi', 'WORKER', 'sujal yadav', 1, 1),
+              ('u-1791158968250', '+91 8763182414', 'testmumbaipro@gmail.com', 'electrician-ramesh-sharma', 'WORKER', 'Ramesh Sharma (Electrician)', 1, 1)
             `);
 
             // 2. Real Worker Profiles
@@ -247,12 +251,18 @@ export const initDb = () => {
             ]);
             const syadavCategories = JSON.stringify(['plumber']);
 
+            const rameshPackages = JSON.stringify([
+              { id: 'pkg-ramesh-1', title: 'Electrical Inspection & Appliance Wiring', description: 'Doorstep electrical wiring, testing, and fixture repair.', price: 249, duration: '45 mins', category: 'electrician' }
+            ]);
+            const rameshCategories = JSON.stringify(['electrician']);
+
             db.run(`INSERT OR IGNORE INTO worker_profiles 
               (id, user_id, trade_category, trade_title, experience_years, daily_rate, hourly_rate, visiting_charge, locality, city, bio, is_available, is_account_locked, kyc_status, rating_average, completed_jobs_count, packages_json, categories_json, latitude, longitude)
               VALUES
               ('w-1791107064294', 'g-user-1791107064285', 'electrician', 'Master Electrician & Plumber Pro', 5, 650, 120, 149, 'Andheri West, Mumbai', 'Mumbai', 'Experienced professional with certified skills.', 1, 0, 'VERIFIED', 5.0, 15, '${suryaPackages.replace(/'/g, "''")}', '${suryaCategories}', 19.1363, 72.8277),
               ('w-1791124150328', 'u-1791124150235', 'plumber', 'Skilled Trade Specialist', 3, 600, 110, 149, 'g.n.rd,thane', 'Mumbai', 'Expert in plumbing and painting.', 1, 0, 'VERIFIED', 4.9, 8, '${sujalPackages.replace(/'/g, "''")}', '${sujalCategories}', 19.2183, 72.9781),
-              ('w-1791044807171', 'QaUznFo8r3edJql6dQn9ACwFIcZ2', 'plumber', 'Master Plumbing & Leak Specialist', 4, 700, 130, 199, 'Andheri West, Mumbai', 'Mumbai', 'Master sanitary & leakage expert.', 1, 0, 'VERIFIED', 5.0, 12, '${syadavPackages.replace(/'/g, "''")}', '${syadavCategories}', 19.1136, 72.8697)
+              ('w-1791044807171', 'QaUznFo8r3edJql6dQn9ACwFIcZ2', 'plumber', 'Master Plumbing & Leak Specialist', 4, 700, 130, 199, 'Andheri West, Mumbai', 'Mumbai', 'Master sanitary & leakage expert.', 1, 0, 'VERIFIED', 5.0, 12, '${syadavPackages.replace(/'/g, "''")}', '${syadavCategories}', 19.1136, 72.8697),
+              ('w-1791158968316', 'u-1791158968250', 'electrician', 'Master Electrical Contractor & Technician', 6, 680, 130, 149, 'Bandra West, Mumbai', 'Mumbai', 'Licensed electrician for all home wiring and repairs.', 1, 0, 'VERIFIED', 5.0, 22, '${rameshPackages.replace(/'/g, "''")}', '${rameshCategories}', 19.0596, 72.8295)
             `);
 
             // 3. Real KYC Records
@@ -261,7 +271,8 @@ export const initDb = () => {
               VALUES 
               ('kyc-w-1791107064294', 'w-1791107064294', 'Surya Yadav', '39182746102', 'SBIN0001823', '9876500000@paytm', 'State Bank of India', 'Aadhaar Card', '7234-8910-1123', '+91 98765 00000', 1),
               ('kyc-w-1791044807171', 'w-1791044807171', 'S. Yadav', '50100293847', 'HDFC0000240', '9111122222@paytm', 'HDFC Bank', 'Aadhaar Card', '6123-4567-8901', '+91 91111 22222', 1),
-              ('kyc-w-1791124150328', 'w-1791124150328', 'sujal yadav', '965319275201', 'KKBK0000671', '9653192752@kotakbank', 'Kotak Mahindra Bank', 'Aadhaar Card', '4591-2830-1928', '+91 9653192752', 1)
+              ('kyc-w-1791124150328', 'w-1791124150328', 'sujal yadav', '965319275201', 'KKBK0000671', '9653192752@kotakbank', 'Kotak Mahindra Bank', 'Aadhaar Card', '4591-2830-1928', '+91 9653192752', 1),
+              ('kyc-w-1791158968316', 'w-1791158968316', 'Ramesh Sharma', '60291827401', 'BARB0BANDRA', '8763182414@paytm', 'Bank of Baroda', 'Aadhaar Card', '8812-4019-3321', '+91 8763182414', 1)
             `);
           }
           resolve(db);

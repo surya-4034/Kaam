@@ -6,6 +6,8 @@ services:
     rootDir: server
     buildCommand: npm install
     startCommand: node index.js
+    healthCheckPath: /api/health
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production

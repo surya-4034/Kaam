@@ -7,6 +7,14 @@ import { connectMongoDB, startAutoSync } from './src/config/mongoose.js';
 import { seedSamplePartners } from './src/models/PartnerModel.js';
 import { startDuesScheduler } from './src/services/duesScheduler.js';
 
+// Ensure background asynchronous notices or network timeouts never bring down the server process
+process.on('unhandledRejection', (reason) => {
+  console.warn('⚠️ [Process Safety - Unhandled Rejection]', reason?.message || reason);
+});
+process.on('uncaughtException', (err) => {
+  console.warn('⚠️ [Process Safety - Uncaught Exception]', err.message);
+});
+
 const PORT = process.env.PORT || 5050;
 
 async function startServer() {
