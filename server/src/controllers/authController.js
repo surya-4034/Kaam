@@ -93,6 +93,34 @@ export const register = (req, res) => {
             ]
           );
 
+          const newWorkerObj = {
+            id: workerId,
+            partnerId: partnerId,
+            userId: userId,
+            name: fullName,
+            phone: userPhone,
+            email: cleanEmail,
+            tradeCategory: tradeCategory || 'plumber',
+            tradeTitle: tradeTitle || 'Skilled Trade Specialist',
+            categories: [tradeCategory || 'plumber'],
+            locality: targetLocality,
+            city: 'Mumbai',
+            dailyRate: Number(dailyRate || 650),
+            hourlyRate: Number(hourlyRate || 120),
+            visitingCharge: 149,
+            bio: bio || 'Skilled Mumbai partner on kaam.',
+            isAvailable: true,
+            isAccountLocked: false,
+            completedJobsCount: 0,
+            ratingAverage: 5.0,
+            packages: [],
+            bank: { holder: fullName, upi: `${userPhone}@paytm`, payoutMode: 'UPI Instant Payout' },
+            latitude: geo.lat,
+            longitude: geo.lng,
+            location: { latitude: geo.lat, longitude: geo.lng },
+            onboardingCompleted: false
+          };
+
           if (isPartnerDbConnected()) {
             try {
               const Partner = getPartnerModel();
@@ -108,16 +136,21 @@ export const register = (req, res) => {
                     email: cleanEmail,
                     tradeCategory: tradeCategory || 'plumber',
                     tradeTitle: tradeTitle || 'Skilled Trade Specialist',
+                    categories: [tradeCategory || 'plumber'],
                     locality: targetLocality,
                     city: 'Mumbai',
                     dailyRate: Number(dailyRate || 650),
                     hourlyRate: Number(hourlyRate || 120),
+                    visitingCharge: 149,
                     onboardingCompleted: false,
                     isAvailable: true,
+                    isAccountLocked: false,
                     completedJobsCount: 0,
                     ratingAverage: 5.0,
                     packages: [],
                     bank: { holder: fullName, upi: `${userPhone}@paytm`, payoutMode: 'UPI Instant Payout' },
+                    latitude: geo.lat,
+                    longitude: geo.lng,
                     location: { latitude: geo.lat, longitude: geo.lng }
                   }
                 },
@@ -129,6 +162,28 @@ export const register = (req, res) => {
               console.warn('[Partner Mongo Register Note]', pErr.message);
             }
           }
+
+          const token = generateToken({ id: userId, phone: userPhone, email: cleanEmail, role: normalizedRole, fullName });
+
+          return res.status(201).json({
+            message: 'Account created successfully.',
+            token,
+            user: {
+              id: userId,
+              phone: userPhone,
+              secondaryPhone: '',
+              email: cleanEmail,
+              role: normalizedRole,
+              fullName,
+              locality: targetLocality,
+              landmark: '',
+              state: 'Maharashtra',
+              pincode: '',
+              address: targetLocality,
+              onboardingCompleted: false
+            },
+            workerProfile: newWorkerObj
+          });
         } else if (normalizedRole === 'CLIENT') {
           const clientId = generateClientId();
           upsertClientToMongo({
@@ -145,6 +200,27 @@ export const register = (req, res) => {
             onboardingCompleted: false
           });
           console.log(`🍃 [kaam_db MongoDB Atlas] Registered new Client ${fullName} (${clientId}) into clients collection!`);
+
+          const token = generateToken({ id: userId, phone: userPhone, email: cleanEmail, role: normalizedRole, fullName });
+
+          return res.status(201).json({
+            message: 'Account created successfully.',
+            token,
+            user: {
+              id: userId,
+              phone: userPhone,
+              secondaryPhone: '',
+              email: cleanEmail,
+              role: normalizedRole,
+              fullName,
+              locality: locality || 'Mumbai',
+              landmark: '',
+              state: 'Maharashtra',
+              pincode: '',
+              address: locality || 'Mumbai',
+              onboardingCompleted: false
+            }
+          });
         }
 
         const token = generateToken({ id: userId, phone: userPhone, email: cleanEmail, role: normalizedRole, fullName });
@@ -161,7 +237,7 @@ export const register = (req, res) => {
             fullName,
             locality: '',
             landmark: '',
-            state: 'Uttar Pradesh',
+            state: 'Maharashtra',
             pincode: '',
             address: '',
             onboardingCompleted: false
@@ -223,7 +299,7 @@ export const login = (req, res) => {
       role: user.role,
       locality: user.locality || '',
       landmark: user.landmark || '',
-      state: user.state || 'Uttar Pradesh',
+      state: user.state || 'Maharashtra',
       pincode: user.pincode || '',
       address: user.address || '',
       onboardingCompleted: Boolean(user.onboarding_completed)
@@ -233,8 +309,64 @@ export const login = (req, res) => {
       db.get(
         `SELECT * FROM worker_profiles WHERE user_id = ? OR id = ?`,
         [user.id, user.worker_profile_id || ''],
-        (wErr, wp) => {
-          if (!wp) {
+        async (wErr, wp) => {
+          let targetWp = wp;
+
+          if (!targetWp && isPartnerDbConnected()) {
+            try {
+              const Partner = getPartnerModel();
+              const mPartner = await Partner.findOne({ $or: [{ userId: user.id }, { email: cleanEmail }] }).lean();
+              if (mPartner) {
+                const pLat = Number(mPartner.latitude || mPartner.location?.latitude || 19.1363);
+                const pLng = Number(mPartner.longitude || mPartner.location?.longitude || 72.8277);
+                await new Promise(r => {
+                  db.run(
+                    `INSERT OR REPLACE INTO worker_profiles (id, user_id, trade_category, trade_title, daily_rate, hourly_rate, locality, city, bio, is_available, is_account_locked, kyc_status, rating_average, completed_jobs_count, latitude, longitude, packages_json, categories_json, visiting_charge, experience_years)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'VERIFIED', ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                      mPartner.id || `w-${Date.now()}`,
+                      user.id,
+                      mPartner.tradeCategory || 'plumber',
+                      mPartner.tradeTitle || 'Skilled Trade Specialist',
+                      Number(mPartner.dailyRate || 650),
+                      Number(mPartner.hourlyRate || 120),
+                      mPartner.locality || 'Andheri West, Mumbai',
+                      mPartner.city || 'Mumbai',
+                      mPartner.bio || 'Skilled Mumbai partner on kaam.',
+                      mPartner.isAvailable !== false ? 1 : 0,
+                      mPartner.isAccountLocked ? 1 : 0,
+                      Number(mPartner.ratingAverage || 5.0),
+                      Number(mPartner.completedJobsCount || 0),
+                      pLat,
+                      pLng,
+                      JSON.stringify(Array.isArray(mPartner.packages) ? mPartner.packages : []),
+                      JSON.stringify(Array.isArray(mPartner.categories) && mPartner.categories.length > 0 ? mPartner.categories : [mPartner.tradeCategory || 'plumber']),
+                      Number(mPartner.visitingCharge || 149),
+                      Number(mPartner.experienceYears || 1)
+                    ],
+                    () => r()
+                  );
+                });
+                targetWp = {
+                  ...mPartner,
+                  trade_category: mPartner.tradeCategory,
+                  trade_title: mPartner.tradeTitle,
+                  daily_rate: mPartner.dailyRate,
+                  hourly_rate: mPartner.hourlyRate,
+                  visiting_charge: mPartner.visitingCharge || 149,
+                  rating_average: mPartner.ratingAverage || 5.0,
+                  completed_jobs_count: mPartner.completedJobsCount || 0,
+                  is_available: mPartner.isAvailable !== false ? 1 : 0,
+                  latitude: pLat,
+                  longitude: pLng
+                };
+              }
+            } catch (pRehydrateErr) {
+              console.warn('[Login Partner Rehydrate Note]', pRehydrateErr.message);
+            }
+          }
+
+          if (!targetWp) {
             return res.json({
               message: 'Login successful.',
               token,
@@ -242,13 +374,13 @@ export const login = (req, res) => {
             });
           }
 
-          db.get(`SELECT * FROM worker_bank_kyc WHERE worker_id = ?`, [wp.id], (kErr, kyc) => {
-            db.all(`SELECT * FROM worker_portfolios WHERE worker_id = ?`, [wp.id], (pErr, portfolios) => {
-              db.get(`SELECT * FROM commission_dues_36h WHERE worker_id = ? AND status = 'PENDING'`, [wp.id], (dErr, dues) => {
+          db.get(`SELECT * FROM worker_bank_kyc WHERE worker_id = ?`, [targetWp.id], (kErr, kyc) => {
+            db.all(`SELECT * FROM worker_portfolios WHERE worker_id = ?`, [targetWp.id], (pErr, portfolios) => {
+              db.get(`SELECT * FROM commission_dues_36h WHERE worker_id = ? AND status = 'PENDING'`, [targetWp.id], (dErr, dues) => {
                 let pkgs = [];
-                let cats = [wp.trade_category || 'plumber'];
-                try { if (wp.packages_json) pkgs = JSON.parse(wp.packages_json); } catch (e) {}
-                try { if (wp.categories_json) cats = JSON.parse(wp.categories_json); } catch (e) {}
+                let cats = [targetWp.trade_category || 'plumber'];
+                try { if (targetWp.packages_json) pkgs = JSON.parse(targetWp.packages_json); } catch (e) {}
+                try { if (targetWp.categories_json) cats = JSON.parse(targetWp.categories_json); } catch (e) {}
                 if (Array.isArray(pkgs)) {
                   pkgs.forEach(p => {
                     if (p.category && !cats.includes(p.category.toLowerCase())) {
@@ -257,25 +389,28 @@ export const login = (req, res) => {
                   });
                 }
                 const workerObj = {
-                  id: wp.id,
+                  id: targetWp.id,
                   userId: user.id,
                   name: user.full_name,
                   phone: user.phone,
                   email: user.email,
-                  tradeCategory: wp.trade_category,
-                  tradeTitle: wp.trade_title,
-                  locality: wp.locality || 'Andheri West, Mumbai',
-                  city: wp.city || 'Mumbai',
-                  dailyRate: wp.daily_rate,
-                  hourlyRate: wp.hourly_rate,
-                  bio: wp.bio,
+                  tradeCategory: targetWp.trade_category || 'plumber',
+                  tradeTitle: targetWp.trade_title || 'Skilled Trade Specialist',
+                  locality: targetWp.locality || 'Andheri West, Mumbai',
+                  city: targetWp.city || 'Mumbai',
+                  dailyRate: targetWp.daily_rate || 650,
+                  hourlyRate: targetWp.hourly_rate || 120,
+                  visitingCharge: targetWp.visiting_charge || 149,
+                  bio: targetWp.bio || 'Skilled Mumbai partner on kaam.',
                   packages: pkgs,
                   categories: cats,
-                  isAvailable: Boolean(wp.is_available),
-                  isAccountLocked: Boolean(wp.is_account_locked),
-                  kycStatus: wp.kyc_status,
-                  completedJobsCount: wp.completed_jobs_count,
-                  ratingAverage: wp.rating_average,
+                  latitude: Number(targetWp.latitude || 19.1363),
+                  longitude: Number(targetWp.longitude || 72.8277),
+                  isAvailable: Boolean(targetWp.is_available),
+                  isAccountLocked: Boolean(targetWp.is_account_locked),
+                  kycStatus: targetWp.kyc_status || 'VERIFIED',
+                  completedJobsCount: targetWp.completed_jobs_count || 0,
+                  ratingAverage: targetWp.rating_average || 5.0,
                   bank: kyc ? {
                     holder: kyc.account_holder_name,
                     bankName: kyc.bank_name,
@@ -395,13 +530,69 @@ export const googleSync = (req, res) => {
       });
 
       if (existingUser.role === 'WORKER') {
-        db.get(`SELECT * FROM worker_profiles WHERE user_id = ?`, [existingUser.id], (wErr, wp) => {
+        db.get(`SELECT * FROM worker_profiles WHERE user_id = ?`, [existingUser.id], async (wErr, wp) => {
+          let targetWp = wp;
+
+          if (!targetWp && isPartnerDbConnected()) {
+            try {
+              const Partner = getPartnerModel();
+              const mPartner = await Partner.findOne({ $or: [{ userId: existingUser.id }, { email: cleanEmail }] }).lean();
+              if (mPartner) {
+                const pLat = Number(mPartner.latitude || mPartner.location?.latitude || 19.1363);
+                const pLng = Number(mPartner.longitude || mPartner.location?.longitude || 72.8277);
+                await new Promise(r => {
+                  db.run(
+                    `INSERT OR REPLACE INTO worker_profiles (id, user_id, trade_category, trade_title, daily_rate, hourly_rate, locality, city, bio, is_available, is_account_locked, kyc_status, rating_average, completed_jobs_count, latitude, longitude, packages_json, categories_json, visiting_charge, experience_years)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'VERIFIED', ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                      mPartner.id || `w-${Date.now()}`,
+                      existingUser.id,
+                      mPartner.tradeCategory || 'plumber',
+                      mPartner.tradeTitle || 'Skilled Trade Specialist',
+                      Number(mPartner.dailyRate || 650),
+                      Number(mPartner.hourlyRate || 120),
+                      mPartner.locality || 'Andheri West, Mumbai',
+                      mPartner.city || 'Mumbai',
+                      mPartner.bio || 'Skilled Mumbai partner on kaam.',
+                      mPartner.isAvailable !== false ? 1 : 0,
+                      mPartner.isAccountLocked ? 1 : 0,
+                      Number(mPartner.ratingAverage || 5.0),
+                      Number(mPartner.completedJobsCount || 0),
+                      pLat,
+                      pLng,
+                      JSON.stringify(Array.isArray(mPartner.packages) ? mPartner.packages : []),
+                      JSON.stringify(Array.isArray(mPartner.categories) && mPartner.categories.length > 0 ? mPartner.categories : [mPartner.tradeCategory || 'plumber']),
+                      Number(mPartner.visitingCharge || 149),
+                      Number(mPartner.experienceYears || 1)
+                    ],
+                    () => r()
+                  );
+                });
+                targetWp = {
+                  ...mPartner,
+                  trade_category: mPartner.tradeCategory,
+                  trade_title: mPartner.tradeTitle,
+                  daily_rate: mPartner.dailyRate,
+                  hourly_rate: mPartner.hourlyRate,
+                  visiting_charge: mPartner.visitingCharge || 149,
+                  rating_average: mPartner.ratingAverage || 5.0,
+                  completed_jobs_count: mPartner.completedJobsCount || 0,
+                  is_available: mPartner.isAvailable !== false ? 1 : 0,
+                  latitude: pLat,
+                  longitude: pLng
+                };
+              }
+            } catch (pRehydrateErr) {
+              console.warn('[Google Sync Partner Rehydrate Note]', pRehydrateErr.message);
+            }
+          }
+
           let workerData = null;
-          if (wp) {
+          if (targetWp) {
             let pkgs = [];
-            let cats = [wp.trade_category || 'plumber'];
-            try { if (wp.packages_json) pkgs = JSON.parse(wp.packages_json); } catch (e) {}
-            try { if (wp.categories_json) cats = JSON.parse(wp.categories_json); } catch (e) {}
+            let cats = [targetWp.trade_category || 'plumber'];
+            try { if (targetWp.packages_json) pkgs = JSON.parse(targetWp.packages_json); } catch (e) {}
+            try { if (targetWp.categories_json) cats = JSON.parse(targetWp.categories_json); } catch (e) {}
             if (Array.isArray(pkgs)) {
               pkgs.forEach(p => {
                 if (p.category && !cats.includes(p.category.toLowerCase())) {
@@ -410,19 +601,22 @@ export const googleSync = (req, res) => {
               });
             }
             workerData = {
-              ...wp,
+              ...targetWp,
               name: existingUser.full_name,
               phone: existingUser.phone,
-              tradeCategory: wp.trade_category,
-              tradeTitle: wp.trade_title,
-              dailyRate: wp.daily_rate,
-              hourlyRate: wp.hourly_rate,
-              locality: wp.locality || 'Andheri West, Mumbai',
-              city: wp.city || 'Mumbai',
+              tradeCategory: targetWp.trade_category || 'plumber',
+              tradeTitle: targetWp.trade_title || 'Skilled Trade Specialist',
+              dailyRate: targetWp.daily_rate || 650,
+              hourlyRate: targetWp.hourly_rate || 120,
+              visitingCharge: targetWp.visiting_charge || 149,
+              locality: targetWp.locality || 'Andheri West, Mumbai',
+              city: targetWp.city || 'Mumbai',
               packages: pkgs,
               categories: cats,
-              isAvailable: Boolean(wp.is_available),
-              onboardingCompleted: Boolean(wp.trade_category || pkgs.length)
+              latitude: Number(targetWp.latitude || 19.1363),
+              longitude: Number(targetWp.longitude || 72.8277),
+              isAvailable: Boolean(targetWp.is_available),
+              onboardingCompleted: true
             };
           }
           return res.json({
@@ -455,29 +649,48 @@ export const googleSync = (req, res) => {
         });
       }
     } else {
-      // Create new user in SQLite database
+      // Create new user in SQLite and MongoDB Atlas
       const newUserId = googleUid || `u-${Date.now()}`;
       const defaultName = fullName || cleanEmail.split('@')[0];
       const uniquePhone = `+91 ${Math.floor(6000000000 + Math.random() * 3999999999)}`;
       const randomPassHash = `google-oauth-${googleUid || Date.now()}`;
 
       db.run(
-        `INSERT INTO users (id, phone, email, password_hash, role, full_name) VALUES (?, ?, ?, ?, ?, ?)`,
-        [newUserId, uniquePhone, cleanEmail, randomPassHash, userRole, defaultName],
+        `INSERT INTO users (id, phone, email, password_hash, role, full_name, locality, state) VALUES (?, ?, ?, ?, ?, ?, ?, 'Maharashtra')`,
+        [newUserId, uniquePhone, cleanEmail, randomPassHash, userRole, defaultName, locality || 'Mumbai'],
         function (iErr) {
           if (iErr) {
             console.error('Google user creation DB error:', iErr);
             return res.status(500).json({ error: iErr.message });
           }
 
+          // Dual-sync user creation to MongoDB Atlas
+          User.findOneAndUpdate(
+            { id: newUserId },
+            {
+              id: newUserId,
+              phone: uniquePhone,
+              email: cleanEmail,
+              password_hash: randomPassHash,
+              role: userRole,
+              full_name: defaultName,
+              locality: locality || 'Mumbai',
+              state: 'Maharashtra',
+              is_active: true
+            },
+            { upsert: true, returnDocument: 'after' }
+          ).catch(mErr => console.warn('[Mongo Google User Sync Note]', mErr.message));
+
           let newWorkerObj = null;
           if (userRole === 'WORKER') {
             const workerId = `w-${Date.now()}`;
+            const partnerId = generatePartnerId();
             const targetLocality = locality || 'Andheri West, Mumbai';
             const geo = resolveWorkerCoordinates({ locality: targetLocality, city: 'Mumbai' }) || { lat: 19.0760, lng: 72.8777 };
 
             newWorkerObj = {
               id: workerId,
+              partnerId: partnerId,
               userId: newUserId,
               name: defaultName,
               phone: uniquePhone,
@@ -492,9 +705,13 @@ export const googleSync = (req, res) => {
               packages: [],
               categories: [tradeCategory || 'plumber'],
               isAvailable: true,
+              isAccountLocked: false,
               completedJobsCount: 0,
               ratingAverage: 5.0,
-              onboardingCompleted: false
+              latitude: geo.lat,
+              longitude: geo.lng,
+              location: { latitude: geo.lat, longitude: geo.lng },
+              onboardingCompleted: true
             };
 
             db.run(
@@ -513,6 +730,64 @@ export const googleSync = (req, res) => {
                 geo.lng
               ]
             );
+
+            if (isPartnerDbConnected()) {
+              try {
+                const Partner = getPartnerModel();
+                Partner.findOneAndUpdate(
+                  { $or: [{ userId: newUserId }, { email: cleanEmail }] },
+                  {
+                    $set: {
+                      id: workerId,
+                      partnerId: partnerId,
+                      userId: newUserId,
+                      name: defaultName,
+                      phone: uniquePhone,
+                      email: cleanEmail,
+                      tradeCategory: tradeCategory || 'plumber',
+                      tradeTitle: tradeTitle || 'Google Verified Worker Specialist',
+                      categories: [tradeCategory || 'plumber'],
+                      locality: targetLocality,
+                      city: 'Mumbai',
+                      dailyRate: Number(dailyRate || 650),
+                      hourlyRate: 120,
+                      visitingCharge: 149,
+                      onboardingCompleted: true,
+                      isAvailable: true,
+                      isAccountLocked: false,
+                      completedJobsCount: 0,
+                      ratingAverage: 5.0,
+                      packages: [],
+                      bank: { holder: defaultName, upi: `${cleanEmail.split('@')[0]}@paytm`, payoutMode: 'UPI Instant Payout' },
+                      latitude: geo.lat,
+                      longitude: geo.lng,
+                      location: { latitude: geo.lat, longitude: geo.lng }
+                    }
+                  },
+                  { upsert: true, new: true }
+                ).then(p => {
+                  console.log(`🍃 [kaam_db MongoDB Atlas] Google-synced new Partner ${defaultName} (${partnerId}) into partners collection!`);
+                }).catch(pErr => console.warn('[Partner Mongo Google Sync Note]', pErr.message));
+              } catch (pErr) {
+                console.warn('[Partner Mongo Google Sync Note]', pErr.message);
+              }
+            }
+          } else if (userRole === 'CLIENT') {
+            const clientId = generateClientId();
+            upsertClientToMongo({
+              id: newUserId,
+              clientId: clientId,
+              userId: newUserId,
+              fullName: defaultName,
+              name: defaultName,
+              phone: uniquePhone,
+              email: cleanEmail,
+              locality: locality || 'Mumbai',
+              city: 'Mumbai',
+              state: 'Maharashtra',
+              onboardingCompleted: true
+            });
+            console.log(`🍃 [kaam_db MongoDB Atlas] Google-synced new Client ${defaultName} (${clientId}) into clients collection!`);
           }
 
           const token = generateToken({ id: newUserId, phone: uniquePhone, email: cleanEmail, role: userRole, fullName: defaultName });

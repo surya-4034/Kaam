@@ -226,8 +226,8 @@ export const resolveWorkerCoordinates = (worker) => {
   const pid = worker.id || worker.user_id || worker.partnerId;
   const liveTelemetry = partnerTelemetryStore.get(pid);
 
-  let wLat = liveTelemetry ? liveTelemetry.lat : (worker.latitude ?? worker.lat);
-  let wLng = liveTelemetry ? liveTelemetry.lng : (worker.longitude ?? worker.lng);
+  let wLat = liveTelemetry ? liveTelemetry.lat : (worker.latitude ?? worker.lat ?? worker.location?.latitude ?? worker.location?.lat);
+  let wLng = liveTelemetry ? liveTelemetry.lng : (worker.longitude ?? worker.lng ?? worker.location?.longitude ?? worker.location?.lng);
 
   // If valid coordinates exist, use them directly (real GPS coordinates)
   if (wLat !== undefined && wLat !== null && !isNaN(Number(wLat)) &&

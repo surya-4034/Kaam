@@ -784,16 +784,39 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = true, initialMode = 'SI
                 </div>
               )}
 
-              {/* FIELD 3: ADDRESS / LOCALITY */}
+              {/* FIELD 3: PRIMARY TRADE CATEGORY */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1 ml-3">Work Locality / City</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1 ml-3">Primary Skilled Trade</label>
+                <div className="relative">
+                  <Wrench className="w-4 h-4 text-purple-400 absolute left-4 top-3.5" />
+                  <select
+                    name="tradeCategory"
+                    value={formData.tradeCategory}
+                    onChange={handleChange}
+                    className="w-full pl-11 pr-4 py-3 rounded-full bg-purple-50/70 border border-purple-100 text-slate-800 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-600 appearance-none cursor-pointer"
+                  >
+                    <option value="plumber">Plumber (Plumbing & Sanitary)</option>
+                    <option value="electrician">Electrician (Wiring & Electricals)</option>
+                    <option value="carpenter">Carpenter (Furniture & Woodwork)</option>
+                    <option value="painter">Painter (Wall Painting & Waterproofing)</option>
+                    <option value="ac_repair">AC Technician (Air Conditioning & Appliances)</option>
+                    <option value="cleaner">Deep Cleaner (Home & Sanitation)</option>
+                    <option value="mason">Mason (Tile, Marble & Construction)</option>
+                    <option value="welder">Welder (Iron, Metal & Fabrication)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* FIELD 4: ADDRESS / LOCALITY */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1 ml-3">Work Locality (Mumbai Region)</label>
                 <div className="relative">
                   <MapPin className="w-4 h-4 text-purple-400 absolute left-4 top-3.5" />
                   <input
                     type="text"
                     name="locality"
                     required
-                    placeholder="e.g. Sector 62, Noida"
+                    placeholder="e.g. Andheri West, Mumbai"
                     value={formData.locality}
                     onChange={handleChange}
                     className="w-full pl-11 pr-4 py-3 rounded-full bg-purple-50/70 border border-purple-100 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"

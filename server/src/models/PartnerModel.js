@@ -56,9 +56,11 @@ export const partnerSchema = new mongoose.Schema({
   bank: bankSchema,
   portfolio: [portfolioSchema],
   location: {
-    latitude: { type: Number },
-    longitude: { type: Number }
-  }
+    latitude: { type: Number, default: 19.1363 },
+    longitude: { type: Number, default: 72.8277 }
+  },
+  latitude: { type: Number, default: 19.1363 },
+  longitude: { type: Number, default: 72.8277 }
 }, { timestamps: true, bufferCommands: false });
 
 export const getPartnerModel = () => {

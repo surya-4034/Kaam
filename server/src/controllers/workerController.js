@@ -12,7 +12,7 @@ export const getWorkers = async (req, res) => {
   if (isPartnerDbConnected()) {
     try {
       const Partner = getPartnerModel();
-      const query = { isAccountLocked: false };
+      const query = { isAccountLocked: { $ne: true } };
 
       if (category && category !== 'all') {
         const catRegex = new RegExp(`^${category}$`, 'i');
@@ -39,7 +39,21 @@ export const getWorkers = async (req, res) => {
       const partners = await Partner.find(query).sort({ ratingAverage: -1 }).lean();
 
       if (partners && partners.length > 0) {
-        return res.json({ count: partners.length, workers: partners });
+        const mappedPartners = partners.map(p => ({
+          ...p,
+          tradeCategory: p.tradeCategory || 'plumber',
+          tradeTitle: p.tradeTitle || 'Skilled Trade Specialist',
+          dailyRate: p.dailyRate || 650,
+          hourlyRate: p.hourlyRate || 120,
+          visitingCharge: p.visitingCharge || 149,
+          experienceYears: p.experienceYears || 1,
+          categories: Array.isArray(p.categories) && p.categories.length > 0 ? p.categories : [p.tradeCategory || 'plumber'],
+          packages: Array.isArray(p.packages) ? p.packages : [],
+          isAvailable: p.isAvailable !== false,
+          ratingAverage: p.ratingAverage || 5.0,
+          completedJobsCount: p.completedJobsCount || 0
+        }));
+        return res.json({ count: mappedPartners.length, workers: mappedPartners });
       }
     } catch (err) {
       console.warn('MongoDB query notice, falling back to SQLite:', err.message);
@@ -48,10 +62,10 @@ export const getWorkers = async (req, res) => {
 
   // SQLite Fallback
   let sql = `
-    SELECT wp.*, u.full_name as name, u.phone 
+    SELECT wp.*, u.full_name as name, u.phone, u.email 
     FROM worker_profiles wp
     JOIN users u ON wp.user_id = u.id
-    WHERE wp.is_account_locked = 0
+    WHERE (wp.is_account_locked = 0 OR wp.is_account_locked IS NULL)
   `;
   const params = [];
 
@@ -170,7 +184,7 @@ export const searchWorkers = async (req, res) => {
   if (isPartnerDbConnected()) {
     try {
       const Partner = getPartnerModel();
-      const query = { isAccountLocked: false };
+      const query = { isAccountLocked: { $ne: true } };
       const conditions = [];
 
       // Category Facet Filter
@@ -244,7 +258,20 @@ export const searchWorkers = async (req, res) => {
         .sort({ isAvailable: -1, ratingAverage: -1, completedJobsCount: -1 })
         .lean();
 
-      const finalPartners = filterAndSortByDistance(rawPartners, lat, lng, maxDistanceKm || 50);
+      const finalPartners = filterAndSortByDistance(rawPartners, lat, lng, maxDistanceKm || 50).map(p => ({
+        ...p,
+        tradeCategory: p.tradeCategory || 'plumber',
+        tradeTitle: p.tradeTitle || 'Skilled Trade Specialist',
+        dailyRate: p.dailyRate || 650,
+        hourlyRate: p.hourlyRate || 120,
+        visitingCharge: p.visitingCharge || 149,
+        experienceYears: p.experienceYears || 1,
+        categories: Array.isArray(p.categories) && p.categories.length > 0 ? p.categories : [p.tradeCategory || 'plumber'],
+        packages: Array.isArray(p.packages) ? p.packages : [],
+        isAvailable: p.isAvailable !== false,
+        ratingAverage: p.ratingAverage || 5.0,
+        completedJobsCount: p.completedJobsCount || 0
+      }));
 
       return res.json({
         status: 'success',
@@ -266,10 +293,10 @@ export const searchWorkers = async (req, res) => {
 
   // SQLite Fallback Search Engine
   let sql = `
-    SELECT wp.*, COALESCE(u.full_name, 'Partner') as name, COALESCE(u.phone, '') as phone 
+    SELECT wp.*, COALESCE(u.full_name, 'Partner') as name, COALESCE(u.phone, '') as phone, COALESCE(u.email, '') as email 
     FROM worker_profiles wp
     LEFT JOIN users u ON wp.user_id = u.id
-    WHERE wp.is_account_locked = 0
+    WHERE (wp.is_account_locked = 0 OR wp.is_account_locked IS NULL)
   `;
   const params = [];
 

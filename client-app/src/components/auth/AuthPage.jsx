@@ -800,7 +800,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                     type="text"
                     name="locality"
                     required
-                    placeholder="e.g. Sector 62, Noida"
+                    placeholder="e.g. Bandra West, Mumbai"
                     value={formData.locality}
                     onChange={handleChange}
                     className="w-full pl-11 pr-4 py-3 rounded-full bg-purple-50/70 border border-purple-100 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"

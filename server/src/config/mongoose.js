@@ -100,19 +100,14 @@ export const syncAllToMongo = async () => {
     const clientDb = mongo.useDb('kaam_client_db');
     const partnerDb = mongo.useDb('kaam_partner_db');
 
-    // A. Sync Users & Prune Non-Existent across databases
+    // A. Sync Users across databases
     await new Promise((resolve) => {
       db.all(`SELECT * FROM users`, [], async (err, users) => {
         if (err || !users) return resolve();
         try {
           const usersCols = [mongo.collection('users'), clientDb.collection('users'), partnerDb.collection('users')];
-          const activeUserIds = users.map(u => u.id);
 
           for (const col of usersCols) {
-            if (activeUserIds.length > 0) {
-              await col.deleteMany({ id: { $nin: activeUserIds } });
-            }
-
             for (const u of users) {
               await col.updateOne(
                 { id: u.id },
@@ -150,7 +145,7 @@ export const syncAllToMongo = async () => {
       });
     });
 
-    // B. Sync Partners & Prune Non-Existent
+    // B. Sync Partners across databases
     await new Promise((resolve) => {
       db.all(`
         SELECT wp.*, u.full_name as user_name, u.phone as user_phone, u.email as user_email
@@ -160,17 +155,8 @@ export const syncAllToMongo = async () => {
         if (err || !workers) return resolve();
         try {
           const partnersCols = [mongo.collection('partners'), partnerDb.collection('partners')];
-          const activeWorkerIds = workers.map(w => w.id);
-          const activeUserIds = workers.map(w => w.user_id);
 
           for (const col of partnersCols) {
-            if (activeWorkerIds.length > 0) {
-              await col.deleteMany({
-                id: { $nin: activeWorkerIds },
-                userId: { $nin: activeUserIds }
-              });
-            }
-
             for (const w of workers) {
               let packages = [];
               let categories = [w.trade_category || 'plumber'];
@@ -355,16 +341,6 @@ export const syncAllToMongo = async () => {
               );
             }
           }
-
-          // Auto-prune dummy clients not in active list from both databases
-          for (const col of clientsCols) {
-            if (activeClientIds.length > 0) {
-              await col.deleteMany({
-                id: { $nin: activeClientIds },
-                userId: { $nin: activeClientIds }
-              });
-            }
-          }
         } catch (e) {
           console.warn('[Sync Clients Notice]', e.message);
         }
@@ -378,13 +354,8 @@ export const syncAllToMongo = async () => {
         if (err || !jobs) return resolve();
         try {
           const bookingsCols = [mongo.collection('bookings'), clientDb.collection('bookings')];
-          const activeJobIds = jobs.map(j => j.id);
 
           for (const col of bookingsCols) {
-            if (activeJobIds.length > 0) {
-              await col.deleteMany({ id: { $nin: activeJobIds } });
-            }
-
             for (const j of jobs) {
               let packages = [];
               try { if (j.packages_json) packages = JSON.parse(j.packages_json); } catch (e) {}
@@ -440,13 +411,8 @@ export const syncAllToMongo = async () => {
         if (err || !kycList) return resolve();
         try {
           const kycCols = [mongo.collection('kyc_records'), partnerDb.collection('kyc_records')];
-          const activeKycIds = kycList.map(k => k.id);
 
           for (const col of kycCols) {
-            if (activeKycIds.length > 0) {
-              await col.deleteMany({ id: { $nin: activeKycIds } });
-            }
-
             for (const k of kycList) {
               await col.updateOne(
                 { id: k.id },
@@ -486,13 +452,8 @@ export const syncAllToMongo = async () => {
         if (err || !dues) return resolve();
         try {
           const duesCols = [mongo.collection('platform_dues'), partnerDb.collection('platform_dues')];
-          const activeDueIds = dues.map(d => d.id);
 
           for (const col of duesCols) {
-            if (activeDueIds.length > 0) {
-              await col.deleteMany({ id: { $nin: activeDueIds } });
-            }
-
             for (const d of dues) {
               await col.updateOne(
                 { id: d.id },
@@ -520,11 +481,117 @@ export const syncAllToMongo = async () => {
       });
     });
 
+    // G. Two-Way Hydration: Pull any Atlas records into local SQLite if missing
+    await hydrateFromAtlasToSQLite();
+
     console.log('🍃 [kaam MongoDB Atlas] Successfully synchronized real data to kaam_client_db, kaam_partner_db & kaam_db (users, partners, clients, bookings, kyc_records, platform_dues)');
   } catch (error) {
     console.warn('⚠️ [kaam MongoDB Atlas Sync Error]', error.message);
   } finally {
     isSyncing = false;
+  }
+};
+
+/**
+ * Hydrates cloud MongoDB Atlas records into local SQLite database.
+ * Ensures new accounts created across different instances/sessions are never lost.
+ */
+export const hydrateFromAtlasToSQLite = async () => {
+  if (!isMongoConnected()) return;
+  try {
+    const mongo = getMongoDb();
+    if (!mongo) return;
+    const partnerDb = mongo.useDb('kaam_partner_db');
+    const clientDb = mongo.useDb('kaam_client_db');
+
+    // 1. Hydrate Users from Atlas into SQLite
+    const atlasUsers = await mongo.collection('users').find({}).toArray();
+    for (const u of atlasUsers) {
+      if (!u.id) continue;
+      await new Promise(r => {
+        db.run(
+          `INSERT OR IGNORE INTO users (id, phone, email, password_hash, role, full_name, secondary_phone, locality, landmark, state, pincode, address, onboarding_completed, is_active)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            u.id,
+            u.phone || '',
+            (u.email || '').toLowerCase(),
+            u.password_hash || `atlas-user-${u.id}`,
+            u.role || 'CLIENT',
+            u.full_name || u.name || 'User',
+            u.secondary_phone || '',
+            u.locality || '',
+            u.landmark || '',
+            u.state || 'Maharashtra',
+            u.pincode || '',
+            u.address || '',
+            u.onboarding_completed ? 1 : 0,
+            u.is_active !== false ? 1 : 0
+          ],
+          () => r()
+        );
+      });
+    }
+
+    // 2. Hydrate Partners from Atlas into SQLite
+    const pCols = [partnerDb.collection('partners'), mongo.collection('partners')];
+    const seenPartnerKeys = new Set();
+
+    for (const pCol of pCols) {
+      const atlasPartners = await pCol.find({}).toArray();
+      for (const p of atlasPartners) {
+        const partnerKey = p.id || p.partnerId;
+        if (!partnerKey || seenPartnerKeys.has(partnerKey)) continue;
+        seenPartnerKeys.add(partnerKey);
+
+        const wId = p.id || `w-${p.partnerId || Date.now()}`;
+        const uId = p.userId || wId;
+
+        // Ensure user account exists
+        await new Promise(r => {
+          db.run(
+            `INSERT OR IGNORE INTO users (id, phone, email, password_hash, role, full_name, locality)
+             VALUES (?, ?, ?, ?, 'WORKER', ?, ?)`,
+            [uId, p.phone || '', (p.email || '').toLowerCase(), `partner-pass-${wId}`, p.name || 'Partner', p.locality || 'Mumbai'],
+            () => r()
+          );
+        });
+
+        const pLat = Number(p.latitude || p.location?.latitude || 19.1363);
+        const pLng = Number(p.longitude || p.location?.longitude || 72.8277);
+
+        await new Promise(r => {
+          db.run(
+            `INSERT OR REPLACE INTO worker_profiles (id, user_id, trade_category, trade_title, daily_rate, hourly_rate, locality, city, bio, is_available, is_account_locked, kyc_status, rating_average, completed_jobs_count, latitude, longitude, packages_json, categories_json, visiting_charge, experience_years)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'VERIFIED', ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              wId,
+              uId,
+              p.tradeCategory || 'plumber',
+              p.tradeTitle || 'Skilled Trade Specialist',
+              Number(p.dailyRate || 650),
+              Number(p.hourlyRate || 120),
+              p.locality || 'Andheri West, Mumbai',
+              p.city || 'Mumbai',
+              p.bio || 'Skilled Mumbai partner on kaam.',
+              p.isAvailable !== false ? 1 : 0,
+              p.isAccountLocked ? 1 : 0,
+              Number(p.ratingAverage || 5.0),
+              Number(p.completedJobsCount || 0),
+              pLat,
+              pLng,
+              JSON.stringify(Array.isArray(p.packages) ? p.packages : []),
+              JSON.stringify(Array.isArray(p.categories) && p.categories.length > 0 ? p.categories : [p.tradeCategory || 'plumber']),
+              Number(p.visitingCharge || 149),
+              Number(p.experienceYears || 1)
+            ],
+            () => r()
+          );
+        });
+      }
+    }
+  } catch (hErr) {
+    console.warn('[Hydrate Atlas Notice]', hErr.message);
   }
 };
 
