@@ -506,8 +506,25 @@ export const createJobPublic = (req, res) => {
              LEFT JOIN worker_profiles wp ON wp.user_id = u.id 
              WHERE wp.id = ? OR wp.user_id = ? OR u.id = ? OR (u.phone != '' AND u.phone LIKE ?)`,
             [effectiveWorkerId, effectiveWorkerId, effectiveWorkerId, `%${String(finalWorkerPhone || '').replace(/\D/g, '')}%`],
-            (uErr, uRow) => {
-              dispatchEmails(uRow?.email || '');
+            async (uErr, uRow) => {
+              let wEmail = uRow?.email || '';
+              if (!wEmail) {
+                try {
+                  const mongo = getMongoDb();
+                  if (mongo) {
+                    const partnerDoc = await mongo.collection('partners').findOne({
+                      $or: [
+                        { id: effectiveWorkerId },
+                        { partnerId: effectiveWorkerId },
+                        { userId: effectiveWorkerId },
+                        { phone: finalWorkerPhone }
+                      ]
+                    });
+                    if (partnerDoc?.email) wEmail = partnerDoc.email;
+                  }
+                } catch (mErr) {}
+              }
+              dispatchEmails(wEmail);
             }
           );
         }
@@ -592,6 +609,34 @@ export const createJobPublic = (req, res) => {
   );
 };
 
+// Universal Helper to resolve client's real email from SQLite or Atlas and dispatch status emails
+const resolveClientEmailAndDispatch = (job, status) => {
+  let targetClientEmail = job.client_email;
+  const doSend = (emailToUse) => {
+    sendJobStatusEmail(emailToUse, status, job).catch(e => console.warn(`[${status} email dispatch warning]:`, e));
+  };
+
+  if (targetClientEmail && targetClientEmail !== 'client@kaam.com' && targetClientEmail.includes('@')) {
+    doSend(targetClientEmail);
+  } else {
+    db.get(`SELECT email FROM users WHERE id = ?`, [job.client_id], async (cErr, cRow) => {
+      let resolvedEmail = cRow?.email || '';
+      if (!resolvedEmail) {
+        try {
+          const mongo = getMongoDb();
+          if (mongo) {
+            const clientDoc = await mongo.collection('clients').findOne({
+              $or: [{ id: job.client_id }, { clientId: job.client_id }, { userId: job.client_id }]
+            });
+            if (clientDoc?.email) resolvedEmail = clientDoc.email;
+          }
+        } catch (e) {}
+      }
+      doSend(resolvedEmail || targetClientEmail || 'client@kaam.com');
+    });
+  }
+};
+
 // Worker Accepts Job
 export const acceptJob = (req, res) => {
   const { id } = req.params;
@@ -636,8 +681,7 @@ export const acceptJob = (req, res) => {
           });
 
           // Dispatch acceptance confirmation email to client WITH the completion code
-          const clientEmail = job.client_email || 'client@kaam.com';
-          sendJobStatusEmail(clientEmail, 'ACCEPTED', job).catch(e => console.warn('Email dispatch warning:', e));
+          resolveClientEmailAndDispatch(job, 'ACCEPTED');
 
           res.json({
             message: 'Job accepted by worker. Confirmation email with completion code sent to client.',
@@ -677,8 +721,7 @@ export const rejectJob = (req, res) => {
 
         // Dispatch rejection notification email to client
         if (job) {
-          const clientEmail = job.client_email || 'client@kaam.com';
-          sendJobStatusEmail(clientEmail, 'REJECTED', job).catch(e => console.warn('Email dispatch warning:', e));
+          resolveClientEmailAndDispatch(job, 'REJECTED');
         }
 
         res.json({ message: 'Job rejected by worker. Notification email sent to client.', jobId: id, status: 'REJECTED' });
@@ -772,8 +815,7 @@ export const verifyAndCompleteJob = (req, res) => {
           job.completed_at = nowISO;
 
           // Dispatch completion email to client
-          const clientEmail = job.client_email || 'client@kaam.com';
-          sendJobStatusEmail(clientEmail, 'COMPLETED', job).catch(e => console.warn('Completion email dispatch warning:', e));
+          resolveClientEmailAndDispatch(job, 'COMPLETED');
 
           res.json({
             success: true,
@@ -837,8 +879,7 @@ export const completeJob = (req, res) => {
         job.status = 'COMPLETED';
         job.completed_at = nowISO;
 
-        const clientEmail = job.client_email || 'client@kaam.com';
-        sendJobStatusEmail(clientEmail, 'COMPLETED', job).catch(e => console.warn('Completion email dispatch warning:', e));
+        resolveClientEmailAndDispatch(job, 'COMPLETED');
 
         res.json({
           message: 'Job marked completed.',

@@ -16,7 +16,7 @@ services:
       - key: JWT_SECRET
         value: kaam_super_secret_jwt_key_2026
       - key: RESEND_API_KEY
-        value: re_cDFX99ay_Ad3ij4KZ8hQhrSaSMrmEZuWR
+        sync: false
       - key: EMAIL_USER
         value: kaam@yors.online
       - key: EMAIL_PASS

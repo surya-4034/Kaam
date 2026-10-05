@@ -329,7 +329,7 @@ export const getEmailLogsHandler = (req, res) => {
 };
 
 // Admin endpoint to set/update Brevo or Resend key at runtime
-export const setEmailKeyHandler = (req, res) => {
+export const setEmailKeyHandler = async (req, res) => {
   const { brevoApiKey, resendApiKey } = { ...(req.query || {}), ...(req.body || {}) };
   if (brevoApiKey) {
     process.env.BREVO_API_KEY = String(brevoApiKey).trim();
@@ -337,11 +337,33 @@ export const setEmailKeyHandler = (req, res) => {
   if (resendApiKey) {
     process.env.RESEND_API_KEY = String(resendApiKey).trim();
   }
+
+  // Dual-sync to MongoDB Atlas system_settings
+  try {
+    const mongo = getMongoDb();
+    if (mongo) {
+      await mongo.collection('system_settings').updateOne(
+        { key: 'email_settings' },
+        {
+          $set: {
+            key: 'email_settings',
+            ...(brevoApiKey ? { brevoApiKey: String(brevoApiKey).trim() } : {}),
+            ...(resendApiKey ? { resendApiKey: String(resendApiKey).trim() } : {}),
+            updatedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
+    }
+  } catch (err) {
+    console.warn('⚠️ [MongoDB Atlas Settings Save Notice]:', err.message);
+  }
+
   res.json({
     success: true,
-    message: 'Email credentials updated live in memory and ready for delivery.',
+    message: 'Email credentials updated live in memory and persisted to MongoDB Atlas.',
     hasBrevoKey: Boolean(process.env.BREVO_API_KEY),
-    hasResendKey: Boolean(process.env.RESEND_API_KEY)
+    hasResendKey: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_cDFX99ay_Ad3ij4KZ8hQhrSaSMrmEZuWR')
   });
 };
 

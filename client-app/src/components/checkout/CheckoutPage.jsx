@@ -276,6 +276,7 @@ export const CheckoutPage = ({
       tradeTitle: worker?.tradeTitle || 'Specialist',
       categoryTitle: worker?.tradeTitle || 'General Service',
       workerPhone: worker?.phone || '',
+      workerEmail: worker?.email || '',
       workerUpi: partnerUpi || worker?.bank?.upi || worker?.upiId || '',
       workerUpiPhone: worker?.bank?.upiPhone || worker?.phone || '',
       workerUpiHolder: worker?.bank?.holder || worker?.name || 'Verified Partner',

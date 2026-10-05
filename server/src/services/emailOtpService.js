@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
+import { getMongoDb } from '../config/mongoose.js';
 
 // In-memory Store for Email OTPs: email -> { otpCode, expiresAt }
 const emailOtpStore = new Map();
@@ -48,9 +49,11 @@ const getTransporter = () => {
   return null;
 };
 
-// Resend Fallback Setup
-const resendApiKey = process.env.RESEND_API_KEY || 're_cDFX99ay_Ad3ij4KZ8hQhrSaSMrmEZuWR';
-const resend = new Resend(resendApiKey);
+// Resend Setup (Active Key)
+const getResendClient = () => {
+  const key = (process.env.RESEND_API_KEY || '').trim();
+  return new Resend(key);
+};
 
 // In-memory Log for Dispatched Emails
 export const emailDispatchLogs = [];
@@ -58,7 +61,7 @@ export const emailDispatchLogs = [];
 /**
  * Universal Email Dispatcher:
  * 1. Brevo REST API (HTTPS port 443 - works everywhere including Render)
- * 2. Resend REST API (HTTPS port 443)
+ * 2. Resend REST API (HTTPS port 443 - tries verified domain then onboarding@resend.dev)
  * 3. Hostinger / Gmail SMTP (ports 465 / 587 - works locally / VPS)
  * 4. Fallback Resend SDK call
  */
@@ -83,6 +86,28 @@ export const dispatchEmail = async ({ to, subject, text, html, senderName = 'KAA
     if (emailDispatchLogs.length > 200) emailDispatchLogs.shift();
     return res;
   };
+
+  // 0. Auto-hydrate keys from Atlas system_settings if not in env
+  const isDefaultResendKey = !process.env.RESEND_API_KEY || 
+    process.env.RESEND_API_KEY.includes('your_') || 
+    process.env.RESEND_API_KEY === 're_cDFX99ay_Ad3ij4KZ8hQhrSaSMrmEZuWR';
+
+  if (isDefaultResendKey || !process.env.BREVO_API_KEY) {
+    try {
+      const mongo = getMongoDb();
+      if (mongo) {
+        const settings = await mongo.collection('system_settings').findOne({ key: 'email_settings' });
+        if (settings) {
+          if (isDefaultResendKey && settings.resendApiKey) {
+            process.env.RESEND_API_KEY = settings.resendApiKey;
+          }
+          if (!process.env.BREVO_API_KEY && settings.brevoApiKey) {
+            process.env.BREVO_API_KEY = settings.brevoApiKey;
+          }
+        }
+      }
+    } catch (sErr) {}
+  }
 
   // 1. Try Brevo HTTPS REST API (Port 443 - zero firewall blocks on Render)
   const brevoKey = (process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY || '').trim();
@@ -118,30 +143,45 @@ export const dispatchEmail = async ({ to, subject, text, html, senderName = 'KAA
   // 2. Try Resend HTTPS REST API (Port 443)
   const resendKey = (process.env.RESEND_API_KEY || '').trim();
   if (resendKey && resendKey !== 're_cDFX99ay_Ad3ij4KZ8hQhrSaSMrmEZuWR') {
-    try {
-      const resp = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${resendKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from: `${senderName} <onboarding@resend.dev>`,
-          to: [cleanTo],
-          subject: subject,
-          html: html,
-          text: text
-        })
-      });
-      const data = await resp.json();
-      if (resp.ok) {
-        console.log(`✅ [RESEND HTTPS API SUCCESS] Delivered to ${cleanTo}! ID: ${data.id}`);
-        return logResult({ success: true, messageId: data.id, provider: 'resend' });
-      } else {
-        console.warn(`⚠️ [RESEND API WARNING]:`, data);
+    const fromCandidates = [
+      `${senderName} <kaam@yors.online>`,
+      `${senderName} <onboarding@resend.dev>`
+    ];
+
+    for (const fromAddress of fromCandidates) {
+      try {
+        const resp = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: fromAddress,
+            to: [cleanTo],
+            subject: subject,
+            html: html,
+            text: text
+          })
+        });
+        const data = await resp.json();
+        if (resp.ok && data.id) {
+          console.log(`✅ [RESEND HTTPS API SUCCESS via ${fromAddress}] Delivered to ${cleanTo}! ID: ${data.id}`);
+          return logResult({ success: true, messageId: data.id, provider: 'resend' });
+        } else {
+          // If domain not verified, let the loop try onboarding@resend.dev
+          if (data.message && data.message.includes('domain is not verified')) {
+            continue;
+          }
+          if (data.message && data.message.includes('only send testing emails to your own email address')) {
+            console.warn(`⚠️ [RESEND RESTRICTION]: ${data.message}`);
+            break;
+          }
+          console.warn(`⚠️ [RESEND API NOTICE]:`, data);
+        }
+      } catch (rErr) {
+        console.error('❌ [RESEND API ERROR]:', rErr.message);
       }
-    } catch (rErr) {
-      console.error('❌ [RESEND API ERROR]:', rErr.message);
     }
   }
 
@@ -197,7 +237,8 @@ export const dispatchEmail = async ({ to, subject, text, html, senderName = 'KAA
 
   // 4. Fallback Resend SDK call
   try {
-    const resendResponse = await resend.emails.send({
+    const resendClient = getResendClient();
+    const resendResponse = await resendClient.emails.send({
       from: `${senderName} <onboarding@resend.dev>`,
       to: [cleanTo],
       subject: subject,
