@@ -9,6 +9,7 @@ import {
   getDuesAudit,
   getPlatformStats,
   getClientDetails,
+  repairPartners,
 } from '../controllers/adminController.js';
 
 const router = express.Router();
@@ -23,5 +24,7 @@ router.post('/kyc/:workerId/approve', approveKyc);
 router.post('/kyc/:workerId/reject', rejectKyc);
 router.get('/dues/audit', getDuesAudit);
 router.get('/stats', getPlatformStats);
+router.get('/repair-partners', repairPartners);
+router.post('/repair-partners', repairPartners);
 
 export default router;

@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { ensureVerifiedPartnersSeeded } from '../constants/verifiedPartners.js';
 
 // Get All Users List (Clients & Workers)
 export const getAllUsers = (req, res) => {
@@ -208,4 +209,28 @@ export const getClientDetails = (req, res) => {
       });
     }
   );
+};
+
+// Admin self-healing maintenance endpoint to guarantee verified partner visibility
+export const repairPartners = async (req, res) => {
+  try {
+    await ensureVerifiedPartnersSeeded(db);
+    db.all(
+      `SELECT wp.id, wp.user_id, wp.trade_title, wp.trade_category, u.full_name, wp.locality
+       FROM worker_profiles wp
+       JOIN users u ON wp.user_id = u.id`,
+      [],
+      (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({
+          status: 'success',
+          message: 'Verified partner profiles guaranteed and repaired.',
+          count: rows ? rows.length : 0,
+          workers: rows || []
+        });
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };

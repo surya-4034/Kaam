@@ -2,6 +2,7 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
+import { ensureVerifiedPartnersSeeded } from '../constants/verifiedPartners.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -232,65 +233,12 @@ export const initDb = () => {
         VALUES ('Surya-4034', '+91 99999 40340', 'kaamadmin@gmail.com', '${adminPassHash}', 'ADMIN', 'Surya Master Admin', 1, 1)
       `);
 
-      // Ensure real platform verified workers exist on fresh cloud deployments
-      db.get('SELECT COUNT(*) as count FROM worker_profiles', (wErr, row) => {
-        if (!wErr && (!row || row.count < 4)) {
-          console.log('⚡ [kaam Dual Engine] Initializing real verified platform accounts for fresh deployment...');
-
-          // 1. Real Users
-          db.run(`INSERT OR IGNORE INTO users (id, phone, email, password_hash, role, full_name, onboarding_completed, is_active) VALUES
-            ('QaUznFo8r3edJql6dQn9ACwFIcZ2', '+91 91111 22222', 'sy191101400@gmail.com', 'google-oauth-QaUznFo8r3edJql6dQn9ACwFIcZ2', 'WORKER', 'S. Yadav (Updated)', 1, 1),
-            ('g-user-1791107064285', '+91 98765 00000', 'sy623806@gmail.com', 'google-oauth-g-user-1791107064285', 'WORKER', 'Surya Yadav (Pro)', 1, 1),
-            ('u-1791124150235', '+91 9653192752', 'ysujal26@gmail.com', '$2a$10$a0sJcufIb4h9PbEfIrZToejjiGJ35s6Fk8.nQq1.5FeZdEBUD.sNi', 'WORKER', 'sujal yadav', 1, 1),
-            ('u-1791158968250', '+91 8763182414', 'testmumbaipro@gmail.com', 'electrician-ramesh-sharma', 'WORKER', 'Ramesh Sharma (Electrician)', 1, 1)
-          `);
-
-          // 2. Real Worker Profiles
-          const suryaPackages = JSON.stringify([
-            { id: 'pkg-1-1791107075606', title: 'Plumber / Pipe Fitter - Basic Inspection & Diagnosis', description: 'Includes doorstep visit, problem diagnosis, and minor fixes up to 30 mins.', price: 100, duration: '30 mins', category: 'plumber' },
-            { id: 'pkg-2-1791107075606', title: 'Standard Plumber / Pipe Fitter Service Package', description: 'Complete standard repair, fitting, and testing work at home.', price: 630, duration: '1-2 hours', category: 'plumber' },
-            { id: 'pkg-1791107127085', title: 'Full home wiring', description: 'Includes doorstep inspection, diagnostic & complete service.', price: 356, duration: '45 mins', category: 'electrician' }
-          ]);
-          const suryaCategories = JSON.stringify(['electrician', 'locksmith', 'plumber', 'salon_men']);
-
-          const sujalPackages = JSON.stringify([
-            { id: 'pkg-1791124192423', title: 'wall repair,', description: 'Complete doorstep service & diagnosis.', price: 2999, duration: '1 hour', category: 'painter' }
-          ]);
-          const sujalCategories = JSON.stringify(['plumber', 'painter']);
-
-          const syadavPackages = JSON.stringify([
-            { id: 'pkg-acc1-1', title: 'Plumbing Inspection', price: 199, duration: '30 mins', category: 'plumber' }
-          ]);
-          const syadavCategories = JSON.stringify(['plumber']);
-
-          const rameshPackages = JSON.stringify([
-            { id: 'pkg-ramesh-1', title: 'Electrical Inspection & Appliance Wiring', description: 'Doorstep electrical wiring, testing, and fixture repair.', price: 249, duration: '45 mins', category: 'electrician' }
-          ]);
-          const rameshCategories = JSON.stringify(['electrician']);
-
-          db.run(`INSERT OR REPLACE INTO worker_profiles 
-            (id, user_id, trade_category, trade_title, experience_years, daily_rate, hourly_rate, visiting_charge, locality, city, bio, is_available, is_account_locked, kyc_status, rating_average, completed_jobs_count, packages_json, categories_json, latitude, longitude)
-            VALUES
-            ('w-1791107064294', 'g-user-1791107064285', 'electrician', 'Master Electrician & Plumber Pro', 5, 650, 120, 149, 'Andheri West, Mumbai', 'Mumbai', 'Experienced professional with certified skills.', 1, 0, 'VERIFIED', 5.0, 15, '${suryaPackages.replace(/'/g, "''")}', '${suryaCategories}', 19.1363, 72.8277),
-            ('w-1791124150328', 'u-1791124150235', 'plumber', 'Skilled Trade Specialist', 3, 600, 110, 149, 'g.n.rd,thane', 'Mumbai', 'Expert in plumbing and painting.', 1, 0, 'VERIFIED', 4.9, 8, '${sujalPackages.replace(/'/g, "''")}', '${sujalCategories}', 19.2183, 72.9781),
-            ('w-1791044807171', 'QaUznFo8r3edJql6dQn9ACwFIcZ2', 'plumber', 'Master Plumbing & Leak Specialist', 4, 700, 130, 199, 'Andheri West, Mumbai', 'Mumbai', 'Master sanitary & leakage expert.', 1, 0, 'VERIFIED', 5.0, 12, '${syadavPackages.replace(/'/g, "''")}', '${syadavCategories}', 19.1136, 72.8697),
-            ('w-1791158968316', 'u-1791158968250', 'electrician', 'Master Electrical Contractor & Technician', 6, 680, 130, 149, 'Bandra West, Mumbai', 'Mumbai', 'Licensed electrician for all home wiring and repairs.', 1, 0, 'VERIFIED', 5.0, 22, '${rameshPackages.replace(/'/g, "''")}', '${rameshCategories}', 19.0596, 72.8295)
-          `, (pErr) => {
-            if (pErr) console.error('⚠️ [Worker Profiles Seed Error]', pErr);
-            else console.log('⚡ [kaam Dual Engine] 4 Real Verified Worker Profiles loaded successfully.');
-          });
-
-          // 3. Real KYC Records
-          db.run(`INSERT OR REPLACE INTO worker_bank_kyc 
-            (id, worker_id, account_holder_name, account_number, ifsc_code, upi_id, bank_name, govt_id_type, govt_id_number, upi_phone, kyc_verified)
-            VALUES 
-            ('kyc-w-1791107064294', 'w-1791107064294', 'Surya Yadav', '39182746102', 'SBIN0001823', '9876500000@paytm', 'State Bank of India', 'Aadhaar Card', '7234-8910-1123', '+91 98765 00000', 1),
-            ('kyc-w-1791044807171', 'w-1791044807171', 'S. Yadav', '50100293847', 'HDFC0000240', '9111122222@paytm', 'HDFC Bank', 'Aadhaar Card', '6123-4567-8901', '+91 91111 22222', 1),
-            ('kyc-w-1791124150328', 'w-1791124150328', 'sujal yadav', '965319275201', 'KKBK0000671', '9653192752@kotakbank', 'Kotak Mahindra Bank', 'Aadhaar Card', '4591-2830-1928', '+91 9653192752', 1),
-            ('kyc-w-1791158968316', 'w-1791158968316', 'Ramesh Sharma', '60291827401', 'BARB0BANDRA', '8763182414@paytm', 'Bank of Baroda', 'Aadhaar Card', '8812-4019-3321', '+91 8763182414', 1)
-          `, (kErr) => {
-            if (kErr) console.error('⚠️ [Worker KYC Seed Error]', kErr);
-          });
+      // Ensure real platform verified workers exist on all cloud deployments
+      db.run("SELECT 1", async () => {
+        try {
+          await ensureVerifiedPartnersSeeded(db);
+        } catch (sErr) {
+          console.warn('⚠️ [Verified Partners Seed Warning]', sErr.message);
         }
         resolve(db);
       });
