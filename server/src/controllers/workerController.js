@@ -569,13 +569,14 @@ export const getPartnerByPartnerId = async (req, res) => {
 
 // Get single partner by User ID or Worker ID
 export const getWorkerByUserId = async (req, res) => {
-  const { userId } = req.params;
+  const targetId = req.params.userId || req.params.id || req.params.workerId;
+  if (!targetId) return res.status(400).json({ error: 'Worker or User ID is required.' });
 
   if (isPartnerDbConnected()) {
     try {
       const Partner = getPartnerModel();
       const partner = await Partner.findOne({
-        $or: [{ userId: userId }, { id: userId }, { partnerId: userId }]
+        $or: [{ userId: targetId }, { id: targetId }, { partnerId: targetId }]
       }).lean();
 
       if (partner) {
@@ -592,10 +593,10 @@ export const getWorkerByUserId = async (req, res) => {
      FROM worker_profiles wp
      JOIN users u ON wp.user_id = u.id
      WHERE wp.user_id = ? OR wp.id = ?`,
-    [userId, userId],
+    [targetId, targetId],
     (err, worker) => {
       if (!worker) {
-        const canonical = CANONICAL_VERIFIED_PARTNERS.find(p => p.id === userId || p.userId === userId || p.partnerId === userId);
+        const canonical = CANONICAL_VERIFIED_PARTNERS.find(p => p.id === targetId || p.userId === targetId || p.partnerId === targetId);
         if (canonical) {
           return res.json({ worker: canonical });
         }
