@@ -1,6 +1,6 @@
 import db from '../config/database.js';
 import { ensureVerifiedPartnersSeeded } from '../constants/verifiedPartners.js';
-import { dispatchEmail, emailDispatchLogs } from '../services/emailOtpService.js';
+import { dispatchEmail, emailDispatchLogs, getActiveResendKey } from '../services/emailOtpService.js';
 import { isMongoConnected, getLastMongoError, forceMongoReconnect, hydrateFromAtlasToSQLite, getMongoDb } from '../config/mongoose.js';
 import net from 'net';
 import nodemailer from 'nodemailer';
@@ -247,7 +247,7 @@ export const testEmailDiagnostics = async (req, res) => {
     hasPass: Boolean(process.env.EMAIL_PASS),
     passLength: (process.env.EMAIL_PASS || '').length,
     hasBrevoKey: Boolean(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY),
-    hasResendKey: Boolean(process.env.RESEND_API_KEY),
+    hasResendKey: Boolean(getActiveResendKey()),
     port465Tcp: 'testing',
     port587Tcp: 'testing',
     dispatchResult: null
@@ -323,7 +323,7 @@ export const getEmailLogsHandler = (req, res) => {
   res.json({
     count: emailDispatchLogs.length,
     hasBrevoKey: Boolean(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY),
-    hasResendKey: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_cDFX99ay_Ad3ij4KZ8hQhrSaSMrmEZuWR'),
+    hasResendKey: Boolean(getActiveResendKey()),
     logs: emailDispatchLogs.slice(-50).reverse()
   });
 };
@@ -363,7 +363,7 @@ export const setEmailKeyHandler = async (req, res) => {
     success: true,
     message: 'Email credentials updated live in memory and persisted to MongoDB Atlas.',
     hasBrevoKey: Boolean(process.env.BREVO_API_KEY),
-    hasResendKey: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_cDFX99ay_Ad3ij4KZ8hQhrSaSMrmEZuWR')
+    hasResendKey: Boolean(getActiveResendKey())
   });
 };
 

@@ -224,11 +224,35 @@ export const initDb = () => {
       db.run(`ALTER TABLE job_requests ADD COLUMN worker_upi_phone TEXT`, () => {});
       db.run(`ALTER TABLE job_requests ADD COLUMN worker_upi_holder TEXT`, () => {});
 
-      // Seed Master Admin User: ID: Surya-4034, Email: kaamadmin@gmail.com, Key: Sujal957#
+      db.run(`ALTER TABLE job_requests ADD COLUMN updated_at DATETIME`, () => {});
+
+      // Admin Schema Migrations (001_admin.sql tables)
+      db.run(`CREATE TABLE IF NOT EXISTS kaam_admin_sessions (token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,csrf_token TEXT NOT NULL,expires_at TEXT NOT NULL,created_at TEXT NOT NULL);`);
+      db.run(`CREATE INDEX IF NOT EXISTS kaam_admin_session_expiry ON kaam_admin_sessions(expires_at);`);
+      db.run(`CREATE TABLE IF NOT EXISTS kaam_admin_audit (id TEXT PRIMARY KEY,actor_id TEXT NOT NULL,actor_name TEXT NOT NULL,action TEXT NOT NULL,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,reason TEXT NOT NULL,before_json TEXT NOT NULL DEFAULT '{}',after_json TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL);`);
+      db.run(`CREATE INDEX IF NOT EXISTS kaam_admin_audit_time ON kaam_admin_audit(created_at);`);
+      db.run(`CREATE TABLE IF NOT EXISTS kaam_admin_commands (id TEXT PRIMARY KEY,actor_id TEXT NOT NULL,request_hash TEXT NOT NULL,result_json TEXT NOT NULL,created_at TEXT NOT NULL);`);
+      db.run(`CREATE TABLE IF NOT EXISTS kaam_admin_cases (id TEXT PRIMARY KEY,title TEXT NOT NULL,description TEXT NOT NULL,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','IN_PROGRESS','RESOLVED')),priority TEXT NOT NULL CHECK(priority IN ('LOW','NORMAL','HIGH','URGENT')),assignee_id TEXT NOT NULL DEFAULT '',created_by TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);`);
+      db.run(`CREATE INDEX IF NOT EXISTS kaam_admin_cases_status ON kaam_admin_cases(status,priority);`);
+      db.run(`CREATE TABLE IF NOT EXISTS kaam_admin_notes (id TEXT PRIMARY KEY,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,body TEXT NOT NULL,actor_id TEXT NOT NULL,actor_name TEXT NOT NULL,created_at TEXT NOT NULL);`);
+      db.run(`CREATE INDEX IF NOT EXISTS kaam_admin_notes_entity ON kaam_admin_notes(entity_type,entity_id,created_at);`);
+      db.run(`CREATE TABLE IF NOT EXISTS kaam_admin_overrides (entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,patch_json TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(entity_type,entity_id));`);
+      db.run(`CREATE TABLE IF NOT EXISTS kaam_admin_outbox (id TEXT PRIMARY KEY,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,created_at TEXT NOT NULL,delivered_at TEXT,last_error TEXT);`);
+      db.run(`CREATE INDEX IF NOT EXISTS kaam_admin_outbox_pending ON kaam_admin_outbox(delivered_at,created_at);`);
+
+      // Seed Master Admin Users:
+      // 1. Surya Master Admin (ID: Surya-4034, Email: kaamadmin@gmail.com, Key: Sujal957#)
       const adminPassHash = bcrypt.hashSync('Sujal957#', 10);
       db.run(`
         INSERT OR REPLACE INTO users (id, phone, email, password_hash, role, full_name, onboarding_completed, is_active)
         VALUES ('Surya-4034', '+91 99999 40340', 'kaamadmin@gmail.com', '${adminPassHash}', 'ADMIN', 'Surya Master Admin', 1, 1)
+      `);
+
+      // 2. Local Demo Admin (ID: demo-admin, Email: admin@kaam.local, Key: ChangeMe-Admin-2026!)
+      const localAdminPassHash = bcrypt.hashSync('ChangeMe-Admin-2026!', 10);
+      db.run(`
+        INSERT OR REPLACE INTO users (id, phone, email, password_hash, role, full_name, onboarding_completed, is_active)
+        VALUES ('demo-admin', '+91 99999 00000', 'admin@kaam.local', '${localAdminPassHash}', 'ADMIN', 'Kaam Admin Operator', 1, 1)
       `);
 
       // Ensure real platform verified workers and seed bookings exist on all cloud deployments

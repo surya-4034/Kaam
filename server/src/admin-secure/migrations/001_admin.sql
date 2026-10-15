@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS kaam_admin_sessions (token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,csrf_token TEXT NOT NULL,expires_at TEXT NOT NULL,created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS kaam_admin_session_expiry ON kaam_admin_sessions(expires_at);
+CREATE TABLE IF NOT EXISTS kaam_admin_audit (id TEXT PRIMARY KEY,actor_id TEXT NOT NULL,actor_name TEXT NOT NULL,action TEXT NOT NULL,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,reason TEXT NOT NULL,before_json TEXT NOT NULL DEFAULT '{}',after_json TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS kaam_admin_audit_time ON kaam_admin_audit(created_at);
+CREATE TABLE IF NOT EXISTS kaam_admin_commands (id TEXT PRIMARY KEY,actor_id TEXT NOT NULL,request_hash TEXT NOT NULL,result_json TEXT NOT NULL,created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS kaam_admin_cases (id TEXT PRIMARY KEY,title TEXT NOT NULL,description TEXT NOT NULL,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','IN_PROGRESS','RESOLVED')),priority TEXT NOT NULL CHECK(priority IN ('LOW','NORMAL','HIGH','URGENT')),assignee_id TEXT NOT NULL DEFAULT '',created_by TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS kaam_admin_cases_status ON kaam_admin_cases(status,priority);
+CREATE TABLE IF NOT EXISTS kaam_admin_notes (id TEXT PRIMARY KEY,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,body TEXT NOT NULL,actor_id TEXT NOT NULL,actor_name TEXT NOT NULL,created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS kaam_admin_notes_entity ON kaam_admin_notes(entity_type,entity_id,created_at);
+CREATE TABLE IF NOT EXISTS kaam_admin_overrides (entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,patch_json TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(entity_type,entity_id));
+CREATE TABLE IF NOT EXISTS kaam_admin_outbox (id TEXT PRIMARY KEY,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,created_at TEXT NOT NULL,delivered_at TEXT,last_error TEXT);
+CREATE INDEX IF NOT EXISTS kaam_admin_outbox_pending ON kaam_admin_outbox(delivered_at,created_at);

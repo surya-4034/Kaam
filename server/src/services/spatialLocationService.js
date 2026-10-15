@@ -79,38 +79,37 @@ export const filterAndSortByDistance = (workers, clientLat, clientLng, maxDistan
   for (const worker of workers) {
     const coords = resolveWorkerCoordinates(worker);
 
-    // Skip un-geolocated workers (never assign dummy client coordinates!)
-    if (!coords) continue;
-
-    const wLat = coords.lat;
-    const wLng = coords.lng;
+    const wLat = coords ? coords.lat : 19.0760;
+    const wLng = coords ? coords.lng : 72.8777;
 
     const dist = calculateDistanceKm(parsedClientLat, parsedClientLng, wLat, wLng);
+    const isWithin = dist <= parsedMaxDist;
 
-    if (dist <= parsedMaxDist) {
-      results.push({
-        ...worker,
-        latitude: wLat,
-        longitude: wLng,
-        distanceKm: dist,
-        isWithinRadius: true,
-        isRealGps: coords.isRealGps
-      });
-    }
+    results.push({
+      ...worker,
+      latitude: wLat,
+      longitude: wLng,
+      distanceKm: dist,
+      isWithinRadius: isWithin,
+      isRealGps: coords ? coords.isRealGps : false
+    });
   }
 
   return results.sort((a, b) => {
-    // 1. Online / Available partners first
-    const aAvail = (a.is_available === 1 || a.is_available === true) ? 1 : 0;
-    const bAvail = (b.is_available === 1 || b.is_available === true) ? 1 : 0;
+    // 1. In-radius partners first
+    if (a.isWithinRadius !== b.isWithinRadius) return a.isWithinRadius ? -1 : 1;
+
+    // 2. Online / Available partners first
+    const aAvail = (a.is_available === 1 || a.is_available === true || a.isAvailable === true) ? 1 : 0;
+    const bAvail = (b.is_available === 1 || b.is_available === true || b.isAvailable === true) ? 1 : 0;
     if (bAvail !== aAvail) return bAvail - aAvail;
 
-    // 2. Proximity (closest distance first)
+    // 3. Proximity (closest distance first)
     if (a.distanceKm !== b.distanceKm) return a.distanceKm - b.distanceKm;
 
-    // 3. Higher rating first
-    const aRating = Number(a.rating_average || a.rating || 5);
-    const bRating = Number(b.rating_average || b.rating || 5);
+    // 4. Higher rating first
+    const aRating = Number(a.rating_average || a.rating || a.ratingAverage || 5);
+    const bRating = Number(b.rating_average || b.rating || b.ratingAverage || 5);
     return bRating - aRating;
   });
 };

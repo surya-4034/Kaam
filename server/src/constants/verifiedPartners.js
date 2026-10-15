@@ -1,3 +1,5 @@
+import bcrypt from 'bcryptjs';
+
 /**
  * Canonical Real Verified Platform Partners (Mumbai)
  * Guaranteed fallback data and seeding utility
@@ -202,25 +204,55 @@ export async function ensureVerifiedPartnersSeeded(db) {
     });
   });
 
-  // 2. Insert or Replace all 4 verified partners into users and worker_profiles
+  // 2. Insert or update all verified partners into users and worker_profiles
+  const defaultPassHash = bcrypt.hashSync('Aa065405#', 10);
   for (const p of CANONICAL_VERIFIED_PARTNERS) {
     await new Promise((resolve) => {
       db.run(
-        `INSERT OR REPLACE INTO users (id, phone, email, password_hash, role, full_name, locality, onboarding_completed, is_active)
-         VALUES (?, ?, ?, ?, 'WORKER', ?, ?, 1, 1)`,
-        [p.userId, p.phone, p.email.toLowerCase(), `worker-verified-hash-${p.userId}`, p.name, p.locality],
+        `INSERT INTO users (id, phone, email, password_hash, role, full_name, locality, onboarding_completed, is_active)
+         VALUES (?, ?, ?, ?, 'WORKER', ?, ?, 1, 1)
+         ON CONFLICT(email, role) DO UPDATE SET
+           full_name = excluded.full_name,
+           phone = excluded.phone,
+           locality = excluded.locality,
+           password_hash = CASE WHEN users.password_hash LIKE 'worker-verified-hash-%' THEN excluded.password_hash ELSE users.password_hash END,
+           is_active = 1`,
+        [p.userId, p.phone, p.email.toLowerCase(), defaultPassHash, p.name, p.locality],
         (uErr) => {
-          if (uErr) console.warn('[Seed User Warn]', uErr.message);
-          resolve();
+          if (uErr) {
+            // Fallback for older schema without composite UNIQUE
+            db.run(
+              `INSERT OR REPLACE INTO users (id, phone, email, password_hash, role, full_name, locality, onboarding_completed, is_active)
+               VALUES (?, ?, ?, ?, 'WORKER', ?, ?, 1, 1)`,
+              [p.userId, p.phone, p.email.toLowerCase(), defaultPassHash, p.name, p.locality],
+              () => resolve()
+            );
+          } else {
+            resolve();
+          }
         }
       );
     });
 
     await new Promise((resolve) => {
       db.run(
-        `INSERT OR REPLACE INTO worker_profiles
+        `INSERT INTO worker_profiles
          (id, user_id, trade_category, trade_title, experience_years, daily_rate, hourly_rate, visiting_charge, locality, city, bio, is_available, is_account_locked, kyc_status, rating_average, completed_jobs_count, packages_json, categories_json, latitude, longitude)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, 'VERIFIED', ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, 'VERIFIED', ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           is_available = 1,
+           is_account_locked = 0,
+           kyc_status = 'VERIFIED',
+           trade_category = excluded.trade_category,
+           trade_title = excluded.trade_title,
+           daily_rate = excluded.daily_rate,
+           hourly_rate = excluded.hourly_rate,
+           visiting_charge = excluded.visiting_charge,
+           locality = excluded.locality,
+           packages_json = excluded.packages_json,
+           categories_json = excluded.categories_json,
+           latitude = excluded.latitude,
+           longitude = excluded.longitude`,
         [
           p.id,
           p.userId,
@@ -241,8 +273,35 @@ export async function ensureVerifiedPartnersSeeded(db) {
           p.longitude
         ],
         (wErr) => {
-          if (wErr) console.warn('[Seed WorkerProfile Warn]', wErr.message);
-          resolve();
+          if (wErr) {
+            db.run(
+              `INSERT OR REPLACE INTO worker_profiles
+               (id, user_id, trade_category, trade_title, experience_years, daily_rate, hourly_rate, visiting_charge, locality, city, bio, is_available, is_account_locked, kyc_status, rating_average, completed_jobs_count, packages_json, categories_json, latitude, longitude)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, 'VERIFIED', ?, ?, ?, ?, ?, ?)`,
+              [
+                p.id,
+                p.userId,
+                p.tradeCategory,
+                p.tradeTitle,
+                p.experienceYears,
+                p.dailyRate,
+                p.hourlyRate,
+                p.visitingCharge,
+                p.locality,
+                p.city,
+                p.bio,
+                p.ratingAverage,
+                p.completedJobsCount,
+                JSON.stringify(p.packages),
+                JSON.stringify(p.categories),
+                p.latitude,
+                p.longitude
+              ],
+              () => resolve()
+            );
+          } else {
+            resolve();
+          }
         }
       );
     });

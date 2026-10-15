@@ -63,16 +63,20 @@ export const getWorkers = async (req, res) => {
 
   // SQLite Fallback
   let sql = `
-    SELECT wp.*, u.full_name as name, u.phone, u.email 
+    SELECT wp.*, COALESCE(u.full_name, 'Partner') as name, COALESCE(u.phone, '') as phone, COALESCE(u.email, '') as email 
     FROM worker_profiles wp
-    JOIN users u ON wp.user_id = u.id
+    LEFT JOIN users u ON wp.user_id = u.id
     WHERE (wp.is_account_locked = 0 OR wp.is_account_locked IS NULL)
   `;
   const params = [];
 
   if (category && category !== 'all') {
-    sql += ` AND LOWER(wp.trade_category) = LOWER(?)`;
-    params.push(category);
+    sql += ` AND (
+      LOWER(wp.trade_category) = LOWER(?)
+      OR LOWER(wp.categories_json) LIKE LOWER(?)
+      OR LOWER(wp.packages_json) LIKE LOWER(?)
+    )`;
+    params.push(category, `%${category}%`, `%${category}%`);
   }
 
   db.all(sql, params, (err, rows) => {
