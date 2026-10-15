@@ -43,7 +43,8 @@ import {
   FileText,
   Copy,
   ExternalLink,
-  QrCode
+  QrCode,
+  Lock
 } from 'lucide-react';
 
 const INDIAN_STATES = [
@@ -328,9 +329,9 @@ export default function App() {
     }));
   };
 
-  // Fetch live workers from backend search engine API
+  // Fetch live workers from backend search engine API (only when client is logged in)
   const fetchWorkersFromDB = async () => {
-    if (!isServiceAvailable) {
+    if (!user || !isServiceAvailable) {
       setDbWorkers([]);
       return;
     }
@@ -705,6 +706,10 @@ export default function App() {
 
   const handleCreateBooking = async (e) => {
     e.preventDefault();
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     setIsSubmitting(true);
 
     const payload = {
@@ -855,6 +860,10 @@ export default function App() {
             searchQuery={searchQuery}
             onBack={() => setActiveWorkerStudio(null)}
             onBookNow={(configuredWorker) => {
+              if (!user) {
+                setShowAuthModal(true);
+                return;
+              }
               setActiveCheckoutOrder({
                 worker: configuredWorker,
                 cartItems: configuredWorker.selectedCartItems || []
@@ -1509,12 +1518,18 @@ export default function App() {
                     <h2 className="text-xl sm:text-2xl font-black text-slate-950 font-['Outfit'] tracking-tight flex items-center gap-2">
                       <span>Available Verified Professionals</span>
                       <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                        isServiceAvailable ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-red-100 text-red-800 border-red-200'
+                        !user 
+                          ? 'bg-amber-50 text-amber-900 border-amber-300'
+                          : isServiceAvailable 
+                            ? 'bg-amber-100 text-amber-800 border-amber-200' 
+                            : 'bg-red-100 text-red-800 border-red-200'
                       }`}>
-                        {isServiceAvailable ? `${filteredWorkers.length} Online in Mumbai` : 'Unavailable'}
+                        {!user ? '🔒 Sign In Required' : isServiceAvailable ? `${filteredWorkers.length} Online in Mumbai` : 'Unavailable'}
                       </span>
                     </h2>
-                    {isServiceAvailable ? (
+                    {!user ? (
+                      <p className="text-xs text-slate-500 mt-0.5">Please sign in to view available verified craftsmen near {selectedCity.split(',')[0]} (Mumbai Region).</p>
+                    ) : isServiceAvailable ? (
                       <p className="text-xs text-slate-500 mt-0.5">Background-checked craftsmen near {selectedCity.split(',')[0]} (Mumbai Region).</p>
                     ) : (
                       <p className="text-xs text-red-600 font-bold mt-0.5">⚠️ Service was unavailable at this place, sorry for inconvenience!</p>
@@ -1558,7 +1573,44 @@ export default function App() {
 
                 {/* Worker Cards Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {!isServiceAvailable ? (
+                  {!user ? (
+                    <div className="col-span-full py-12 px-6 sm:px-12 text-center bg-gradient-to-b from-white via-amber-50/40 to-amber-100/20 rounded-3xl border-2 border-dashed border-amber-300 shadow-sm space-y-6">
+                      <div className="w-16 h-16 rounded-3xl bg-amber-500 text-slate-950 flex items-center justify-center mx-auto text-2xl font-black shadow-md shadow-amber-500/30">
+                        <Lock className="w-8 h-8" />
+                      </div>
+                      <div className="space-y-2 max-w-lg mx-auto">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 px-3 py-1 rounded-full border border-amber-200">
+                          Client Login Required
+                        </span>
+                        <h3 className="text-xl sm:text-2xl font-black text-slate-950 font-['Outfit'] tracking-tight pt-1">
+                          Sign In to View & Book {selectedCategory !== 'all' ? selectedCategory.toUpperCase() : 'Verified'} Partners
+                        </h3>
+                        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                          To protect our tradespeople's privacy and ensure safe, verified bookings across Mumbai, craftsmen profiles and rates are accessible only to signed-in clients.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-bold text-slate-700 py-1">
+                        <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-emerald-600" /> Aadhaar KYC Verified</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Transparent Visiting Rates</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-emerald-600" /> 30-Min Rapid Doorstep</span>
+                      </div>
+
+                      <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowAuthModal(true)}
+                          className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:brightness-105 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/25 active:scale-95 transition-all flex items-center justify-center gap-2"
+                        >
+                          <User className="w-4 h-4" />
+                          <span>Login / Sign Up to View Partners</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : !isServiceAvailable ? (
                     <div className="col-span-full p-12 text-center bg-red-50/70 rounded-3xl border-2 border-red-200 shadow-sm space-y-4">
                       <div className="w-16 h-16 rounded-3xl bg-red-100 text-red-600 flex items-center justify-center mx-auto text-3xl font-black shadow-sm">
                         ⚠️
@@ -1662,6 +1714,10 @@ export default function App() {
                           <div>
                             <button
                               onClick={() => {
+                                if (!user) {
+                                  setShowAuthModal(true);
+                                  return;
+                                }
                                 setActiveWorkerStudio(w);
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                               }}
@@ -1710,6 +1766,10 @@ export default function App() {
                           <span className="text-sm font-black text-slate-900 font-['Outfit']">₹{srv.price}</span>
                           <button
                             onClick={() => {
+                              if (!user) {
+                                setShowAuthModal(true);
+                                return;
+                              }
                               setSelectedCategory(srv.category);
                               const targetSection = document.getElementById('verified-pros-section');
                               if (targetSection) {
