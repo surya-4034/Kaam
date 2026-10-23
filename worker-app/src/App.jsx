@@ -3,7 +3,6 @@ import { AuthPage } from './components/auth/AuthPage';
 import { WorkerLandingPage } from './components/landing/WorkerLandingPage';
 import { WorkerOnboardingWizard } from './components/onboarding/WorkerOnboardingWizard';
 import { SERVICE_CATEGORIES_50 } from './data/serviceCategories';
-import { broadcastPartnerLocation } from './services/partnerLocationService';
 import { auth } from './config/firebase';
 import {
   HardHat,
@@ -238,20 +237,6 @@ export default function App() {
           onboardingCompleted: true
         })
       });
-
-      if (bankData.upi) {
-        fetch(`${API_BASE}/workers/bank-kyc`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: currentUserId,
-            workerId: worker.id,
-            accountHolderName: bankData.holder,
-            upiId: bankData.upi,
-            bankName: 'UPI Direct'
-          })
-        }).catch(e => console.warn('Bank KYC sync error:', e));
-      }
 
       if (res.ok) {
         setShowEditProfileModal(false);
@@ -779,19 +764,6 @@ export default function App() {
     }
   }, [user?.id]);
 
-  // Broadcast Live GPS Location to Backend Server
-  useEffect(() => {
-    if (user && (worker?.id || user?.id)) {
-      broadcastPartnerLocation(
-        worker.id || user.id,
-        worker.isAvailable ?? true,
-        worker.city || 'Mumbai',
-        worker.locality || 'Andheri West, Mumbai'
-      );
-    }
-  }, [user, worker?.id, worker?.isAvailable]);
-
-
   // Sync UPI form on change
   useEffect(() => {
     if (worker.bank) {
@@ -1008,23 +980,7 @@ export default function App() {
       setWorker(updated);
       localStorage.setItem('kaam_worker_profile', JSON.stringify(updated));
 
-      // 1. Update KYC / Bank record
-      await fetch(`${API_BASE}/workers/bank-kyc`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workerId: worker.id,
-          userId: user?.id,
-          accountHolderName: bankForm.accountHolderName,
-          upiId: (bankForm.upiId || '').trim(),
-          upiPhone: bankForm.upiPhone || '',
-          bankName: 'UPI Direct',
-          govtIdType: 'Aadhaar',
-          govtIdNumber: 'VERIFIED',
-        }),
-      }).catch(e => console.warn(e));
-
-      // 2. Also persist in worker profile
+      // Persist payout details in the existing worker profile record.
       await fetch(`${API_BASE}/workers/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -1266,7 +1222,7 @@ export default function App() {
               <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3.5">
                   <div>
-                    <h2 className="text-lg font-black text-slate-950">Nearby Service Requests</h2>
+                    <h2 className="text-lg font-black text-slate-950">New Service Requests</h2>
                     <p className="text-xs text-slate-500">Live requests matching your trade ({worker.tradeTitle})</p>
                   </div>
                   <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold">

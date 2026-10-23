@@ -188,20 +188,6 @@ export const WorkerOnboardingWizard = ({ user, workerProfile, onComplete, onCanc
         }),
       }).catch(e => console.warn('API sync warning:', e));
 
-      // 2. Submit UPI
-      await fetch(`${API_BASE_URL}/api/workers/bank-kyc`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user?.id,
-          accountHolderName: accountHolderName,
-          upiId: upiId,
-          bankName: 'UPI Direct',
-          govtIdType: 'Aadhaar',
-          govtIdNumber: 'VERIFIED',
-        }),
-      }).catch(e => console.warn('UPI sync warning:', e));
-
     } catch (err) {
       console.warn('Local fallback save used:', err);
     } finally {

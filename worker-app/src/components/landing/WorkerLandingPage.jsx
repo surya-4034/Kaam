@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   CheckCircle2,
   PhoneCall,
-  MapPin,
   TrendingUp,
   Clock,
   ArrowRight,
@@ -32,16 +31,6 @@ import {
   Search,
   User
 } from 'lucide-react';
-
-const CITIES = [
-  "Mumbai (All Neighborhoods)",
-  "Andheri West, Mumbai",
-  "Bandra West, Mumbai",
-  "Powai, Mumbai",
-  "Dadar & South Mumbai",
-  "Thane West, MMR",
-  "Vashi (Navi Mumbai)"
-];
 
 const TRADES_CATALOG = [
   {
@@ -164,7 +153,7 @@ const TESTIMONIALS = [
     location: 'Lajpat Nagar, South Delhi',
     earnings: '₹29,000+ / month',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80',
-    quote: 'Part-time kaam karke roz 900-1200 rupees mil jaate hain. Platform pe Aadhaar verification ke baad clients ka bhi pura bharosa milta hai.',
+    quote: 'Part-time kaam karke roz 900-1200 rupees mil jaate hain. Complete service profile se clients ko meri skills aur prices clearly samajh aati hain.',
     rating: 5.0,
     jobsCompleted: 119
   }
@@ -173,7 +162,7 @@ const TESTIMONIALS = [
 const FAQS = [
   {
     q: 'Kya KAAM app par worker registration bilkul free hai?',
-    a: 'Haan! KAAM app par registration, profile banana, aur nearby jobs receive karna 100% FREE hai. Koi bhi advance ya secret registration fee nahi li jaati.'
+    a: 'Haan! KAAM app par registration, profile banana, aur job requests receive karna 100% FREE hai. Koi bhi advance ya secret registration fee nahi li jaati.'
   },
   {
     q: 'Payment mujhe kab aur kaise milegi?',
@@ -182,10 +171,6 @@ const FAQS = [
   {
     q: 'KAAM platform ki commission kitni hai aur kab deni hoti hai?',
     a: 'KAAM sirf 10% minimal platform fee leta hai. Aur iska sabse bada fayda ye hai ki aapko fee turant nahi deni – aapko 36 ghante (1.5 din) ka grace period milta hai UPI se pay karne ka.'
-  },
-  {
-    q: 'KYC Verification ke liye konse documents chahiye?',
-    a: 'Aapko sirf apna Aadhaar Card number, Mobile Number, aur Bank Details enter karni hoti hai. Verification ke baad aapke profile par Verified Karigar ka badge lag jata hai.'
   },
   {
     q: 'Kya me apni visiting fee aur service package charges khud set kar sakta hu?',
@@ -198,9 +183,6 @@ const FAQS = [
 ];
 
 export function WorkerLandingPage({ onOpenAuth }) {
-  const [selectedCity, setSelectedCity] = useState("Mumbai (All Neighborhoods)");
-  const [showCityDropdown, setShowCityDropdown] = useState(false);
-
   // Earning Estimator State
   const [selectedTrade, setSelectedTrade] = useState(TRADES_CATALOG[0]);
   const [workingDays, setWorkingDays] = useState(25);
@@ -241,7 +223,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3.5 shadow-sm">
           <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-4">
             
-            {/* Left: Brand Logo & Location Selector */}
+            {/* Brand */}
             <div className="flex items-center gap-6">
               <div 
                 onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
@@ -257,32 +239,6 @@ export function WorkerLandingPage({ onOpenAuth }) {
                 </div>
               </div>
 
-              {/* City / Location Dropdown */}
-              <div className="relative hidden md:block">
-                <button
-                  type="button"
-                  onClick={() => setShowCityDropdown(!showCityDropdown)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50 text-xs font-bold text-slate-700 transition"
-                >
-                  <MapPin className="w-3.5 h-3.5 text-amber-600" />
-                  <span>{selectedCity}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                </button>
-
-                {showCityDropdown && (
-                  <div className="absolute left-0 top-10 w-52 bg-white rounded-2xl shadow-xl border border-slate-200 p-1.5 z-50 animate-in fade-in">
-                    {CITIES.map(city => (
-                      <button
-                        key={city}
-                        onClick={() => { setSelectedCity(city); setShowCityDropdown(false); }}
-                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition ${selectedCity === city ? 'bg-amber-50 text-amber-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'}`}
-                      >
-                        {city}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Center Navigation Links */}
@@ -315,27 +271,27 @@ export function WorkerLandingPage({ onOpenAuth }) {
           </div>
         </header>
 
-        {/* HERO SECTION (MATCHING CLIENT APP WARM CREAM GRAPHIC BACKGROUND) */}
-        <section className="bg-gradient-to-b from-[#faf7f2] via-white to-transparent py-12 px-4 sm:px-8 border-b border-slate-200">
+        {/* PARTNER HERO */}
+        <section className="kaam-hero kaam-grid-bg border-b border-slate-200/70 px-4 py-14 sm:px-8 sm:py-20">
           <div className="max-w-[1440px] mx-auto grid lg:grid-cols-12 gap-12 items-center">
             
             {/* Left Hero Main Text */}
             <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
               
               <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-100 border border-amber-200 text-amber-900 text-xs font-extrabold tracking-wide uppercase">
-                <ShieldCheck className="w-4 h-4 text-amber-600" />
-                <span>India's #1 Marketplace for Skilled Trades & Craftsmen</span>
+                <Briefcase className="w-4 h-4 text-amber-600" />
+                <span>Built for independent service professionals</span>
               </span>
 
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-950 font-['Outfit'] tracking-tight leading-tight">
-                Apne Hunar Se Kamayein <br className="hidden sm:inline" />
-                <span className="text-amber-600 underline decoration-amber-300 decoration-wavy underline-offset-8">
-                  Har Din Behtareen Aamdani
+                Apne hunar ko badhaiye. <br className="hidden sm:inline" />
+                <span className="text-amber-600">
+                  Apna kaam, apni terms par.
                 </span>
               </h1>
 
               <p className="text-slate-600 text-sm sm:text-base max-w-2xl font-medium leading-relaxed">
-                Connect directly with 50,000+ homeowners in <span className="text-slate-950 font-bold">{selectedCity}</span>. Zero joining fee, 100% direct cash/UPI payouts from clients, and complete freedom to set your visiting fees and service package prices.
+                Create a clear service profile, receive customer requests, manage packages and collect direct cash or UPI payments—all from one focused partner workspace.
               </p>
 
               {/* Quick Hero Feature Cards */}
@@ -346,9 +302,9 @@ export function WorkerLandingPage({ onOpenAuth }) {
                   <p className="text-[10px] text-slate-500 font-medium">Directly from client</p>
                 </div>
                 <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm text-left">
-                  <MapPin className="w-5 h-5 text-amber-600 mb-1" />
-                  <p className="text-xs font-bold text-slate-900">5-km Radius Jobs</p>
-                  <p className="text-[10px] text-slate-500 font-medium">Near your home</p>
+                  <Briefcase className="w-5 h-5 text-amber-600 mb-1" />
+                  <p className="text-xs font-bold text-slate-900">Live Job Requests</p>
+                  <p className="text-[10px] text-slate-500 font-medium">Accept work that suits you</p>
                 </div>
                 <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm text-left">
                   <Clock className="w-5 h-5 text-sky-600 mb-1" />
@@ -371,7 +327,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
                 <div className="h-8 w-px bg-slate-200 hidden sm:block" />
                 <div>
                   <p className="text-2xl font-black text-amber-600 font-['Outfit']">15,000+</p>
-                  <p className="text-xs text-slate-500 font-semibold">Verified Karigars Online</p>
+                  <p className="text-xs text-slate-500 font-semibold">Active Partner Profiles</p>
                 </div>
                 <div className="h-8 w-px bg-slate-200 hidden sm:block" />
                 <div>
@@ -384,7 +340,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
 
             {/* Right Hero Registration Form Box */}
             <div className="lg:col-span-5">
-              <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-200/50 space-y-5 relative">
+              <div className="kaam-hero-panel relative space-y-5 rounded-[2rem] border border-white/80 bg-white/90 p-6 shadow-2xl shadow-slate-900/10 backdrop-blur sm:p-8">
                 <div className="absolute -top-3.5 right-6 px-3 py-1 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow-sm">
                   ⚡ 2-Minute Setup
                 </div>
@@ -424,16 +380,6 @@ export function WorkerLandingPage({ onOpenAuth }) {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1.5">Preferred Work City</label>
-                    <input
-                      type="text"
-                      disabled
-                      value={selectedCity}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 font-bold cursor-not-allowed"
-                    />
-                  </div>
-
                   <button
                     type="submit"
                     className="w-full py-3.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-black text-xs shadow-md shadow-slate-900/10 active:scale-95 transition-all flex items-center justify-center gap-2"
@@ -445,7 +391,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
 
                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
                   <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> 100% Free Signup</span>
-                  <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Aadhaar KYC Enabled</span>
+                  <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Guided profile setup</span>
                 </div>
 
               </div>
@@ -673,7 +619,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
                 Kaise Shuru Karein KAAM Par Earning?
               </h2>
               <p className="text-slate-600 text-xs sm:text-sm font-medium">
-                Only 4 quick steps to verify your profile and start getting direct homeowner calls in your city.
+                Four straightforward steps to complete your profile and start managing customer requests.
               </p>
             </div>
 
@@ -695,9 +641,9 @@ export function WorkerLandingPage({ onOpenAuth }) {
                 <span className="w-10 h-10 rounded-2xl bg-sky-500 text-white font-black text-lg grid place-items-center font-['Outfit'] shadow-sm">
                   2
                 </span>
-                <h3 className="text-lg font-black text-slate-950 font-['Outfit']">Aadhaar KYC Check</h3>
+                <h3 className="text-lg font-black text-slate-950 font-['Outfit']">Build Your Service Profile</h3>
                 <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  Enter basic Aadhaar ID & bank details to earn the official <strong>Verified Karigar</strong> badge on your profile.
+                  Add your experience, service categories, work photos, packages and visiting fee so customers know what you offer.
                 </p>
               </div>
 
@@ -706,9 +652,9 @@ export function WorkerLandingPage({ onOpenAuth }) {
                 <span className="w-10 h-10 rounded-2xl bg-emerald-500 text-white font-black text-lg grid place-items-center font-['Outfit'] shadow-sm">
                   3
                 </span>
-                <h3 className="text-lg font-black text-slate-950 font-['Outfit']">Get Nearby Job Alerts</h3>
+                <h3 className="text-lg font-black text-slate-950 font-['Outfit']">Receive Job Requests</h3>
                 <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  Receive instant booking requests from homeowners within 5 km. Accept or decline based on your schedule.
+                  Review new booking requests and accept or decline each one based on your schedule.
                 </p>
               </div>
 
