@@ -32,5 +32,6 @@ server/demo.html
 create_word_doc.py
 *.docx
 *.zip
+*.backup*
 
 
