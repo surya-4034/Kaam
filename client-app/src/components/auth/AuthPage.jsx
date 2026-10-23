@@ -488,7 +488,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
               {viewState === 'LOGIN_MAIN' || viewState === 'LOGIN_EMAIL_FORM' || viewState === 'FORGOT_REQUEST' || viewState === 'FORGOT_RESET' ? 'KAAM Login' : 'Create Kaam Account'}
             </h2>
             <p className="text-xs text-amber-100/90 font-medium">
-              {isWorkerApp ? 'Connect with homeowners & accept daily jobs' : 'Hire verified local tradespeople & skilled workers'}
+              {isWorkerApp ? 'Connect with homeowners & accept daily jobs' : 'Hire skilled local tradespeople and service professionals'}
             </p>
           </div>
         </div>

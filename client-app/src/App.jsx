@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CATEGORIES, INITIAL_WORKERS, POPULAR_SERVICES, CUSTOMER_REVIEWS, TRADE_SERVICES } from './data/mockData';
+import { CATEGORIES, INITIAL_WORKERS, POPULAR_SERVICES, CUSTOMER_REVIEWS, TRADE_SERVICES, getTradeWorkImage } from './data/mockData';
 import { SERVICE_CATEGORIES_50 } from './data/serviceCategories';
 import { AuthPage } from './components/auth/AuthPage';
 import { ClientOnboardingWizard } from './components/onboarding/ClientOnboardingWizard';
 import { WorkerProfileDetail } from './components/profile/WorkerProfileDetail';
 import { CheckoutPage } from './components/checkout/CheckoutPage';
-import { getCurrentClientLocation, formatDistanceBadge, CITY_COORDINATES, isMumbaiLocation, MUMBAI_LOCATIONS, DEFAULT_CLIENT_LOCATION } from './services/locationService';
 import { auth } from './config/firebase';
 import { API_BASE_URL } from './config/api';
 import { QRCodeSVG } from 'qrcode.react';
@@ -72,21 +71,6 @@ const INDIAN_STATES = [
   "Goa"
 ];
 
-const CITIES = [
-  "Mumbai (All Neighborhoods)",
-  "Andheri West, Mumbai",
-  "Bandra West, Mumbai",
-  "Powai, Mumbai",
-  "Colaba / South Mumbai",
-  "Dadar West, Mumbai",
-  "Thane West, MMR",
-  "Vashi (Navi Mumbai)",
-  "Delhi NCR (Outside Mumbai)",
-  "Noida, UP (Outside Mumbai)",
-  "Bengaluru, KA (Outside Mumbai)",
-  "Pune, MH (Outside Mumbai)"
-];
-
 const ICON_MAP = {
   Wrench,
   Droplets,
@@ -106,10 +90,6 @@ export default function App() {
     const saved = localStorage.getItem('kaam_client_user');
     return saved ? JSON.parse(saved) : null;
   });
-
-  // Selected City / Location
-  const [selectedCity, setSelectedCity] = useState('Mumbai (All Neighborhoods)');
-  const [showCityDropdown, setShowCityDropdown] = useState(false);
 
   // Auth Modal State (Triggered on Login click or Booking)
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -149,39 +129,6 @@ export default function App() {
       });
     }
   }, [user]);
-
-  // 1-TIME SILENT LIVE GEOLOCATION CAPTURE
-  useEffect(() => {
-    if (!user?.id) return;
-    const hasSynced = localStorage.getItem('kaam_geo_synced_v1');
-    if (hasSynced) return;
-
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const { latitude, longitude } = pos.coords;
-          localStorage.setItem('kaam_geo_synced_v1', 'true');
-          localStorage.setItem('kaam_user_coords', JSON.stringify({ latitude, longitude }));
-
-          try {
-            await fetch(`${API_BASE_URL}/api/auth/update-location`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: user.id, latitude, longitude })
-            });
-          } catch (e) {
-            // Silently ignore network failures in background
-          }
-        },
-        () => {
-          localStorage.setItem('kaam_geo_synced_v1', 'true');
-        },
-        { timeout: 8000, maximumAge: 600000, enableHighAccuracy: false }
-      );
-    } else {
-      localStorage.setItem('kaam_geo_synced_v1', 'true');
-    }
-  }, [user?.id]);
 
   const handleOpenProfileModal = async () => {
     setProfileMessage('');
@@ -256,37 +203,6 @@ export default function App() {
   }, [showTradeDropdown]);
 
   const [maxBudget, setMaxBudget] = useState(1500);
-  const [onlyVerified, setOnlyVerified] = useState(false);
-
-  const [searchRadiusKm, setSearchRadiusKm] = useState(50);
-  const [clientCoords, setClientCoords] = useState({ lat: 19.0760, lng: 72.8777 });
-  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-
-  // Exact Mumbai Geographic Range Availability Checks (Based strictly on selected city/locality/GPS)
-  const UNAVAILABLE_MESSAGE = 'Service was unavailable at this place, sorry for inconvenience!';
-  const cityAvailability = isMumbaiLocation(selectedCity);
-  const isServiceAvailable = cityAvailability.isAvailable;
-
-  const handleDetectClientLocation = async () => {
-    setIsDetectingLocation(true);
-    const coords = await getCurrentClientLocation();
-    if (coords && coords.isMumbai) {
-      setClientCoords({ lat: coords.lat, lng: coords.lng });
-    } else {
-      setClientCoords({ lat: 19.0760, lng: 72.8777 });
-    }
-    setIsDetectingLocation(false);
-  };
-
-  useEffect(() => {
-    if (CITY_COORDINATES[selectedCity]) {
-      setClientCoords({
-        lat: CITY_COORDINATES[selectedCity].lat,
-        lng: CITY_COORDINATES[selectedCity].lng
-      });
-    }
-  }, [selectedCity]);
-
   const [selectedWorkerProfile, setSelectedWorkerProfile] = useState(null);
   const [activeWorkerStudio, setActiveWorkerStudio] = useState(null);
   const [activeCheckoutOrder, setActiveCheckoutOrder] = useState(null);
@@ -295,7 +211,7 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [jobs, setJobs] = useState([]);
-  const [dbWorkers, setDbWorkers] = useState([]);
+  const [dbWorkers, setDbWorkers] = useState(INITIAL_WORKERS || []);
 
   const [bookingForm, setBookingForm] = useState({
     name: user?.fullName || 'Verma Family (Homeowner)',
@@ -329,25 +245,15 @@ export default function App() {
     }));
   };
 
-  // Fetch live workers from backend search engine API (only when client is logged in)
+  // Fetch live workers from backend search engine API
   const fetchWorkersFromDB = async () => {
-    if (!user || !isServiceAvailable) {
-      setDbWorkers([]);
-      return;
-    }
-
     try {
       let targetUrl = `${API_BASE_URL}/api/workers/search?`;
       const params = new URLSearchParams();
       if (selectedCategory && selectedCategory !== 'all') params.append('category', selectedCategory);
       if (searchQuery) params.append('q', searchQuery);
       if (maxBudget) params.append('maxBudget', maxBudget);
-      const latToSend = clientCoords?.lat || 19.0760;
-      const lngToSend = clientCoords?.lng || 72.8777;
-      params.append('lat', latToSend);
-      params.append('lng', lngToSend);
       params.append('city', 'Mumbai');
-      params.append('maxDistanceKm', searchRadiusKm || 75);
 
       targetUrl += params.toString();
 
@@ -397,10 +303,7 @@ export default function App() {
             reviewCount: w.completedJobsCount ? w.completedJobsCount + 20 : 35,
             completedJobsCount: w.completedJobsCount || 10,
             isAvailable: Boolean(w.isAvailable),
-            kycStatus: w.kycStatus || 'VERIFIED',
-            distanceKm: w.distanceKm ?? 0,
-            distanceBadge: formatDistanceBadge(w.distanceKm),
-            photo: w.photo || (idx % 2 === 0 ? 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?auto=format&fit=crop&w=600&q=80' : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80'),
+            photo: getTradeWorkImage(w.tradeCategory || w.trade, idx, w.photo),
             bio: w.bio || 'Certified specialist with proven track record in residential and commercial repairs.',
             portfolio: (() => {
               const raw = (Array.isArray(w.portfolio) && w.portfolio.length > 0)
@@ -440,11 +343,14 @@ export default function App() {
             upiId: w.bank?.upi || w.upi_id || w.upiId || ''
           }));
           setDbWorkers(mapped);
-        } else {
-          setDbWorkers([]);
+        } else if (INITIAL_WORKERS && INITIAL_WORKERS.length > 0) {
+          setDbWorkers(INITIAL_WORKERS);
         }
       } catch (err) {
-        console.warn('Backend workers endpoint offline:', err.message);
+        console.warn('Backend workers endpoint notice:', err.message);
+        if (INITIAL_WORKERS && INITIAL_WORKERS.length > 0) {
+          setDbWorkers(INITIAL_WORKERS);
+        }
       }
   };
 
@@ -480,18 +386,20 @@ export default function App() {
       };
     }
     return () => clearInterval(intervalWorkers);
-  }, [user?.id, selectedCategory, searchQuery, maxBudget, searchRadiusKm, clientCoords?.lat, clientCoords?.lng]);
+  }, [user?.id, selectedCategory, searchQuery, maxBudget]);
 
   const handleLogout = () => {
     try {
       auth.signOut();
     } catch (e) {}
     setUser(null);
+    setJobs([]);
     localStorage.removeItem('kaam_client_user');
     localStorage.removeItem('kaam_client_token');
     localStorage.removeItem('kaam_token');
     localStorage.removeItem('kaam_user');
     setActiveTab('browse');
+    fetchWorkersFromDB();
   };
 
   const handleProfileFormChange = (e) => {
@@ -596,7 +504,7 @@ export default function App() {
     }
   };
 
-  const workerList = dbWorkers;
+  const workerList = (dbWorkers && dbWorkers.length > 0) ? dbWorkers : (INITIAL_WORKERS || []);
 
   const filteredWorkers = workerList.filter((worker) => {
     const selCat = (selectedCategory || 'all').toLowerCase().trim();
@@ -700,16 +608,11 @@ export default function App() {
     })();
 
     const matchesBudget = (worker.visitingCharge || 149) <= maxBudget || (Array.isArray(worker.packages) && worker.packages.length > 0 ? worker.packages.some(p => (p.price || 0) <= maxBudget) : true);
-    const matchesVerified = !onlyVerified || worker.kycStatus === 'VERIFIED';
-    return matchesCat && matchesSearch && matchesBudget && matchesVerified;
+    return matchesCat && matchesSearch && matchesBudget;
   });
 
   const handleCreateBooking = async (e) => {
     e.preventDefault();
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
     setIsSubmitting(true);
 
     const payload = {
@@ -795,10 +698,6 @@ export default function App() {
                   </span>
                 </div>
 
-                <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700">
-                  <MapPin className="w-3.5 h-3.5 text-amber-600" />
-                  <span>{selectedCity}</span>
-                </div>
               </div>
 
               {/* Center search input */}
@@ -855,7 +754,6 @@ export default function App() {
           {/* STUDIO DETAIL VIEW */}
           <WorkerProfileDetail
             worker={activeWorkerStudio}
-            selectedCity={selectedCity}
             activeCategoryFilter={selectedCategory}
             searchQuery={searchQuery}
             onBack={() => setActiveWorkerStudio(null)}
@@ -933,7 +831,7 @@ export default function App() {
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3.5 shadow-sm">
           <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-4">
             
-            {/* Left: Brand Logo & Location Selector */}
+            {/* Brand */}
             <div className="flex items-center gap-6">
               <div 
                 onClick={() => { setSelectedCategory('all'); setSearchQuery(''); setActiveTab('browse'); }}
@@ -947,64 +845,6 @@ export default function App() {
                 </span>
               </div>
 
-              {/* City / Location Dropdown */}
-              <div className="relative hidden md:block">
-                <button
-                  type="button"
-                  onClick={() => setShowCityDropdown(!showCityDropdown)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
-                    isServiceAvailable 
-                      ? 'border-slate-200 hover:border-slate-300 bg-slate-50 text-slate-700' 
-                      : 'border-red-300 bg-red-50 text-red-700 animate-pulse'
-                  }`}
-                >
-                  <MapPin className={`w-3.5 h-3.5 ${isServiceAvailable ? 'text-amber-600' : 'text-red-600'}`} />
-                  <span>{selectedCity}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                </button>
-
-                {showCityDropdown && (
-                  <div className="absolute left-0 top-10 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-50 animate-in fade-in max-h-96 overflow-y-auto">
-                    <div className="px-2 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
-                      Operating Coverage (Mumbai & MMR)
-                    </div>
-                    {CITIES.filter(c => !c.includes('Outside Mumbai')).map(city => (
-                      <button
-                        key={city}
-                        onClick={() => {
-                          setSelectedCity(city);
-                          setShowCityDropdown(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between ${
-                          selectedCity === city ? 'bg-amber-50 text-amber-800 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        <span>{city}</span>
-                        <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-black">Active</span>
-                      </button>
-                    ))}
-
-                    <div className="px-2 py-1 text-[10px] font-black uppercase tracking-wider text-red-500 border-b border-slate-100 mt-2 mb-1">
-                      Outside Mumbai (Non-Operating Zone)
-                    </div>
-                    {CITIES.filter(c => c.includes('Outside Mumbai')).map(city => (
-                      <button
-                        key={city}
-                        onClick={() => {
-                          setSelectedCity(city);
-                          setShowCityDropdown(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between ${
-                          selectedCity === city ? 'bg-red-50 text-red-700 font-extrabold' : 'text-slate-500 hover:bg-red-50/50'
-                        }`}
-                      >
-                        <span className="truncate">{city}</span>
-                        <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-black shrink-0">Unavailable</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Center: Global Service Search Input with Integrated Trades Dropdown */}
@@ -1173,88 +1013,84 @@ export default function App() {
           </div>
         </header>
 
-        {/* STICKY OUTSIDE MUMBAI SERVICE UNAVAILABLE ALERT BANNER */}
-        {!isServiceAvailable && (
-          <div className="bg-red-600 text-white px-4 py-3 shadow-md flex items-center justify-between gap-3 text-xs sm:text-sm font-black sticky top-[69px] z-30 animate-in slide-in-from-top">
-            <div className="flex items-center gap-2 max-w-4xl mx-auto">
-              <AlertCircle className="w-5 h-5 shrink-0 text-amber-300" />
-              <span>Service was unavailable at this place, sorry for inconvenience!</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedCity('Mumbai (All Neighborhoods)');
-                setClientCoords({ lat: 19.0760, lng: 72.8777 });
-                setSearchQuery('');
-              }}
-              className="px-3.5 py-1.5 rounded-full bg-white text-red-700 hover:bg-red-50 text-xs font-black shadow-sm transition shrink-0 active:scale-95"
-            >
-              Switch to Mumbai
-            </button>
-          </div>
-        )}
+        {/* PRIMARY DISCOVERY HERO */}
+        <section className="kaam-hero kaam-grid-bg border-b border-slate-200/70 px-4 py-12 sm:px-8 sm:py-16">
+          <div className="mx-auto grid max-w-[1440px] items-center gap-10 lg:grid-cols-[0.9fr_1.1fr]">
+            <div className="space-y-6 text-center lg:text-left">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/70 bg-white/80 px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-wide text-amber-900 shadow-sm backdrop-blur">
+                <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                <span>Clear choices. Trusted work. Easy booking.</span>
+              </span>
 
-        {/* HERO SECTION: URBAN COMPANY STYLE CATEGORY CAROUSEL & HEADLINE */}
-        <section className="bg-gradient-to-b from-[#faf7f2] via-white to-transparent py-10 px-4 sm:px-8 border-b border-slate-100">
-          <div className="max-w-[1440px] mx-auto text-center space-y-4">
-            
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-100 border border-amber-200 text-amber-900 text-xs font-extrabold tracking-wide uppercase">
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>Verified Home Services & Skilled Craftsmen</span>
-            </span>
+              <div className="space-y-4">
+                <h1 className="max-w-3xl font-['Outfit'] text-4xl font-black leading-[1.04] tracking-tight text-slate-950 sm:text-6xl">
+                  Reliable help for every job around your home.
+                </h1>
+                <p className="mx-auto max-w-xl text-sm font-medium leading-7 text-slate-600 sm:text-base lg:mx-0">
+                  Compare skilled professionals, transparent visiting fees and service packages—then book the right person in a few simple steps.
+                </p>
+              </div>
 
-            <h1 className="text-3xl sm:text-5xl font-black text-slate-950 font-['Outfit'] tracking-tight leading-tight max-w-3xl mx-auto">
-              {isServiceAvailable ? (
-                <>
-                  Home services at your doorstep in <span className="text-amber-600 underline decoration-amber-300 decoration-wavy underline-offset-8">{selectedCity.split(',')[0]}</span>
-                </>
-              ) : (
-                <span className="text-red-600">
-                  Service was unavailable at this place, sorry for inconvenience!
-                </span>
-              )}
-            </h1>
+              <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('service-professionals')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-xs font-black text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800"
+                >
+                  Browse professionals <ArrowRight className="h-4 w-4 text-amber-400" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => user ? setActiveTab('my-bookings') : setShowAuthModal(true)}
+                  className="rounded-2xl border border-slate-300 bg-white/80 px-5 py-3 text-xs font-black text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-white"
+                >
+                  Track my bookings
+                </button>
+              </div>
 
-            <p className="text-slate-600 text-sm max-w-xl mx-auto font-medium">
-              {isServiceAvailable ? (
-                "Hire background-verified plumbers, electricians, carpenters, painters, and home maintenance pros in under 30 minutes across Mumbai."
-              ) : (
-                "Kaam operates exclusively across Mumbai & the Mumbai Metropolitan Region (MMR). Services are currently unavailable at this place."
-              )}
-            </p>
-
-            {/* URBAN COMPANY CATEGORY TILES GRID */}
-            <div className="pt-6 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-8 gap-3 max-w-5xl mx-auto">
-              {CATEGORIES.map((cat) => {
-                const IconComp = ICON_MAP[cat.icon] || Wrench;
-                const isSelected = selectedCategory === cat.id;
-
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => {
-                      setSelectedCategory(cat.id);
-                      if (activeTab !== 'browse') setActiveTab('browse');
-                    }}
-                    className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border transition-all duration-200 group ${
-                      isSelected
-                        ? 'bg-amber-400/20 border-amber-400 shadow-md shadow-amber-500/10 scale-105'
-                        : 'bg-white border-slate-200/80 hover:border-slate-300 hover:shadow-sm'
-                    }`}
-                  >
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-2 transition-transform group-hover:scale-110 ${
-                      isSelected ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      <IconComp className="w-5 h-5 stroke-[2.2]" />
-                    </div>
-                    <span className={`text-[11px] font-extrabold text-center leading-tight ${isSelected ? 'text-amber-900 font-black' : 'text-slate-700'}`}>
-                      {cat.name}
-                    </span>
-                  </button>
-                );
-              })}
+              <div className="flex flex-wrap justify-center gap-5 text-[11px] font-bold text-slate-600 lg:justify-start">
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Upfront service details</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Direct booking updates</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Secure completion code</span>
+              </div>
             </div>
 
+            <div className="kaam-hero-panel rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-2xl shadow-slate-900/10 backdrop-blur sm:p-7">
+              <div className="mb-5 flex items-end justify-between gap-4 text-left">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700">Start here</p>
+                  <h2 className="mt-1 font-['Outfit'] text-2xl font-black text-slate-950">What can we help with?</h2>
+                </div>
+                <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-500 sm:block">Choose a category</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                {CATEGORIES.map((cat) => {
+                  const IconComp = ICON_MAP[cat.icon] || Wrench;
+                  const isSelected = selectedCategory === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        setSelectedCategory(cat.id);
+                        if (activeTab !== 'browse') setActiveTab('browse');
+                        window.setTimeout(() => document.getElementById('service-professionals')?.scrollIntoView({ behavior: 'smooth' }), 80);
+                      }}
+                      className={`group flex min-h-28 flex-col items-center justify-center rounded-2xl border p-3 text-center transition-all duration-200 ${
+                        isSelected
+                          ? 'border-amber-400 bg-amber-50 text-amber-950 shadow-md shadow-amber-500/10'
+                          : 'border-slate-200 bg-white text-slate-700 hover:-translate-y-1 hover:border-amber-300 hover:shadow-lg'
+                      }`}
+                    >
+                      <span className={`mb-2 grid h-11 w-11 place-items-center rounded-xl transition ${isSelected ? 'bg-amber-400 text-slate-950' : 'bg-slate-100 text-slate-700 group-hover:bg-amber-100 group-hover:text-amber-800'}`}>
+                        <IconComp className="h-5 w-5 stroke-[2.2]" />
+                      </span>
+                      <span className="text-[11px] font-extrabold leading-tight">{cat.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1299,7 +1135,7 @@ export default function App() {
                     <div className="bg-white p-12 rounded-3xl text-center space-y-3 text-slate-400 border border-slate-200">
                       <Briefcase className="w-12 h-12 text-slate-300 mx-auto" />
                       <p className="text-sm font-bold text-slate-700">No active bookings yet.</p>
-                      <p className="text-xs text-slate-500">Explore services and select a verified tradesperson to book.</p>
+                      <p className="text-xs text-slate-500">Explore services and select a professional to book.</p>
                     </div>
                   );
                 }
@@ -1307,7 +1143,7 @@ export default function App() {
                 return (
                   <div className="space-y-4">
                     {displayJobs.map((j) => {
-                    const workerName = j.worker_name || j.workerName || 'Verified Service Partner';
+                    const workerName = j.worker_name || j.workerName || 'KAAM Service Partner';
                     const tradeTitle = j.trade_title || j.tradeTitle || 'Home Service Professional';
                     const workerPhone = j.worker_phone || j.workerPhone || '+91 98765 43210';
                     const workDesc = j.work_description || j.workDescription;
@@ -1511,133 +1347,28 @@ export default function App() {
           </div>
           ) : (
             <>
-              {/* SECTION 1: VERIFIED TRADESPERSON CARDS & SEARCH RESULTS (PRIMARY TOP VIEW) */}
-              <section id="verified-pros-section" className="space-y-4 pt-2 scroll-mt-24">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+              {/* SECTION 1: SERVICE PROFESSIONALS */}
+              <section id="service-professionals" className="space-y-5 pt-2 scroll-mt-24">
+                <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-950 font-['Outfit'] tracking-tight flex items-center gap-2">
-                      <span>Available Verified Professionals</span>
-                      <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                        !user 
-                          ? 'bg-amber-50 text-amber-900 border-amber-300'
-                          : isServiceAvailable 
-                            ? 'bg-amber-100 text-amber-800 border-amber-200' 
-                            : 'bg-red-100 text-red-800 border-red-200'
-                      }`}>
-                        {!user ? '🔒 Sign In Required' : isServiceAvailable ? `${filteredWorkers.length} Online in Mumbai` : 'Unavailable'}
+                    <h2 className="flex items-center gap-2 font-['Outfit'] text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
+                      <span>Available service professionals</span>
+                      <span className="rounded-full border border-amber-200 bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800">
+                        {filteredWorkers.length} profiles
                       </span>
                     </h2>
-                    {!user ? (
-                      <p className="text-xs text-slate-500 mt-0.5">Please sign in to view available verified craftsmen near {selectedCity.split(',')[0]} (Mumbai Region).</p>
-                    ) : isServiceAvailable ? (
-                      <p className="text-xs text-slate-500 mt-0.5">Background-checked craftsmen near {selectedCity.split(',')[0]} (Mumbai Region).</p>
-                    ) : (
-                      <p className="text-xs text-red-600 font-bold mt-0.5">⚠️ Service was unavailable at this place, sorry for inconvenience!</p>
-                    )}
+                    <p className="mt-1 text-xs text-slate-500">
+                      Compare experience, ratings, service packages and visiting fees before you book.
+                    </p>
                   </div>
-
-                  {/* Filter Toolbar with 50km Radius Selector & GPS Auto-Detect */}
-                  <div className="flex flex-wrap items-center gap-2.5 text-xs">
-                    <button
-                      type="button"
-                      onClick={handleDetectClientLocation}
-                      disabled={isDetectingLocation}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold border border-amber-300 transition active:scale-95"
-                    >
-                      <MapPin className="w-3.5 h-3.5 text-amber-600" />
-                      <span>{isDetectingLocation ? 'Locating...' : '📍 Near Me (Mumbai)'}</span>
-                    </button>
-
-                    <select
-                      value={searchRadiusKm}
-                      onChange={(e) => setSearchRadiusKm(Number(e.target.value))}
-                      className="bg-white border border-slate-200 text-slate-800 font-bold px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
-                    >
-                      <option value={10}>Radius: 10 km</option>
-                      <option value={25}>Radius: 25 km</option>
-                      <option value={50}>Radius: 50 km (Default MMR)</option>
-                    </select>
-
-                    <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-slate-200">
-                      <input
-                        type="checkbox"
-                        checked={onlyVerified}
-                        onChange={(e) => setOnlyVerified(e.target.checked)}
-                        className="accent-amber-500 rounded"
-                      />
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      <span className="font-semibold text-slate-700">KYC Verified Only</span>
-                    </label>
-                  </div>
+                  <span className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-600 shadow-sm">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Live availability shown on every profile
+                  </span>
                 </div>
 
                 {/* Worker Cards Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {!user ? (
-                    <div className="col-span-full py-12 px-6 sm:px-12 text-center bg-gradient-to-b from-white via-amber-50/40 to-amber-100/20 rounded-3xl border-2 border-dashed border-amber-300 shadow-sm space-y-6">
-                      <div className="w-16 h-16 rounded-3xl bg-amber-500 text-slate-950 flex items-center justify-center mx-auto text-2xl font-black shadow-md shadow-amber-500/30">
-                        <Lock className="w-8 h-8" />
-                      </div>
-                      <div className="space-y-2 max-w-lg mx-auto">
-                        <span className="text-[11px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 px-3 py-1 rounded-full border border-amber-200">
-                          Client Login Required
-                        </span>
-                        <h3 className="text-xl sm:text-2xl font-black text-slate-950 font-['Outfit'] tracking-tight pt-1">
-                          Sign In to View & Book {selectedCategory !== 'all' ? selectedCategory.toUpperCase() : 'Verified'} Partners
-                        </h3>
-                        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                          To protect our tradespeople's privacy and ensure safe, verified bookings across Mumbai, craftsmen profiles and rates are accessible only to signed-in clients.
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-bold text-slate-700 py-1">
-                        <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-emerald-600" /> Aadhaar KYC Verified</span>
-                        <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Transparent Visiting Rates</span>
-                        <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-emerald-600" /> 30-Min Rapid Doorstep</span>
-                      </div>
-
-                      <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setShowAuthModal(true)}
-                          className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:brightness-105 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/25 active:scale-95 transition-all flex items-center justify-center gap-2"
-                        >
-                          <User className="w-4 h-4" />
-                          <span>Login / Sign Up to View Partners</span>
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : !isServiceAvailable ? (
-                    <div className="col-span-full p-12 text-center bg-red-50/70 rounded-3xl border-2 border-red-200 shadow-sm space-y-4">
-                      <div className="w-16 h-16 rounded-3xl bg-red-100 text-red-600 flex items-center justify-center mx-auto text-3xl font-black shadow-sm">
-                        ⚠️
-                      </div>
-                      <div className="space-y-2 max-w-lg mx-auto">
-                        <h3 className="text-xl font-black text-red-950 font-['Outfit']">
-                          Service was unavailable at this place, sorry for inconvenience!
-                        </h3>
-                        <p className="text-xs text-red-700 leading-relaxed font-medium">
-                          Kaam currently operates exclusively across Mumbai and the Mumbai Metropolitan Region (MMR). Services are not available in "{selectedCity}". Please select an area within Mumbai to view verified tradespeople.
-                        </p>
-                        <div className="pt-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedCity('Mumbai (All Neighborhoods)');
-                              setClientCoords({ lat: 19.0760, lng: 72.8777 });
-                              setSearchQuery('');
-                            }}
-                            className="px-6 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-black transition active:scale-95 shadow-md"
-                          >
-                            Switch to Mumbai Services
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : filteredWorkers.length === 0 ? (
+                  {filteredWorkers.length === 0 ? (
                     <div className="col-span-full p-12 text-center bg-white rounded-3xl border border-slate-200 shadow-sm space-y-4">
                       <div className="w-16 h-16 rounded-3xl bg-amber-100 text-amber-900 flex items-center justify-center mx-auto text-2xl font-black shadow-sm">
                         🛠️
@@ -1647,7 +1378,7 @@ export default function App() {
                           No Registered {selectedCategory !== 'all' ? selectedCategory.toUpperCase() : (searchQuery || 'Service')} Partners in Mumbai Yet
                         </h3>
                         <p className="text-xs text-slate-500 max-w-md mx-auto">
-                          Real accounts are active! When a new service partner registers on the Partner App for this trade in Mumbai, they will immediately appear here on the client desk with live distance.
+                          New partner profiles will appear here as soon as they register for this service category.
                         </p>
                       </div>
                     </div>
@@ -1658,20 +1389,24 @@ export default function App() {
                       {/* Photo & Badges */}
                       <div className="relative h-48 overflow-hidden bg-slate-950">
                         <img
-                          src={w.photo}
+                          src={w.photo || getTradeWorkImage(w.trade, 0)}
                           alt={w.name}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = getTradeWorkImage(w.trade, 0);
+                          }}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
                         
                         <div className="absolute left-3.5 top-3.5 flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md text-slate-950 text-[10px] font-black tracking-wide shadow-sm">
-                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>KAAM VERIFIED</span>
+                          <Briefcase className="w-3.5 h-3.5 text-amber-700" />
+                          <span>KAAM PROFESSIONAL</span>
                         </div>
 
                         <div className="absolute bottom-3 left-3.5 flex items-center gap-1.5 text-white">
-                          <span className="px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-[11px] font-bold border border-white/20 text-amber-300">
-                            {w.distanceBadge || (w.distanceKm ? `📍 ${w.distanceKm} km away` : '📍 Near you')}
+                          <span className={`px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-[11px] font-bold border border-white/20 ${w.isAvailable ? 'text-emerald-300' : 'text-slate-300'}`}>
+                            {w.isAvailable ? 'Available for bookings' : 'Currently unavailable'}
                           </span>
                         </div>
                       </div>
@@ -1695,7 +1430,7 @@ export default function App() {
                             <span className="font-semibold">{w.reviewCount} reviews</span>
                             <span>•</span>
                             <span className="text-emerald-700 font-bold flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Aadhaar & Bank KYC
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> {w.completedJobsCount || 0} completed jobs
                             </span>
                           </div>
 
@@ -1714,10 +1449,6 @@ export default function App() {
                           <div>
                             <button
                               onClick={() => {
-                                if (!user) {
-                                  setShowAuthModal(true);
-                                  return;
-                                }
                                 setActiveWorkerStudio(w);
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                               }}
@@ -1766,12 +1497,8 @@ export default function App() {
                           <span className="text-sm font-black text-slate-900 font-['Outfit']">₹{srv.price}</span>
                           <button
                             onClick={() => {
-                              if (!user) {
-                                setShowAuthModal(true);
-                                return;
-                              }
                               setSelectedCategory(srv.category);
-                              const targetSection = document.getElementById('verified-pros-section');
+                              const targetSection = document.getElementById('service-professionals');
                               if (targetSection) {
                                 targetSection.scrollIntoView({ behavior: 'smooth' });
                               }
@@ -1800,8 +1527,8 @@ export default function App() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                   <div className="bg-white/10 backdrop-blur-md p-6 rounded-2xl border border-white/10 space-y-2">
                     <Shield className="w-8 h-8 text-amber-400" />
-                    <h3 className="text-base font-bold">100% Background Verified</h3>
-                    <p className="text-xs text-slate-300 leading-relaxed">Every professional goes through strict Aadhaar & criminal background authentication.</p>
+                    <h3 className="text-base font-bold">Detailed professional profiles</h3>
+                    <p className="text-xs text-slate-300 leading-relaxed">Compare experience, ratings, completed jobs, packages and pricing before making a booking.</p>
                   </div>
 
                   <div className="bg-white/10 backdrop-blur-md p-6 rounded-2xl border border-white/10 space-y-2">
@@ -1859,7 +1586,7 @@ export default function App() {
                 <span className="text-xl font-black text-white font-['Outfit']">kaam</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                India's premier on-demand blue-collar tradesperson marketplace connecting homeowners with verified craftsmen.
+                A simple service marketplace connecting customers with skilled independent professionals.
               </p>
             </div>
 
@@ -1913,7 +1640,7 @@ export default function App() {
 
       {/* POPUP MODAL: BOOKING & PARTNER DETAILS (WITH LIVE PAYMENT QR & CHOSEN PACKAGES) */}
       {selectedJobDetails && (() => {
-        const workerName = selectedJobDetails.worker_name || selectedJobDetails.workerName || 'Verified Service Partner';
+        const workerName = selectedJobDetails.worker_name || selectedJobDetails.workerName || 'KAAM Service Partner';
         const tradeTitle = selectedJobDetails.trade_title || selectedJobDetails.tradeTitle || selectedJobDetails.category_title || 'Home Service Professional';
         const workerPhone = selectedJobDetails.worker_phone || selectedJobDetails.workerPhone || '+91 98765 43210';
         const workerLocality = selectedJobDetails.worker_locality || selectedJobDetails.locality || 'Mumbai, Maharashtra';
@@ -2182,7 +1909,7 @@ export default function App() {
                   <span>•</span>
                   <span>{selectedWorkerProfile.experience} years experience</span>
                   <span>•</span>
-                  <span className="text-emerald-700 font-bold">KYC Verified</span>
+                  <span className="text-emerald-700 font-bold">Profile available</span>
                 </div>
               </div>
 

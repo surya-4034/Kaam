@@ -4,7 +4,6 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import {
   Search,
   MapPin,
-  LocateFixed,
   History,
   X,
   ArrowLeft,
@@ -313,29 +312,6 @@ export const AddressAndSlotWorkflow = ({
     });
   };
 
-  // Handle GPS Current Location Button
-  const handleUseCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setPinCoords({ lat, lng });
-
-          // Reverse geocode to find address name
-          reverseGeocode(lat, lng).then(() => {
-            setCurrentStep('MAP_PINPOINT');
-          });
-        },
-        (err) => {
-          console.warn('Geolocation failed:', err);
-          // Fallback to default
-          setCurrentStep('MAP_PINPOINT');
-        }
-      );
-    }
-  };
-
   const handleSaveAddressAndProceedToSlots = (e) => {
     e.preventDefault();
     if (!houseNumber.trim()) return;
@@ -411,16 +387,6 @@ export const AddressAndSlotWorkflow = ({
               </button>
             ) : null}
           </div>
-
-          {/* Use Current Location CTA */}
-          <button
-            type="button"
-            onClick={handleUseCurrentLocation}
-            className="flex items-center gap-2.5 py-1 text-xs font-black text-[#5932ea] hover:text-[#4927cb] transition active:scale-95"
-          >
-            <LocateFixed className="w-4 h-4 text-[#5932ea]" />
-            <span>Use current location (Mumbai)</span>
-          </button>
 
           {/* AUTOCOMPLETE RESULTS (Real-World Live Mapbox Data) */}
           {searchQuery.trim() ? (
@@ -571,23 +537,6 @@ export const AddressAndSlotWorkflow = ({
               </button>
             </div>
 
-            {/* Target GPS Recenter Button */}
-            <button
-              onClick={() => {
-                if (navigator.geolocation && mapInstanceRef.current) {
-                  navigator.geolocation.getCurrentPosition((pos) => {
-                    const lat = pos.coords.latitude;
-                    const lng = pos.coords.longitude;
-                    mapInstanceRef.current.flyTo({ center: [lng, lat], zoom: 16 });
-                    reverseGeocode(lat, lng);
-                  });
-                }
-              }}
-              title="Locate Me"
-              className="absolute bottom-4 left-4 z-30 w-10 h-10 rounded-full bg-white text-slate-800 shadow-xl border border-slate-200 grid place-items-center hover:bg-slate-50 active:scale-95 transition"
-            >
-              <LocateFixed className="w-5 h-5 text-slate-700" />
-            </button>
           </div>
 
           {/* RIGHT PANE (50%): DOORSTEP DETAILS FORM + STICKY BOTTOM BUTTON */}

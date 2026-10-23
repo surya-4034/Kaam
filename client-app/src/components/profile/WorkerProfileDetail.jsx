@@ -21,13 +21,12 @@ import {
   ImageIcon,
   Maximize2
 } from 'lucide-react';
-import { TRADE_SERVICES } from '../../data/mockData';
+import { TRADE_SERVICES, getTradeWorkImage } from '../../data/mockData';
 
 export const WorkerProfileDetail = ({
   worker,
   onBack,
   onBookNow,
-  selectedCity = 'Mumbai',
   activeCategoryFilter = 'all',
   searchQuery = ''
 }) => {
@@ -200,7 +199,7 @@ export const WorkerProfileDetail = ({
     category: pkg.category || worker.trade,
     rating: '5.0',
     reviewsCount: worker.completedJobsCount || 12,
-    badge: 'Verified Package',
+    badge: 'Service Package',
     features: [pkg.description || 'Includes doorstep visit, inspection & complete service.']
   }));
 
@@ -226,7 +225,15 @@ export const WorkerProfileDetail = ({
           {/* Worker summary chip */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <img src={worker.photo} alt={worker.name} className="w-8 h-8 rounded-full object-cover border border-amber-400" />
+              <img
+                src={worker.photo || getTradeWorkImage(worker.trade, 0)}
+                alt={worker.name}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = getTradeWorkImage(worker.trade, 0);
+                }}
+                className="w-8 h-8 rounded-full object-cover border border-amber-400"
+              />
               <div className="hidden sm:block text-left">
                 <p className="text-xs font-extrabold text-slate-900 leading-none">{worker.name}</p>
                 <p className="text-[10px] text-amber-700 font-bold">{worker.tradeTitle} • {worker.locality}</p>
@@ -299,7 +306,7 @@ export const WorkerProfileDetail = ({
                   <div className="relative z-10 space-y-1.5">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-xs shadow-md">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>Verified Partner Craftsmanship</span>
+                      <span>Partner Work Showcase</span>
                     </span>
                     <h3 className="text-white text-lg sm:text-xl font-black drop-shadow">
                       {worker.name} • {worker.tradeTitle || 'Professional Services'}
@@ -653,7 +660,7 @@ export const WorkerProfileDetail = ({
                       ? (selectedTrade !== 'all' ? `${worker.name}'s ${selectedTrade} Packages` : `${worker.name}'s Custom Service Packages`)
                       : (catalog.subcategories.find(s => s.id === activeSubcat)?.name || 'Service Packages')}
                   </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Customized for {worker.name}'s verified trade expertise</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Customized for {worker.name}'s listed trade expertise</p>
                 </div>
                 <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
                   {itemsToRender.length} Available
@@ -670,7 +677,7 @@ export const WorkerProfileDetail = ({
                     No {selectedTrade} Packages Listed Yet
                   </h3>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                    {worker.name} provides custom services upon booking. You can also view packages across their other verified skills.
+                    {worker.name} provides custom services upon booking. You can also view packages across their other listed skills.
                   </p>
                   <button
                     type="button"
@@ -799,7 +806,7 @@ export const WorkerProfileDetail = ({
               <div className="space-y-3 text-xs text-slate-700">
                 <div className="flex items-center gap-2.5 font-bold">
                   <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
-                  <span>Verified Professionals</span>
+                  <span>Service Professionals</span>
                 </div>
                 <div className="flex items-center gap-2.5 font-bold">
                   <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />

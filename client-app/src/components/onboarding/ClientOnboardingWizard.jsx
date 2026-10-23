@@ -348,7 +348,7 @@ export const ClientOnboardingWizard = ({ user, onComplete }) => {
               <div className="flex justify-between items-center pb-2 border-b border-slate-800">
                 <span className="font-bold text-white text-sm">{formData.fullName}</span>
                 <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-bold">
-                  Verified Client
+                  Client Profile
                 </span>
               </div>
 

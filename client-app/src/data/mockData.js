@@ -10,7 +10,206 @@ export const CATEGORIES = [
   { id: 'cleaner', name: 'Site Cleaners', icon: 'Sparkles', count: 9, desc: 'Post-construction debris cleanup, deep home cleaning' },
 ];
 
-export const INITIAL_WORKERS = [];
+export const TRADE_WORK_IMAGES = {
+  electrician: [
+    'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=600&q=80', // switchboard & wiring
+    'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80', // breaker panel & inspection
+    'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=600&q=80', // wire circuitry repair
+  ],
+  plumber: [
+    'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=600&q=80', // pipe repair & tap fixture
+    'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=600&q=80', // pipe wrench & fittings
+    'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?auto=format&fit=crop&w=600&q=80', // water piping maintenance
+  ],
+  carpenter: [
+    'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80', // wood carpentry & furniture framing
+    'https://images.unsplash.com/photo-1538688525198-9b88f6f53126?auto=format&fit=crop&w=600&q=80', // woodwork measurements
+  ],
+  painter: [
+    'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&w=600&q=80', // wall roller painting
+    'https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=600&q=80', // putty & wall detail work
+  ],
+  cleaner: [
+    'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=600&q=80', // deep sanitation & cleaning
+    'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=600&q=80', // site cleaning
+  ],
+  mason: [
+    'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=600&q=80', // construction brickwork & masonry
+  ],
+  mistry: [
+    'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=600&q=80', // construction mistry
+  ],
+  welder: [
+    'https://images.unsplash.com/photo-1504917599217-d4dc5ebe6122?auto=format&fit=crop&w=600&q=80', // metal welding & torch
+  ],
+  ac_repair: [
+    'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=600&q=80', // AC servicing
+  ],
+  locksmith: [
+    'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80',
+  ],
+  salon_men: [
+    'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=600&q=80',
+  ],
+  default: [
+    'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80',
+    'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=600&q=80',
+  ]
+};
+
+// Generic face portrait headshots that should be converted to trade work pictures
+const GENERIC_HEADSHOTS = [
+  'photo-1540569014015-19a7be504e3a',
+  'photo-1507003211169-0a1dd7228f2d',
+  'photo-1534528741775-53994a69daeb',
+  'photo-1500648767791-00dcc994a43e'
+];
+
+export function getTradeWorkImage(trade, index = 0, currentPhoto = '') {
+  if (currentPhoto && typeof currentPhoto === 'string') {
+    const isHeadshot = GENERIC_HEADSHOTS.some(shot => currentPhoto.includes(shot));
+    if (!isHeadshot && currentPhoto.startsWith('http')) {
+      return currentPhoto;
+    }
+  }
+  const key = (trade || '').toLowerCase().trim();
+  const list = TRADE_WORK_IMAGES[key] || TRADE_WORK_IMAGES.default;
+  const safeIdx = Math.abs(Number(index) || 0) % list.length;
+  return list[safeIdx];
+}
+
+export const INITIAL_WORKERS = [
+  {
+    id: 'w-1791107064294',
+    name: 'Surya Yadav (Pro)',
+    phone: '+91 98765 00000',
+    email: 'sy623806@gmail.com',
+    trade: 'electrician',
+    tradeTitle: 'Master Electrician & Plumber Pro',
+    categories: ['electrician', 'locksmith', 'plumber', 'salon_men'],
+    locality: 'Andheri West, Mumbai',
+    city: 'Mumbai',
+    experience: 5,
+    bio: 'Experienced professional with certified skills.',
+    dailyRate: 650,
+    hourlyRate: 120,
+    visitingCharge: 149,
+    isAvailable: true,
+    rating: 5.0,
+    reviewCount: 35,
+    completedJobsCount: 15,
+    photo: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=600&q=80',
+    packages: [
+      { id: 'pkg-1-1791107075606', title: 'Plumber / Pipe Fitter - Basic Inspection & Diagnosis', description: 'Includes doorstep visit, problem diagnosis, and minor fixes up to 30 mins.', price: 100, duration: '30 mins', category: 'plumber' },
+      { id: 'pkg-2-1791107075606', title: 'Standard Plumber / Pipe Fitter Service Package', description: 'Complete standard repair, fitting, and testing work at home.', price: 630, duration: '1-2 hours', category: 'plumber' },
+      { id: 'pkg-1791107127085', title: 'Full home wiring', description: 'Includes doorstep inspection, diagnostic & complete service.', price: 356, duration: '45 mins', category: 'electrician' }
+    ],
+    bank: {
+      holder: 'Surya Yadav',
+      upi: '9876500000@paytm',
+      upiPhone: '+91 98765 00000',
+      bankName: 'State Bank of India'
+    },
+    portfolio: [],
+    portfolioImages: []
+  },
+  {
+    id: 'w-1791124150328',
+    name: 'sujal yadav',
+    phone: '+91 9653192752',
+    email: 'ysujal26@gmail.com',
+    trade: 'plumber',
+    tradeTitle: 'Skilled Trade Specialist',
+    categories: ['plumber', 'painter'],
+    locality: 'g.n.rd, Thane',
+    city: 'Mumbai',
+    experience: 3,
+    bio: 'Expert in plumbing and painting.',
+    dailyRate: 600,
+    hourlyRate: 110,
+    visitingCharge: 149,
+    isAvailable: true,
+    rating: 4.9,
+    reviewCount: 28,
+    completedJobsCount: 8,
+    photo: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=600&q=80',
+    packages: [
+      { id: 'pkg-1791124192423', title: 'wall repair', description: 'Complete doorstep service & diagnosis.', price: 2999, duration: '1 hour', category: 'painter' }
+    ],
+    bank: {
+      holder: 'sujal yadav',
+      upi: '9653192752@kotakbank',
+      upiPhone: '+91 9653192752',
+      bankName: 'Kotak Mahindra Bank'
+    },
+    portfolio: [],
+    portfolioImages: []
+  },
+  {
+    id: 'w-1791044807171',
+    name: 'S. Yadav (Updated)',
+    phone: '+91 91111 22222',
+    email: 'sy191101400@gmail.com',
+    trade: 'plumber',
+    tradeTitle: 'Master Plumbing & Leak Specialist',
+    categories: ['plumber'],
+    locality: 'Andheri West, Mumbai',
+    city: 'Mumbai',
+    experience: 4,
+    bio: 'Master sanitary & leakage expert.',
+    dailyRate: 700,
+    hourlyRate: 130,
+    visitingCharge: 199,
+    isAvailable: true,
+    rating: 5.0,
+    reviewCount: 32,
+    completedJobsCount: 12,
+    photo: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=600&q=80',
+    packages: [
+      { id: 'pkg-acc1-1', title: 'Plumbing Inspection', description: 'Doorstep inspection and diagnostic leak test.', price: 199, duration: '30 mins', category: 'plumber' }
+    ],
+    bank: {
+      holder: 'S. Yadav',
+      upi: '9111122222@paytm',
+      upiPhone: '+91 91111 22222',
+      bankName: 'HDFC Bank'
+    },
+    portfolio: [],
+    portfolioImages: []
+  },
+  {
+    id: 'w-1791158968316',
+    name: 'Ramesh Sharma (Electrician)',
+    phone: '+91 8763182414',
+    email: 'testmumbaipro@gmail.com',
+    trade: 'electrician',
+    tradeTitle: 'Master Electrical Contractor & Technician',
+    categories: ['electrician'],
+    locality: 'Bandra West, Mumbai',
+    city: 'Mumbai',
+    experience: 6,
+    bio: 'Licensed electrician for all home wiring and repairs.',
+    dailyRate: 680,
+    hourlyRate: 130,
+    visitingCharge: 149,
+    isAvailable: true,
+    rating: 5.0,
+    reviewCount: 42,
+    completedJobsCount: 22,
+    photo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80',
+    packages: [
+      { id: 'pkg-ramesh-1', title: 'Electrical Inspection & Appliance Wiring', description: 'Doorstep electrical wiring, testing, and fixture repair.', price: 249, duration: '45 mins', category: 'electrician' }
+    ],
+    bank: {
+      holder: 'Ramesh Sharma',
+      upi: '8763182414@paytm',
+      upiPhone: '+91 8763182414',
+      bankName: 'Bank of Baroda'
+    },
+    portfolio: [],
+    portfolioImages: []
+  }
+];
 
 export const POPULAR_SERVICES = [
   {
