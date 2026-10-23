@@ -93,8 +93,10 @@ export const getWorkers = async (req, res) => {
           }
         });
       }
+      const canonicalMatch = CANONICAL_VERIFIED_PARTNERS.find(c => c.id === r.id || c.email === r.email);
       return {
         ...r,
+        photo: r.photo || (canonicalMatch ? canonicalMatch.photo : null),
         tradeCategory: r.trade_category,
         tradeTitle: r.trade_title,
         dailyRate: r.daily_rate,
@@ -397,8 +399,10 @@ export const searchWorkers = async (req, res) => {
         });
       }
 
+      const canonicalMatch = CANONICAL_VERIFIED_PARTNERS.find(c => c.id === r.id || c.email === r.email);
       return {
         ...r,
+        photo: r.photo || (canonicalMatch ? canonicalMatch.photo : null),
         tradeCategory: r.trade_category,
         tradeTitle: r.trade_title,
         dailyRate: r.daily_rate,
@@ -626,6 +630,10 @@ export const getWorkerByUserId = async (req, res) => {
       worker.completedJobsCount = worker.completed_jobs_count;
       worker.isAvailable = Boolean(worker.is_available);
       worker.city = worker.city || 'Mumbai';
+      const canonicalMatch = CANONICAL_VERIFIED_PARTNERS.find(p => p.id === worker.id || p.userId === worker.user_id || p.email === worker.email);
+      if (!worker.photo && canonicalMatch) {
+        worker.photo = canonicalMatch.photo;
+      }
 
       db.all(`SELECT * FROM worker_portfolios WHERE worker_id = ?`, [worker.id], (pErr, portfolio) => {
         worker.portfolio = (portfolio || []).map(p => ({
