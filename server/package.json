@@ -1,7 +1,7 @@
 {
-  "name": "kaam-backend-api",
+  "name": "connect-backend-api",
   "version": "1.0.0",
-  "description": "Production REST API Backend for kaam - Skilled Trades Worker Marketplace",
+  "description": "Production REST API Backend for Connect - Skilled Trades Worker Marketplace",
   "main": "index.js",
   "type": "module",
   "scripts": {

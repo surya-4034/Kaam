@@ -316,7 +316,7 @@ export const createJobPublic = (req, res) => {
 
   const finalClientId = req.body.clientId || req.body.client_id || (req.user && req.user.id) || `u-client-${Date.now()}`;
   const finalCategoryTitle = categoryTitle || reqCategoryTitle || tradeTitle || 'General Service';
-  const finalClientEmail = clientEmail || reqClientEmail || 'client@kaam.com';
+  const finalClientEmail = clientEmail || reqClientEmail || 'client@connect.com';
   const finalClientName = clientName || 'Verma Family (Homeowner)';
   const finalClientPhone = clientPhone || '+91 98111 00223';
 
@@ -616,7 +616,7 @@ const resolveClientEmailAndDispatch = (job, status) => {
     sendJobStatusEmail(emailToUse, status, job).catch(e => console.warn(`[${status} email dispatch warning]:`, e));
   };
 
-  if (targetClientEmail && targetClientEmail !== 'client@kaam.com' && targetClientEmail.includes('@')) {
+  if (targetClientEmail && targetClientEmail !== 'client@connect.com' && targetClientEmail.includes('@')) {
     doSend(targetClientEmail);
   } else {
     db.get(`SELECT email FROM users WHERE id = ?`, [job.client_id], async (cErr, cRow) => {
@@ -632,7 +632,7 @@ const resolveClientEmailAndDispatch = (job, status) => {
           }
         } catch (e) {}
       }
-      doSend(resolvedEmail || targetClientEmail || 'client@kaam.com');
+      doSend(resolvedEmail || targetClientEmail || 'client@connect.com');
     });
   }
 };

@@ -41,7 +41,7 @@ mountKaamAdmin(app, { db, prefix: '/api/admin' });
 app.get('/', (req, res) => {
   res.json({
     status: 'online',
-    platform: 'kaam Production API Server',
+    platform: 'Connect Production API Server',
     version: '4.0.0',
     health: '/api/health',
     endpoints: {
@@ -60,7 +60,7 @@ app.get('/', (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
-    platform: 'kaam API Backend',
+    platform: 'Connect API Backend',
     mongoConnected: isMongoConnected(),
     mongoError: getLastMongoError(),
     timestamp: new Date().toISOString()

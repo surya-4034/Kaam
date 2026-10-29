@@ -332,5 +332,5 @@ export async function ensureVerifiedPartnersSeeded(db) {
     }
   }
 
-  console.log('⚡ [kaam Canonical Engine] 4 Verified Partner Profiles guaranteed and synced.');
+  console.log('⚡ [Connect Canonical Engine] 4 Verified Partner Profiles guaranteed and synced.');
 }

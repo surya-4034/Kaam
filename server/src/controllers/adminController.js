@@ -275,16 +275,16 @@ export const testEmailDiagnostics = async (req, res) => {
   try {
     const outcome = await dispatchEmail({
       to: targetEmail,
-      subject: `KAAM Email Diagnostics Test - ${new Date().toLocaleTimeString('en-IN')}`,
-      text: `Hello,\n\nThis is a live test email from KAAM Server to verify real email delivery to ${targetEmail}.\nTimestamp: ${new Date().toISOString()}`,
+      subject: `Connect Email Diagnostics Test - ${new Date().toLocaleTimeString('en-IN')}`,
+      text: `Hello,\n\nThis is a live test email from Connect Server to verify real email delivery to ${targetEmail}.\nTimestamp: ${new Date().toISOString()}`,
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #0284c7; margin-top: 0;">KAAM Email Deliverability Test</h2>
-          <p>This email confirms that the KAAM email notification system is working and successfully delivered to <strong>${targetEmail}</strong>.</p>
+          <h2 style="color: #0284c7; margin-top: 0;">Connect Email Deliverability Test</h2>
+          <p>This email confirms that the Connect email notification system is working and successfully delivered to <strong>${targetEmail}</strong>.</p>
           <p style="font-size: 12px; color: #64748b;">Timestamp: ${new Date().toISOString()}</p>
         </div>
       `,
-      senderName: 'KAAM Diagnostic'
+      senderName: 'Connect Diagnostic'
     });
     results.dispatchResult = outcome;
   } catch (dErr) {

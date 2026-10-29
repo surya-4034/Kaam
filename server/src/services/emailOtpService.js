@@ -74,7 +74,7 @@ export const emailDispatchLogs = [];
  * 3. Hostinger / Gmail SMTP (ports 465 / 587 - works locally / VPS)
  * 4. Fallback Resend SDK call
  */
-export const dispatchEmail = async ({ to, subject, text, html, senderName = 'KAAM Support' }) => {
+export const dispatchEmail = async ({ to, subject, text, html, senderName = 'Connect Support' }) => {
   const cleanTo = (to || '').toLowerCase().trim();
   if (!cleanTo || !cleanTo.includes('@')) {
     console.warn('⚠️ [EMAIL DISPATCH]: Invalid recipient email:', to);
@@ -286,20 +286,20 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
   emailOtpStore.set(cleanEmail, { otpCode: generatedOtp, expiresAt });
 
   // Format Clean Subject Line (NO CODE IN TITLE) & High-Deliverability Body Text
-  let subjectText = "KAAM Account Verification";
+  let subjectText = "Connect Account Verification";
   if (context === 'SIGNUP') {
-    subjectText = "Verify your email for your KAAM account";
+    subjectText = "Verify your email for your Connect account";
   } else if (context === 'RESET_PASSWORD') {
-    subjectText = "KAAM Password Reset Code";
+    subjectText = "Connect Password Reset Code";
   } else if (context === 'LOGIN') {
-    subjectText = "KAAM Sign-in Verification Code";
+    subjectText = "Connect Sign-in Verification Code";
   }
 
-  const plainTextBody = `Hello,\n\nYour 6-digit KAAM verification code is:\n\n${generatedOtp}\n\nThis code expires in 10 minutes. Please do not share this code with anyone.\n\nRegards,\nKAAM Support Team\nkaam@yors.online`;
+  const plainTextBody = `Hello,\n\nYour 6-digit Connect verification code is:\n\n${generatedOtp}\n\nThis code expires in 10 minutes. Please do not share this code with anyone.\n\nRegards,\nConnect Support Team\nkaam@yors.online`;
 
   const htmlBody = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; color: #1e293b; max-width: 480px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
-      <p style="font-size: 16px; font-weight: bold; color: #0284c7; margin-top: 0;">KAAM Platform Verification</p>
+      <p style="font-size: 16px; font-weight: bold; color: #0284c7; margin-top: 0;">Connect Platform Verification</p>
       <p style="margin-bottom: 16px;">Hello,</p>
       <p style="margin-bottom: 16px;">Your 6-digit verification code is:</p>
       
@@ -326,7 +326,7 @@ export const sendEmailOtp = async (email, context = 'SIGNUP') => {
     subject: subjectText,
     text: plainTextBody,
     html: htmlBody,
-    senderName: 'KAAM Verification'
+    senderName: 'Connect Verification'
   });
 
   return {
@@ -347,8 +347,8 @@ export const sendAdminForgotOtpEmail = async () => {
 
   emailOtpStore.set(targetEmail, { otpCode: generatedOtp, expiresAt });
 
-  const subjectText = `KAAM Master Admin Password Reset Verification`;
-  const plainTextBody = `KAAM Master Admin Password Reset Request
+  const subjectText = `Connect Master Admin Password Reset Verification`;
+  const plainTextBody = `Connect Master Admin Password Reset Request
 
 Hello Admin,
 
@@ -359,7 +359,7 @@ SECRET CODE: ${generatedOtp}
 If you did not request this password reset, please secure your account immediately. Code expires in 10 minutes.
 
 Regards,
-KAAM Platform Security`;
+Connect Platform Security`;
 
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 24px; border-radius: 16px; max-width: 500px; margin: 0 auto; border: 1px solid #1e293b;">
@@ -370,7 +370,7 @@ KAAM Platform Security`;
         ${generatedOtp}
       </div>
 
-      <p style="font-size: 11px; color: #64748b; margin-top: 16px; text-align: center;">KAAM Automated Master Security Service • Code expires in 10 min</p>
+      <p style="font-size: 11px; color: #64748b; margin-top: 16px; text-align: center;">Connect Automated Master Security Service • Code expires in 10 min</p>
     </div>
   `;
 
@@ -385,7 +385,7 @@ KAAM Platform Security`;
   if (transporter) {
     try {
       await transporter.sendMail({
-        from: `"KAAM Admin Security" <${process.env.EMAIL_USER}>`,
+        from: `"Connect Admin Security" <${process.env.EMAIL_USER}>`,
         replyTo: process.env.EMAIL_USER,
         to: targetEmail,
         subject: subjectText,
@@ -401,7 +401,7 @@ KAAM Platform Security`;
 
   try {
     await resend.emails.send({
-      from: 'KAAM Admin Security <onboarding@resend.dev>',
+      from: 'Connect Admin Security <onboarding@resend.dev>',
       to: [targetEmail],
       subject: subjectText,
       text: plainTextBody,
@@ -422,8 +422,8 @@ export const sendAdminPasswordChangeConfirmationEmail = async () => {
   const targetEmail = 'kaamadmin@gmail.com';
   const timestampStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
-  const subjectText = `🔒 KAAM Admin Security Alert: Master Admin Password Reset Successfully`;
-  const plainTextBody = `KAAM Master Admin Security Notice
+  const subjectText = `🔒 Connect Admin Security Alert: Master Admin Password Reset Successfully`;
+  const plainTextBody = `Connect Master Admin Security Notice
 
 Hello Admin,
 
@@ -432,7 +432,7 @@ The password for Master Admin account (ID: Surya-4034 / kaamadmin@gmail.com) was
 If you performed this action, no further steps are needed.
 
 Regards,
-KAAM Platform Security`;
+Connect Platform Security`;
 
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 24px; border-radius: 16px; max-width: 500px; margin: 0 auto; border: 1px solid #1e293b;">
@@ -446,7 +446,7 @@ KAAM Platform Security`;
         <p style="margin: 4px 0;"><strong style="color: #cbd5e1;">Status:</strong> <span style="color: #4ade80; font-weight: bold;">SECURED & UPDATED</span></p>
       </div>
 
-      <p style="font-size: 11px; color: #64748b; margin-top: 16px; text-align: center;">KAAM Automated Security System</p>
+      <p style="font-size: 11px; color: #64748b; margin-top: 16px; text-align: center;">Connect Automated Security System</p>
     </div>
   `;
 
@@ -460,7 +460,7 @@ KAAM Platform Security`;
   if (transporter) {
     try {
       await transporter.sendMail({
-        from: `"KAAM Admin Security" <${process.env.EMAIL_USER}>`,
+        from: `"Connect Admin Security" <${process.env.EMAIL_USER}>`,
         replyTo: process.env.EMAIL_USER,
         to: targetEmail,
         subject: subjectText,
@@ -476,7 +476,7 @@ KAAM Platform Security`;
 
   try {
     await resend.emails.send({
-      from: 'KAAM Security <onboarding@resend.dev>',
+      from: 'Connect Security <onboarding@resend.dev>',
       to: [targetEmail],
       subject: subjectText,
       text: plainTextBody,
@@ -497,22 +497,22 @@ export const sendPasswordResetSuccessEmail = async (email) => {
   const cleanEmail = email.toLowerCase().trim();
   const timestampStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
-  const subjectText = `🔑 KAAM Account Password Updated Successfully`;
+  const subjectText = `🔑 Connect Account Password Updated Successfully`;
   const plainTextBody = `Hello,
 
-The password for your KAAM account (${cleanEmail}) was updated successfully on ${timestampStr} IST.
+The password for your Connect account (${cleanEmail}) was updated successfully on ${timestampStr} IST.
 
 If you performed this password reset, no further action is required. You can now log in using your new password.
 
-If you did NOT perform this password reset, please contact KAAM Support immediately.
+If you did NOT perform this password reset, please contact Connect Support immediately.
 
 Regards,
-KAAM Platform Security`;
+Connect Platform Security`;
 
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 24px; border-radius: 16px; max-width: 500px; margin: 0 auto; border: 1px solid #1e293b;">
       <h3 style="color: #4ade80; margin-top: 0; font-size: 18px;">🔑 Password Updated Successfully</h3>
-      <p style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">The password for your KAAM account has been changed.</p>
+      <p style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">The password for your Connect account has been changed.</p>
       
       <div style="background-color: #1e293b; padding: 16px; border-radius: 12px; font-size: 13px; line-height: 1.6; border: 1px solid #334155;">
         <p style="margin: 4px 0;"><strong style="color: #cbd5e1;">Account Email:</strong> ${cleanEmail}</p>
@@ -521,7 +521,7 @@ KAAM Platform Security`;
       </div>
 
       <p style="font-size: 12px; color: #cbd5e1; margin-top: 16px;">You can now log in to your account with your new password.</p>
-      <p style="font-size: 11px; color: #64748b; margin-top: 12px; text-align: center;">KAAM Automated Security Notice</p>
+      <p style="font-size: 11px; color: #64748b; margin-top: 12px; text-align: center;">Connect Automated Security Notice</p>
     </div>
   `;
 
@@ -535,7 +535,7 @@ KAAM Platform Security`;
   if (transporter) {
     try {
       await transporter.sendMail({
-        from: `"KAAM Security" <${process.env.EMAIL_USER}>`,
+        from: `"Connect Security" <${process.env.EMAIL_USER}>`,
         replyTo: process.env.EMAIL_USER,
         to: cleanEmail,
         subject: subjectText,
@@ -551,7 +551,7 @@ KAAM Platform Security`;
 
   try {
     await resend.emails.send({
-      from: 'KAAM Security <onboarding@resend.dev>',
+      from: 'Connect Security <onboarding@resend.dev>',
       to: [cleanEmail],
       subject: subjectText,
       text: plainTextBody,
@@ -573,9 +573,9 @@ export const sendAdminLoginAlertEmail = async (adminId = 'Surya-4034', loginEmai
   const targetEmail = 'kaamadmin@gmail.com';
   const timestampStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
-  const subjectText = `🔒 KAAM Admin Login Notice: Session Active (ID: ${adminId})`;
+  const subjectText = `🔒 Connect Admin Login Notice: Session Active (ID: ${adminId})`;
   
-  const plainTextBody = `KAAM Admin Login Alert
+  const plainTextBody = `Connect Admin Login Alert
 
 Hello Admin,
 
@@ -588,11 +588,11 @@ Your Master Admin account has logged in successfully.
 • Status: AUTHENTICATED & ACTIVE
 
 Regards,
-KAAM Platform Security System`;
+Connect Platform Security System`;
 
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 24px; border-radius: 16px; max-width: 500px; margin: 0 auto; border: 1px solid #1e293b;">
-      <h3 style="color: #c084fc; margin-top: 0; font-size: 18px;">🔒 KAAM Admin Login Notice</h3>
+      <h3 style="color: #c084fc; margin-top: 0; font-size: 18px;">🔒 Connect Admin Login Notice</h3>
       <p style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">Master Admin account login was performed successfully.</p>
       
       <div style="background-color: #1e293b; padding: 16px; border-radius: 12px; font-size: 13px; line-height: 1.6; border: 1px solid #334155;">
@@ -602,7 +602,7 @@ KAAM Platform Security System`;
         <p style="margin: 4px 0;"><strong style="color: #cbd5e1;">Session Status:</strong> <span style="color: #4ade80; font-weight: bold;">AUTHENTICATED & ACTIVE</span></p>
       </div>
 
-      <p style="font-size: 11px; color: #64748b; margin-top: 16px; text-align: center;">KAAM Automated Security Alert</p>
+      <p style="font-size: 11px; color: #64748b; margin-top: 16px; text-align: center;">Connect Automated Security Alert</p>
     </div>
   `;
 
@@ -616,7 +616,7 @@ KAAM Platform Security System`;
   if (transporter) {
     try {
       const info = await transporter.sendMail({
-        from: `"KAAM Security Alert" <${process.env.EMAIL_USER}>`,
+        from: `"Connect Security Alert" <${process.env.EMAIL_USER}>`,
         replyTo: process.env.EMAIL_USER,
         to: targetEmail,
         subject: subjectText,
@@ -633,7 +633,7 @@ KAAM Platform Security System`;
 
   try {
     const resendResponse = await resend.emails.send({
-      from: 'KAAM Security <onboarding@resend.dev>',
+      from: 'Connect Security <onboarding@resend.dev>',
       to: [targetEmail],
       subject: subjectText,
       text: plainTextBody,
@@ -694,7 +694,7 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
   const isCompleted = status === 'COMPLETED';
 
   const partnerName = job.worker_name || 'Service Partner';
-  const partnerPhone = job.worker_phone || 'Available on KAAM App';
+  const partnerPhone = job.worker_phone || 'Available on Connect App';
   const categoryTitle = job.category_title || job.trade_title || 'Home Service';
   const agreedFee = job.agreed_total_fee ? `₹${job.agreed_total_fee}` : 'Standard Rate';
   const location = job.location_address || 'Registered Address';
@@ -702,20 +702,20 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
   const clientName = job.client_name || 'Valued Customer';
   const completionCode = job.completion_code || job.completionCode || '';
 
-  let subjectText = `Service Request Declined by Partner | KAAM`;
+  let subjectText = `Service Request Declined by Partner | Connect`;
   if (isAccepted) {
-    subjectText = `Booking Confirmed: ${partnerName} Accepted Your Request | KAAM`;
+    subjectText = `Booking Confirmed: ${partnerName} Accepted Your Request | Connect`;
   } else if (isRequested) {
-    subjectText = `Booking Request Placed: Waiting for Partner Confirmation | KAAM`;
+    subjectText = `Booking Request Placed: Waiting for Partner Confirmation | Connect`;
   } else if (isCompleted) {
-    subjectText = `Work Completed: Service Order Finished by ${partnerName} | KAAM`;
+    subjectText = `Work Completed: Service Order Finished by ${partnerName} | Connect`;
   }
 
   let plainTextBody = '';
   let htmlBody = '';
 
   if (isRequested) {
-    plainTextBody = `Hello ${clientName},\n\nYour booking request for "${categoryTitle}" has been placed and sent to ${partnerName}'s desk.\n\nStatus: ⏳ Waiting for confirmation\n\n📌 Request Summary:\n- Service Partner: ${partnerName}\n- Service Category: ${categoryTitle}\n- Total Agreed Fee: ${agreedFee}\n- Service Address: ${location}\n- Work Details: ${description}\n\nYou will receive an immediate confirmation email as soon as ${partnerName} confirms your booking!\n\nTrack your booking in real time: https://kaam-client.yors.online\n\nKAAM Support Team`;
+    plainTextBody = `Hello ${clientName},\n\nYour booking request for "${categoryTitle}" has been placed and sent to ${partnerName}'s desk.\n\nStatus: ⏳ Waiting for confirmation\n\n📌 Request Summary:\n- Service Partner: ${partnerName}\n- Service Category: ${categoryTitle}\n- Total Agreed Fee: ${agreedFee}\n- Service Address: ${location}\n- Work Details: ${description}\n\nYou will receive an immediate confirmation email as soon as ${partnerName} confirms your booking!\n\nTrack your booking in real time: https://kaam-client.yors.online\n\nConnect Support Team`;
 
     htmlBody = `
       <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
@@ -748,11 +748,11 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
         </div>
 
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">KAAM Automated Service Dispatch • Support Email: kaam@yors.online</p>
+        <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">Connect Automated Service Dispatch • Support Email: kaam@yors.online</p>
       </div>
     `;
   } else if (isAccepted) {
-    plainTextBody = `Hello ${clientName},\n\nGreat news! Your job request for "${categoryTitle}" has been ACCEPTED by ${partnerName}.\n\n🔑 YOUR WORK COMPLETION VERIFICATION CODE: ${completionCode}\n(Please provide this 6-digit code to ${partnerName} ONLY after the work has been completed at your doorstep. The partner needs this code to mark the job completed.)\n\n📌 Booking Details:\n- Partner: ${partnerName}\n- Contact: ${partnerPhone}\n- Service Category: ${categoryTitle}\n- Agreed Fee: ${agreedFee}\n- Location: ${location}\n- Details: ${description}\n\nThank you for choosing KAAM Platform!\nKAAM Support Team`;
+    plainTextBody = `Hello ${clientName},\n\nGreat news! Your job request for "${categoryTitle}" has been ACCEPTED by ${partnerName}.\n\n🔑 YOUR WORK COMPLETION VERIFICATION CODE: ${completionCode}\n(Please provide this 6-digit code to ${partnerName} ONLY after the work has been completed at your doorstep. The partner needs this code to mark the job completed.)\n\n📌 Booking Details:\n- Partner: ${partnerName}\n- Contact: ${partnerPhone}\n- Service Category: ${categoryTitle}\n- Agreed Fee: ${agreedFee}\n- Location: ${location}\n- Details: ${description}\n\nThank you for choosing Connect Platform!\nConnect Support Team`;
 
     htmlBody = `
       <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
@@ -796,16 +796,16 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
 
         <div style="text-align: center; margin-bottom: 20px;">
           <a href="https://kaam-client.yors.online" style="background-color: #059669; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
-            Open KAAM Client Desk ➔
+            Open Connect Client Desk ➔
           </a>
         </div>
 
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">KAAM Automated Service Dispatch • Support Email: kaam@yors.online</p>
+        <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">Connect Automated Service Dispatch • Support Email: kaam@yors.online</p>
       </div>
     `;
   } else if (isCompleted) {
-    plainTextBody = `Hello ${clientName},\n\nGreat news! Your service job for "${categoryTitle}" has been COMPLETED by ${partnerName}!\n\n📌 Completion Summary:\n- Service: ${categoryTitle}\n- Partner: ${partnerName}\n- Contact: ${partnerPhone}\n- Total Agreed Fee: ${agreedFee}\n- Location: ${location}\n- Status: ✅ VERIFIED & COMPLETED\n\nThank you for choosing KAAM Platform!\nKAAM Support Team`;
+    plainTextBody = `Hello ${clientName},\n\nGreat news! Your service job for "${categoryTitle}" has been COMPLETED by ${partnerName}!\n\n📌 Completion Summary:\n- Service: ${categoryTitle}\n- Partner: ${partnerName}\n- Contact: ${partnerPhone}\n- Total Agreed Fee: ${agreedFee}\n- Location: ${location}\n- Status: ✅ VERIFIED & COMPLETED\n\nThank you for choosing Connect Platform!\nConnect Support Team`;
 
     htmlBody = `
       <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
@@ -833,21 +833,21 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
         </div>
 
         <p style="font-size: 13px; color: #475569; text-align: center; margin-bottom: 20px;">
-          Thank you for choosing KAAM Platform! We hope you enjoyed the service.
+          Thank you for choosing Connect Platform! We hope you enjoyed the service.
         </p>
 
         <div style="text-align: center; margin-bottom: 20px;">
           <a href="https://kaam-client.yors.online" style="background-color: #15803d; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
-            Book Another Service on KAAM ➔
+            Book Another Service on Connect ➔
           </a>
         </div>
 
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">KAAM Automated Service Dispatch • Support Email: kaam@yors.online</p>
+        <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">Connect Automated Service Dispatch • Support Email: kaam@yors.online</p>
       </div>
     `;
   } else {
-    plainTextBody = `Hello ${clientName},\n\nWe regret to inform you that your request for "${categoryTitle}" was DECLINED by ${partnerName} as they are currently unavailable for this schedule.\n\n📌 Request Details:\n- Category: ${categoryTitle}\n- Partner: ${partnerName}\n- Fee: ${agreedFee}\n\nYou can easily select another top-rated service partner on KAAM.\nVisit https://kaam-client.yors.online to rebook.\n\nKAAM Support Team`;
+    plainTextBody = `Hello ${clientName},\n\nWe regret to inform you that your request for "${categoryTitle}" was DECLINED by ${partnerName} as they are currently unavailable for this schedule.\n\n📌 Request Details:\n- Category: ${categoryTitle}\n- Partner: ${partnerName}\n- Fee: ${agreedFee}\n\nYou can easily select another top-rated service partner on Connect.\nVisit https://kaam-client.yors.online to rebook.\n\nConnect Support Team`;
 
     htmlBody = `
       <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
@@ -878,7 +878,7 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
         </div>
 
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">KAAM Automated Service Dispatch • Support Email: kaam@yors.online</p>
+        <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">Connect Automated Service Dispatch • Support Email: kaam@yors.online</p>
       </div>
     `;
   }
@@ -893,7 +893,7 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
     subject: subjectText,
     text: plainTextBody,
     html: htmlBody,
-    senderName: 'KAAM Support'
+    senderName: 'Connect Support'
   });
 
   return res;
@@ -911,16 +911,16 @@ export const sendPartnerNewJobRequestEmail = async (partnerEmail, job = {}) => {
 
   const partnerName = job.worker_name || 'Service Partner';
   const clientName = job.client_name || 'Homeowner';
-  const clientPhone = job.client_phone || 'Available on KAAM App';
+  const clientPhone = job.client_phone || 'Available on Connect App';
   const categoryTitle = job.category_title || job.trade_title || 'Home Service';
   const agreedFee = job.agreed_total_fee ? `₹${job.agreed_total_fee}` : 'Standard Rate';
   const location = job.location_address || 'Mumbai';
   const description = job.work_description || 'Service booking';
   const timeSlot = job.time_slot ? ` (${job.time_slot})` : '';
 
-  const subjectText = `🔔 New Booking Request from ${clientName} (${categoryTitle}) | KAAM Partner`;
+  const subjectText = `🔔 New Booking Request from ${clientName} (${categoryTitle}) | Connect Partner`;
 
-  const plainTextBody = `Hello ${partnerName},\n\nYou have received a new booking request on KAAM!\n\n📌 Request Summary:\n- Customer: ${clientName}\n- Contact: ${clientPhone}\n- Service Category: ${categoryTitle}\n- Total Agreed Fee: ${agreedFee}\n- Service Location: ${location}\n- Work Scope: ${description}${timeSlot}\n\nPlease open your partner desk now to ACCEPT or DECLINE this request:\nhttps://kaam-partner.yors.online\n\nKAAM Partner Support Team`;
+  const plainTextBody = `Hello ${partnerName},\n\nYou have received a new booking request on Connect!\n\n📌 Request Summary:\n- Customer: ${clientName}\n- Contact: ${clientPhone}\n- Service Category: ${categoryTitle}\n- Total Agreed Fee: ${agreedFee}\n- Service Location: ${location}\n- Work Scope: ${description}${timeSlot}\n\nPlease open your partner desk now to ACCEPT or DECLINE this request:\nhttps://kaam-partner.yors.online\n\nConnect Partner Support Team`;
 
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
@@ -954,7 +954,7 @@ export const sendPartnerNewJobRequestEmail = async (partnerEmail, job = {}) => {
       </div>
 
       <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-      <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">KAAM Automated Service Dispatch • Support Email: kaam@yors.online</p>
+      <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">Connect Automated Service Dispatch • Support Email: kaam@yors.online</p>
     </div>
   `;
 
@@ -963,7 +963,7 @@ export const sendPartnerNewJobRequestEmail = async (partnerEmail, job = {}) => {
     subject: subjectText,
     text: plainTextBody,
     html: htmlBody,
-    senderName: 'KAAM Partner Dispatch'
+    senderName: 'Connect Partner Dispatch'
   });
 };
 

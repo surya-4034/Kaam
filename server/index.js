@@ -25,7 +25,7 @@ async function startServer() {
 
     // 2. Initialize Local SQLite & Schema (Dual-sync engine)
     await initDb();
-    console.log('[kaam Backend] Database engine initialized successfully.');
+    console.log('[Connect Backend] Database engine initialized successfully.');
 
     // 3. Start Automated Database Auto-Update Monitor & 36-Hour Dues Monitor
     startAutoSync();
@@ -33,11 +33,11 @@ async function startServer() {
 
     // 4. Start Express HTTP Server
     app.listen(PORT, () => {
-      console.log(`[kaam Backend] Production API Server running on port ${PORT}`);
-      console.log(`[kaam Backend] Health check: http://localhost:${PORT}/api/health`);
+      console.log(`[Connect Backend] Production API Server running on port ${PORT}`);
+      console.log(`[Connect Backend] Health check: http://localhost:${PORT}/api/health`);
     });
   } catch (err) {
-    console.error('[kaam Backend Initialization Failed]', err);
+    console.error('[Connect Backend Initialization Failed]', err);
     process.exit(1);
   }
 }

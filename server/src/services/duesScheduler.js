@@ -1,7 +1,7 @@
 import db from '../config/database.js';
 
 export const startDuesScheduler = () => {
-  console.log('[kaam Dues Scheduler] Automated 36-hour commission monitor started.');
+  console.log('[Connect Dues Scheduler] Automated 36-hour commission monitor started.');
 
   // Run initial check and repeat every 60 seconds
   const checkOverdueDues = () => {
@@ -12,12 +12,12 @@ export const startDuesScheduler = () => {
       [nowISO],
       (err, rows) => {
         if (err) {
-          console.error('[kaam Dues Scheduler Error]', err);
+          console.error('[Connect Dues Scheduler Error]', err);
           return;
         }
 
         if (rows && rows.length > 0) {
-          console.log(`[kaam Dues Scheduler] Found ${rows.length} overdue 36h commission dues. Locking worker profiles...`);
+          console.log(`[Connect Dues Scheduler] Found ${rows.length} overdue 36h commission dues. Locking worker profiles...`);
 
           rows.forEach((due) => {
             // Update dues status to OVERDUE & LOCK
@@ -32,7 +32,7 @@ export const startDuesScheduler = () => {
               [due.worker_id]
             );
 
-            console.log(`[kaam Dues Lock] Worker ID '${due.worker_id}' locked due to unpaid ₹${due.amount_due} fee.`);
+            console.log(`[Connect Dues Lock] Worker ID '${due.worker_id}' locked due to unpaid ₹${due.amount_due} fee.`);
           });
         }
       }
