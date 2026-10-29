@@ -3,7 +3,8 @@ import { AuthPage } from './components/auth/AuthPage';
 import { WorkerLandingPage } from './components/landing/WorkerLandingPage';
 import { WorkerOnboardingWizard } from './components/onboarding/WorkerOnboardingWizard';
 import { SERVICE_CATEGORIES_50 } from './data/serviceCategories';
-import { auth } from './config/firebase';
+import { auth, browserPopupRedirectResolver } from './config/firebase';
+import { getRedirectResult } from 'firebase/auth';
 import {
   HardHat,
   Inbox,
@@ -86,8 +87,17 @@ const createDefaultWorkerProfile = (currentUser) => ({
 export default function App() {
   const [user, setUser] = useState(() => {
     try {
-      const saved = localStorage.getItem('kaam_worker_user') || localStorage.getItem('kaam_user');
-      return saved ? JSON.parse(saved) : null;
+      const savedWorker = localStorage.getItem('kaam_worker_user');
+      if (savedWorker) {
+        const parsed = JSON.parse(savedWorker);
+        if (parsed && (parsed.role === 'WORKER' || !parsed.role)) return parsed;
+      }
+      const savedGeneral = localStorage.getItem('kaam_user');
+      if (savedGeneral) {
+        const parsed = JSON.parse(savedGeneral);
+        if (parsed && parsed.role === 'WORKER') return parsed;
+      }
+      return null;
     } catch (e) {
       return null;
     }
@@ -100,8 +110,17 @@ export default function App() {
   const [worker, setWorker] = useState(() => {
     const savedUser = (() => {
       try {
-        const s = localStorage.getItem('kaam_worker_user') || localStorage.getItem('kaam_user');
-        return s ? JSON.parse(s) : null;
+        const savedWorker = localStorage.getItem('kaam_worker_user');
+        if (savedWorker) {
+          const parsed = JSON.parse(savedWorker);
+          if (parsed && (parsed.role === 'WORKER' || !parsed.role)) return parsed;
+        }
+        const savedGeneral = localStorage.getItem('kaam_user');
+        if (savedGeneral) {
+          const parsed = JSON.parse(savedGeneral);
+          if (parsed && parsed.role === 'WORKER') return parsed;
+        }
+        return null;
       } catch (e) { return null; }
     })();
 
@@ -791,6 +810,61 @@ export default function App() {
     localStorage.removeItem('kaam_user');
   };
 
+  const handleWorkerLoginSuccess = (userData, workerProfileData) => {
+    setUser(userData);
+    setShowAuthModal(false);
+    setShowWorkerOnboarding(false);
+    localStorage.setItem('kaam_worker_user', JSON.stringify(userData));
+
+    const initialProf = workerProfileData || userData.workerProfile;
+    if (initialProf) {
+      const freshProf = {
+        ...createDefaultWorkerProfile(userData),
+        ...initialProf,
+        userId: userData.id,
+        name: initialProf.name || userData.fullName,
+        phone: initialProf.phone || userData.phone || '',
+        email: initialProf.email || userData.email || '',
+      };
+      setWorker(freshProf);
+      localStorage.setItem('kaam_worker_profile', JSON.stringify(freshProf));
+    } else {
+      setWorker(createDefaultWorkerProfile(userData));
+    }
+    fetchWorkerProfileFromDB(userData.id);
+  };
+
+  // Handle Google OAuth Redirect Result on mount (in case popup was blocked)
+  useEffect(() => {
+    let isMounted = true;
+    const processWorkerRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth, browserPopupRedirectResolver);
+        if (result && result.user && isMounted) {
+          const syncRes = await fetch(`${API_BASE}/auth/google-sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              googleUid: result.user.uid,
+              email: result.user.email,
+              fullName: result.user.displayName || (result.user.email ? result.user.email.split('@')[0] : 'Connect Worker'),
+              photoURL: result.user.photoURL,
+              role: 'WORKER'
+            }),
+          });
+          const syncData = await syncRes.json();
+          if (syncRes.ok && syncData.user && isMounted) {
+            handleWorkerLoginSuccess(syncData.user, syncData.workerProfile);
+          }
+        }
+      } catch (err) {
+        console.warn('Worker Google redirect notice:', err);
+      }
+    };
+    processWorkerRedirect();
+    return () => { isMounted = false; };
+  }, []);
+
   if (!user) {
     if (showAuthModal) {
       return (
@@ -805,29 +879,7 @@ export default function App() {
             initialMode={authModalOptions?.mode || 'SIGNUP_MAIN'}
             initialPhone={authModalOptions?.phone || ''}
             initialTrade={authModalOptions?.trade || ''}
-            onLoginSuccess={(userData, workerProfileData) => {
-              setUser(userData);
-              setShowAuthModal(false);
-              setShowWorkerOnboarding(false);
-              localStorage.setItem('kaam_worker_user', JSON.stringify(userData));
-
-              const initialProf = workerProfileData || userData.workerProfile;
-              if (initialProf) {
-                const freshProf = {
-                  ...createDefaultWorkerProfile(userData),
-                  ...initialProf,
-                  userId: userData.id,
-                  name: initialProf.name || userData.fullName,
-                  phone: initialProf.phone || userData.phone || '',
-                  email: initialProf.email || userData.email || '',
-                };
-                setWorker(freshProf);
-                localStorage.setItem('kaam_worker_profile', JSON.stringify(freshProf));
-              } else {
-                setWorker(createDefaultWorkerProfile(userData));
-              }
-              fetchWorkerProfileFromDB(userData.id);
-            }}
+            onLoginSuccess={handleWorkerLoginSuccess}
             isWorkerApp={true}
           />
         </div>
@@ -1043,10 +1095,10 @@ export default function App() {
             {/* Logo */}
             <div className="flex items-center gap-2.5">
               <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-amber-400 via-amber-500 to-yellow-400 text-[18px] font-black text-slate-950 shadow-md shadow-amber-500/20">
-                K
+                C
               </span>
               <span className="text-[21px] font-black tracking-tight text-slate-900">
-                kaam <span className="text-amber-700 text-xs font-bold uppercase tracking-wider bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200">Partner</span>
+                connect <span className="text-amber-700 text-xs font-bold uppercase tracking-wider bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200">Partner</span>
               </span>
             </div>
 
@@ -2806,7 +2858,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-white p-6 text-center text-xs text-slate-500">
-        © 2026 kaam Partner Portal • 50+ Local Home Services Network
+        © 2026 Connect Partner Portal • 50+ Local Home Services Network
       </footer>
     </div>
   );

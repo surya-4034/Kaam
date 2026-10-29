@@ -131,7 +131,7 @@ const TESTIMONIALS = [
     location: 'Sector 62, Noida',
     earnings: '₹42,000+ / month',
     avatar: 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?auto=format&fit=crop&w=400&q=80',
-    quote: 'Pehle dukaan pe grahak ka intezar karna padta tha. Ab KAAM app se roz 3-4 pakke kaam milte hain, customer seedhe cash ya UPI deta hai.',
+    quote: 'Pehle dukaan pe grahak ka intezar karna padta tha. Ab Connect app se roz 3-4 pakke kaam milte hain, customer seedhe cash ya UPI deta hai.',
     rating: 4.9,
     jobsCompleted: 184
   },
@@ -161,16 +161,16 @@ const TESTIMONIALS = [
 
 const FAQS = [
   {
-    q: 'Kya KAAM app par worker registration bilkul free hai?',
-    a: 'Haan! KAAM app par registration, profile banana, aur job requests receive karna 100% FREE hai. Koi bhi advance ya secret registration fee nahi li jaati.'
+    q: 'Kya Connect app par worker registration bilkul free hai?',
+    a: 'Haan! Connect app par registration, profile banana, aur job requests receive karna 100% FREE hai. Koi bhi advance ya secret registration fee nahi li jaati.'
   },
   {
     q: 'Payment mujhe kab aur kaise milegi?',
     a: 'Payment aapko seedhe customer se milati hai kaam khatam hone par. Customer aapko Cash de sakta hai ya aapke UPI QR par transfer kar sakta hai.'
   },
   {
-    q: 'KAAM platform ki commission kitni hai aur kab deni hoti hai?',
-    a: 'KAAM sirf 10% minimal platform fee leta hai. Aur iska sabse bada fayda ye hai ki aapko fee turant nahi deni – aapko 36 ghante (1.5 din) ka grace period milta hai UPI se pay karne ka.'
+    q: 'Connect platform ki commission kitni hai aur kab deni hoti hai?',
+    a: 'Connect sirf 10% minimal platform fee leta hai. Aur iska sabse bada fayda ye hai ki aapko fee turant nahi deni – aapko 36 ghante (1.5 din) ka grace period milta hai UPI se pay karne ka.'
   },
   {
     q: 'Kya me apni visiting fee aur service package charges khud set kar sakta hu?',
@@ -178,7 +178,7 @@ const FAQS = [
   },
   {
     q: 'Agar kisi job me customer se koi issue ho toh kya karein?',
-    a: 'KAAM platform par 24/7 dedicated Worker Partner Support Helpline aur WhatsApp Assistant uplabdh hai. Aap ek click me help desk se connect ho sakte hain.'
+    a: 'Connect platform par 24/7 dedicated Worker Partner Support Helpline aur WhatsApp Assistant uplabdh hai. Aap ek click me help desk se connect ho sakte hain.'
   }
 ];
 
@@ -210,7 +210,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
         {/* TOP ANNOUNCEMENT BAR (Matching Client App Warm Accent) */}
         <div className="bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 text-slate-950 font-extrabold text-xs px-4 py-2 text-center flex items-center justify-center gap-2 shadow-sm">
           <Sparkles className="w-4 h-4 shrink-0 text-slate-950" />
-          <span>KAAM Karigar Partner Offer: 0% Joining Fee + Free ₹2 Lakh Accident Cover for First 5,000 Workers!</span>
+          <span>Connect Karigar Partner Offer: 0% Joining Fee + Free ₹2 Lakh Accident Cover for First 5,000 Workers!</span>
           <button 
             onClick={() => onOpenAuth({ mode: 'SIGNUP_MAIN' })}
             className="hidden sm:inline-flex items-center gap-1 bg-slate-950 text-amber-400 px-3 py-0.5 rounded-full text-[11px] font-black hover:bg-slate-800 transition"
@@ -234,7 +234,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
                 </span>
                 <div>
                   <span className="text-2xl font-black text-slate-900 font-['Outfit'] tracking-tight">
-                    kaam <span className="text-amber-700 text-xs font-bold uppercase tracking-wider bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200">Karigar Partner</span>
+                    connect <span className="text-amber-700 text-xs font-bold uppercase tracking-wider bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200">Karigar Partner</span>
                   </span>
                 </div>
               </div>
@@ -346,7 +346,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
                 </div>
 
                 <div>
-                  <h3 className="text-xl font-black text-slate-950 font-['Outfit']">Join KAAM as a Partner</h3>
+                  <h3 className="text-xl font-black text-slate-950 font-['Outfit']">Join Connect as a Partner</h3>
                   <p className="text-xs text-slate-500 mt-1">Enter your details to receive daily job requests in your locality.</p>
                 </div>
 
@@ -412,7 +412,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
                 Aap Har Mahine Kitna Kamayein?
               </h2>
               <p className="text-slate-600 text-xs sm:text-sm font-medium">
-                Select your trade, working days, and average jobs per day to calculate your potential monthly income on KAAM.
+                Select your trade, working days, and average jobs per day to calculate your potential monthly income on Connect.
               </p>
             </div>
 
@@ -616,7 +616,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
                 ⚡ 4 Simple Steps
               </span>
               <h2 className="text-3xl sm:text-4xl font-black text-slate-950 font-['Outfit']">
-                Kaise Shuru Karein KAAM Par Earning?
+                Kaise Shuru Karein Connect Par Earning?
               </h2>
               <p className="text-slate-600 text-xs sm:text-sm font-medium">
                 Four straightforward steps to complete your profile and start managing customer requests.
@@ -683,10 +683,10 @@ export function WorkerLandingPage({ onOpenAuth }) {
                 🤝 Partner Advantages
               </span>
               <h2 className="text-3xl sm:text-4xl font-black text-slate-950 font-['Outfit']">
-                Kyu 15,000+ Karigar KAAM Platform Pasand Karte Hain?
+                Kyu 15,000+ Karigar Connect Platform Pasand Karte Hain?
               </h2>
               <p className="text-slate-600 text-xs sm:text-sm font-medium">
-                Compare why KAAM is far superior to traditional contractor arrangements or offline market waiting.
+                Compare why Connect is far superior to traditional contractor arrangements or offline market waiting.
               </p>
             </div>
 
@@ -708,7 +708,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
                 </div>
                 <h3 className="text-xl font-bold text-slate-950 font-['Outfit']">36-Hour Dues Grace Period</h3>
                 <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  KAAM charges only 10% commission. You get a generous 36-hour grace period to clear platform dues via UPI after collecting cash from client.
+                  Connect charges only 10% commission. You get a generous 36-hour grace period to clear platform dues via UPI after collecting cash from client.
                 </p>
               </div>
 
@@ -718,7 +718,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
                 </div>
                 <h3 className="text-xl font-bold text-slate-950 font-['Outfit']">Free ₹2 Lakh Partner Insurance</h3>
                 <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  Active KAAM partners get complimentary accidental insurance cover up to ₹2,00,000 for work safety & family security.
+                  Active Connect partners get complimentary accidental insurance cover up to ₹2,00,000 for work safety & family security.
                 </p>
               </div>
 
@@ -739,7 +739,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
                 Real Stories from Verified Craftsmen
               </h2>
               <p className="text-slate-600 text-xs sm:text-sm font-medium">
-                Read how tradespeople across Delhi NCR transformed their daily income with KAAM.
+                Read how tradespeople across Delhi NCR transformed their daily income with Connect.
               </p>
             </div>
 
@@ -815,7 +815,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
         <section className="py-16 px-4 sm:px-8 bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 text-slate-950 shadow-inner">
           <div className="max-w-[1200px] mx-auto text-center space-y-6">
             <h2 className="text-3xl sm:text-5xl font-black font-['Outfit'] tracking-tight">
-              Aaj Hi KAAM Partner Banein Aur Apne Hunar Ka Sahi Daam Payein!
+              Aaj Hi Connect Partner Banein Aur Apne Hunar Ka Sahi Daam Payein!
             </h2>
             <p className="text-slate-950/90 text-sm sm:text-base font-bold max-w-2xl mx-auto">
               Join 15,000+ plumbers, electricians, carpenters & mechanics earning guaranteed daily income in your area.
@@ -845,8 +845,8 @@ export function WorkerLandingPage({ onOpenAuth }) {
           
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-tr from-amber-400 via-amber-500 to-yellow-400 text-slate-950 font-black text-base">K</span>
-              <span className="text-xl font-black text-white font-['Outfit']">kaam Partner</span>
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-tr from-amber-400 via-amber-500 to-yellow-400 text-slate-950 font-black text-base">C</span>
+              <span className="text-xl font-black text-white font-['Outfit']">connect Partner</span>
             </div>
             <p className="text-slate-500 leading-relaxed font-medium">
               Dedicated marketplace platform empowering local skilled tradespeople with direct homeowner jobs, daily cash settlements & 36-hour flexible dues ledger.
@@ -880,7 +880,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
             <p className="text-slate-400 font-medium">Have questions or need assistance joining?</p>
             <div className="flex items-center gap-2 text-amber-400 font-extrabold text-sm">
               <PhoneCall className="w-4 h-4" />
-              <span>1800-123-KAAM (Toll Free)</span>
+              <span>1800-123-CONNECT (Toll Free)</span>
             </div>
             <p className="text-slate-500 text-[10px]">Mon-Sat: 8:00 AM – 9:00 PM</p>
           </div>
@@ -888,7 +888,7 @@ export function WorkerLandingPage({ onOpenAuth }) {
         </div>
 
         <div className="max-w-[1440px] mx-auto pt-8 mt-8 border-t border-slate-900 flex flex-wrap items-center justify-between gap-4 text-slate-500 text-[11px]">
-          <p>© 2026 KAAM Skilled Trades Marketplace • All Rights Reserved</p>
+          <p>© 2026 Connect Skilled Trades Marketplace • All Rights Reserved</p>
           <div className="flex gap-4">
             <a href="#" className="hover:text-slate-300">Partner Terms</a>
             <a href="#" className="hover:text-slate-300">Privacy Policy</a>

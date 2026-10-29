@@ -1,5 +1,5 @@
 {
-  "name": "kaam-worker-app",
+  "name": "connect-worker-app",
   "private": true,
   "version": "1.0.1",
   "type": "module",
