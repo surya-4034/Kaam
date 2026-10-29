@@ -1,6 +1,6 @@
-# 🛠️ kaam (काम) — Modern On-Demand Home Services Platform
+# 🛠️ Connect — Modern On-Demand Home Services Platform
 
-`kaam` is a production-ready, full-stack on-demand home services platform inspired by Urban Company. It features a standalone multi-app architecture, dual-database resiliency (MongoDB Atlas + SQLite fallback), an advanced Search System Engine with synonym expansion, a multi-ID requesting lifecycle, and automated HTML email notifications.
+`Connect` is a production-ready, full-stack on-demand home services platform inspired by Urban Company. It features a standalone multi-app architecture, dual-database resiliency (MongoDB Atlas + SQLite fallback), an advanced Search System Engine with synonym expansion, a multi-ID requesting lifecycle, and automated HTML email notifications.
 
 ---
 

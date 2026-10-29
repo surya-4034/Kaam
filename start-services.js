@@ -13,7 +13,7 @@ const services = [
 ];
 
 console.log('\x1b[1m\x1b[34m====================================================\x1b[0m');
-console.log('\x1b[1m\x1b[32m  kaam (काम) - Standalone Multi-App Architecture\x1b[0m');
+console.log('\x1b[1m\x1b[32m  Connect - Standalone Multi-App Architecture\x1b[0m');
 console.log('\x1b[1m\x1b[34m====================================================\x1b[0m');
 console.log('⚡ Starting all 4 services with real SQLite DB connectivity...\n');
 

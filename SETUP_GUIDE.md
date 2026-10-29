@@ -1,6 +1,6 @@
-# 🚀 kaam (काम) — Fresh PC Setup & Dependency Guide
+# 🚀 Connect — Fresh PC Setup & Dependency Guide
 
-This guide contains everything required to reinstall, configure, and run the **kaam** marketplace platform on a brand-new or freshly formatted PC.
+This guide contains everything required to reinstall, configure, and run the **Connect** marketplace platform on a brand-new or freshly formatted PC.
 
 ---
 

@@ -1,7 +1,7 @@
 {
-  "name": "kaam-master-project",
+  "name": "connect-master-project",
   "version": "1.0.0",
-  "description": "kaam (काम) Local Skilled Trades & Worker Marketplace",
+  "description": "Connect Local Skilled Trades & Worker Marketplace",
   "type": "module",
   "scripts": {
     "start": "node start-services.js",
