@@ -410,7 +410,7 @@ export default function App() {
               <div className="w-14 h-14 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center mx-auto text-cyan-400 shadow-lg shadow-cyan-500/20">
                 <ShieldCheck className="w-8 h-8" />
               </div>
-              <h1 className="text-2xl font-black text-white font-['Outfit'] tracking-tight">KAAM Admin Portal</h1>
+              <h1 className="text-2xl font-black text-white font-['Outfit'] tracking-tight">Connect Admin Portal</h1>
               <p className="text-xs text-slate-400">Master Control Portal • ID: <span className="font-mono text-cyan-300 font-bold">Surya-4034</span></p>
             </div>
 
@@ -610,7 +610,7 @@ export default function App() {
 
         {/* Footer info */}
         <div className="text-center p-4 border-t border-slate-800/80 text-[11px] text-slate-500">
-          KAAM Platform Master Control System • ID: <span className="font-mono text-cyan-400 font-bold">Surya-4034</span>
+          Connect Platform Master Control System • ID: <span className="font-mono text-cyan-400 font-bold">Surya-4034</span>
         </div>
       </div>
     );
@@ -631,7 +631,7 @@ export default function App() {
               <div className="flex items-center gap-3">
                 <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                  <span>KAAM Platform Admin Console • Logged in as Surya-4034</span>
+                  <span>Connect Platform Admin Console • Logged in as Surya-4034</span>
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black font-['Outfit'] text-white mt-1">Client & Worker Accounts Control</h1>
@@ -1311,7 +1311,7 @@ export default function App() {
       )}
 
       <footer className="p-4 border-t border-slate-800 text-center text-xs text-slate-500 bg-slate-900/40">
-        KAAM Platform Master Control System • ID: <span className="font-mono text-cyan-400 font-bold">Surya-4034</span>
+        Connect Platform Master Control System • ID: <span className="font-mono text-cyan-400 font-bold">Surya-4034</span>
       </footer>
 
     </div>
