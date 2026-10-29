@@ -509,7 +509,7 @@ export const CUSTOMER_REVIEWS = [
     city: 'Delhi NCR',
     tradeUsed: 'Electrician Service',
     rating: 5,
-    comment: 'Booked Aamir for short circuit fault finding. Super polite, professional, and transparent about rates. Highly recommend kaam!',
+    comment: 'Booked Aamir for short circuit fault finding. Super polite, professional, and transparent about rates. Highly recommend Connect!',
     date: '3 days ago'
   },
   {

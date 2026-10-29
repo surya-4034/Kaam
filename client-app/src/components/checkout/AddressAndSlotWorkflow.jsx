@@ -644,7 +644,7 @@ export const AddressAndSlotWorkflow = ({
                         Service was unavailable at this place, sorry for inconvenience!
                       </p>
                       <p className="text-[11px] text-red-700 leading-tight">
-                        Kaam home services currently operate exclusively within Mumbai and the Mumbai Metropolitan Region (MMR). Please select an address located in Mumbai.
+                        Connect home services currently operate exclusively within Mumbai and the Mumbai Metropolitan Region (MMR). Please select an address located in Mumbai.
                       </p>
                     </div>
                   </div>

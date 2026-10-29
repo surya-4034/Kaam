@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { User, Lock, Mail, MapPin, Eye, EyeOff, Wrench, ShieldCheck, ArrowRight, CheckCircle2, KeyRound, ArrowLeft, Send } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Lock, Mail, MapPin, Eye, EyeOff, Wrench, ShieldCheck, ArrowRight, CheckCircle2, KeyRound, ArrowLeft, Send, AlertCircle } from 'lucide-react';
 import { auth, googleProvider, browserPopupRedirectResolver } from '../../config/firebase';
 import { API_BASE_URL } from '../../config/api';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 
 export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }) => {
   // View State
@@ -13,6 +13,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [popupBlocked, setPopupBlocked] = useState(false);
 
   // Email Verification Sub-state for Sign Up
   const [isSendingCode, setIsSendingCode] = useState(false);
@@ -47,17 +48,105 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     }
   };
 
+  // Sync Google Account Details with Backend
+  const syncGoogleUserWithBackend = async (googleUser) => {
+    try {
+      setSuccessMessage('Google Account Verified! Syncing with Database...');
+
+      const syncRes = await fetch(`${API_BASE_URL}/api/auth/google-sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          googleUid: googleUser.googleUid || googleUser.uid,
+          email: googleUser.email,
+          fullName: googleUser.fullName || googleUser.displayName || (googleUser.email ? googleUser.email.split('@')[0] : 'Connect User'),
+          photoURL: googleUser.photoURL || null,
+          role: isWorkerApp ? 'WORKER' : 'CLIENT'
+        }),
+      });
+
+      const syncData = await syncRes.json();
+
+      if (syncRes.ok && syncData.user) {
+        if (syncData.token) {
+          localStorage.setItem('kaam_token', syncData.token);
+          localStorage.setItem('kaam_user', JSON.stringify(syncData.user));
+          if (!isWorkerApp) {
+            localStorage.setItem('kaam_client_user', JSON.stringify(syncData.user));
+          } else {
+            localStorage.setItem('kaam_worker_user', JSON.stringify(syncData.user));
+          }
+        }
+        setSuccessMessage(`Welcome ${syncData.user.fullName}! Logged in successfully.`);
+        setTimeout(() => {
+          if (typeof onLoginSuccess === 'function') {
+            onLoginSuccess(syncData.user);
+          }
+        }, 500);
+        return true;
+      } else {
+        setErrorMessage(syncData.error || 'Failed to authenticate with database.');
+        return false;
+      }
+    } catch (error) {
+      console.error('Google Sync Error:', error);
+      setErrorMessage('Server connection error. Please ensure backend services are running.');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // CHECK PENDING GOOGLE REDIRECT RESULT ON MOUNT
+  useEffect(() => {
+    let isMounted = true;
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth, browserPopupRedirectResolver);
+        if (result && result.user && isMounted) {
+          setIsLoading(true);
+          await syncGoogleUserWithBackend({
+            googleUid: result.user.uid,
+            email: result.user.email,
+            fullName: result.user.displayName || (result.user.email ? result.user.email.split('@')[0] : 'Connect User'),
+            photoURL: result.user.photoURL,
+          });
+        }
+      } catch (err) {
+        console.warn('Redirect check notice:', err);
+      }
+    };
+    checkRedirectResult();
+    return () => { isMounted = false; };
+  }, []);
+
+  // DIRECT GOOGLE REDIRECT SIGN-IN (NO POPUP REQUIRED)
+  const handleGoogleRedirectSignIn = async () => {
+    setIsLoading(true);
+    setPopupBlocked(false);
+    setErrorMessage('');
+    setSuccessMessage('Redirecting to Google Secure Sign-In...');
+    try {
+      sessionStorage.setItem('connect_auth_redirect_role', isWorkerApp ? 'WORKER' : 'CLIENT');
+      await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
+    } catch (redirErr) {
+      console.error('Direct Google redirect error:', redirErr);
+      setIsLoading(false);
+      setErrorMessage(redirErr.message || 'Google Redirect failed. Please use Email login.');
+    }
+  };
+
   // DIRECT GOOGLE AUTHENTICATION WITH AUTOMATIC BACKEND DATABASE SYNC & ERROR-FREE FALLBACK
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     setErrorMessage('');
+    setPopupBlocked(false);
     setSuccessMessage('Connecting to Google Account System...');
 
     let googleUser = null;
 
     try {
-      googleProvider.setCustomParameters({ prompt: 'select_account' });
-      // Pass browserPopupRedirectResolver to ensure popup operation works reliably in all environments
+      // Attempt popup sign in
       const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
       if (result && result.user) {
         googleUser = {
@@ -70,10 +159,26 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     } catch (fbErr) {
       console.warn('Firebase popup notice:', fbErr.message || fbErr);
       const rawMsg = (fbErr.message || '').toLowerCase();
-      if (fbErr.code === 'auth/popup-closed-by-user' || fbErr.code === 'auth/cancelled-popup-request') {
-        setErrorMessage('Google Sign-In popup was closed. Please try again.');
-      } else if (fbErr.code === 'auth/popup-blocked') {
-        setErrorMessage('Popup was blocked by your browser. Please allow popups for localhost and try again.');
+      
+      // Handle Popup Blocked - seamlessly attempt redirect and show helpful UI
+      if (fbErr.code === 'auth/popup-blocked' || rawMsg.includes('popup-blocked') || rawMsg.includes('pop-up was blocked')) {
+        setPopupBlocked(true);
+        setErrorMessage('Pop-up was blocked by your browser.');
+        setSuccessMessage('Pop-up was blocked. Redirecting you to Google Sign-In...');
+        try {
+          sessionStorage.setItem('connect_auth_redirect_role', isWorkerApp ? 'WORKER' : 'CLIENT');
+          await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
+          return;
+        } catch (autoRedirErr) {
+          console.warn('Auto redirect fallback failed:', autoRedirErr);
+          setIsLoading(false);
+          setSuccessMessage('');
+          setErrorMessage('Pop-up was blocked. Please click "Sign In via Google Redirect" below or allow pop-ups.');
+          return;
+        }
+      } else if (fbErr.code === 'auth/popup-closed-by-user' || fbErr.code === 'auth/cancelled-popup-request') {
+        setErrorMessage('Google Sign-In popup was closed. Please try again or use Google Redirect.');
+        setPopupBlocked(true);
       } else if (fbErr.code === 'auth/unauthorized-domain') {
         setErrorMessage(`Domain '${window.location.hostname}' is not authorized in Firebase Console > Authentication > Settings > Authorized domains. You can also use Email Login below.`);
       } else if (rawMsg.includes('database is closing') || rawMsg.includes('closing/hidden') || rawMsg.includes('internal-error')) {
@@ -109,42 +214,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
       return;
     }
 
-    try {
-      setSuccessMessage('Google Account Verified! Syncing with Database...');
-
-      const syncRes = await fetch(`${API_BASE_URL}/api/auth/google-sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          googleUid: googleUser.googleUid,
-          email: googleUser.email,
-          fullName: googleUser.fullName,
-          photoURL: googleUser.photoURL,
-          role: isWorkerApp ? 'WORKER' : 'CLIENT'
-        }),
-      });
-
-      const syncData = await syncRes.json();
-
-      if (syncRes.ok && syncData.user) {
-        if (syncData.token) {
-          localStorage.setItem('kaam_token', syncData.token);
-          localStorage.setItem('kaam_user', JSON.stringify(syncData.user));
-          if (!isWorkerApp) {
-            localStorage.setItem('kaam_client_user', JSON.stringify(syncData.user));
-          }
-        }
-        setSuccessMessage(`Welcome ${syncData.user.fullName}! Logged in successfully.`);
-        setTimeout(() => onLoginSuccess(syncData.user), 500);
-      } else {
-        setErrorMessage(syncData.error || 'Failed to authenticate with database.');
-      }
-    } catch (error) {
-      console.error('Google Sync Error:', error);
-      setErrorMessage('Server connection error. Please ensure backend services are running.');
-    } finally {
-      setIsLoading(false);
-    }
+    await syncGoogleUserWithBackend(googleUser);
   };
 
   // SEND 6-DIGIT EMAIL VERIFICATION CODE (SIGNUP)
@@ -270,7 +340,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
         locality: formData.locality,
         role: isWorkerApp ? 'WORKER' : 'CLIENT',
       };
-      setSuccessMessage('Welcome to kaam!');
+      setSuccessMessage('Welcome to Connect!');
       setTimeout(() => onLoginSuccess(mockUser), 800);
     } finally {
       setIsLoading(false);
@@ -481,11 +551,11 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
           <div className="relative z-10 space-y-1">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 backdrop-blur-md border border-amber-300/30 text-xs font-black tracking-wider text-amber-300 uppercase">
               <Wrench className="w-3.5 h-3.5 text-amber-400" />
-              <span>kaam • {isWorkerApp ? 'Worker Site' : 'Client Site'}</span>
+              <span>Connect • {isWorkerApp ? 'Worker Site' : 'Client Site'}</span>
             </div>
             
             <h2 className="text-2xl font-black font-['Outfit'] text-white tracking-tight">
-              {viewState === 'LOGIN_MAIN' || viewState === 'LOGIN_EMAIL_FORM' || viewState === 'FORGOT_REQUEST' || viewState === 'FORGOT_RESET' ? 'KAAM Login' : 'Create Kaam Account'}
+              {viewState === 'LOGIN_MAIN' || viewState === 'LOGIN_EMAIL_FORM' || viewState === 'FORGOT_REQUEST' || viewState === 'FORGOT_RESET' ? 'Connect Login' : 'Create Connect Account'}
             </h2>
             <p className="text-xs text-amber-100/90 font-medium">
               {isWorkerApp ? 'Connect with homeowners & accept daily jobs' : 'Hire skilled local tradespeople and service professionals'}
@@ -511,31 +581,83 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
             </div>
           )}
 
+          {/* POP-UP BLOCKED HELPER & INSTANT FALLBACK BANNER */}
+          {popupBlocked && (
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-300 text-slate-800 space-y-2.5 shadow-sm">
+              <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Pop-up was blocked by your browser</span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Your browser blocked the pop-up window. You can sign in using full-page Google Redirect without any pop-up window:
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleGoogleRedirectSignIn}
+                  disabled={isLoading}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all"
+                >
+                  <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                  <span>Sign In via Google Redirect (No Pop-up)</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setViewState('LOGIN_EMAIL_FORM'); setPopupBlocked(false); }}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                >
+                  <Mail className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Use Email Instead</span>
+                </button>
+              </div>
+              <div className="text-[10px] text-amber-800 pt-1 flex items-center gap-1.5">
+                <span>💡</span>
+                <span><strong>Tip:</strong> Click the <strong>Pop-up blocked</strong> icon in your browser URL bar and select <em>"Always allow pop-ups from localhost"</em>.</span>
+              </div>
+            </div>
+          )}
+
           {/* ======================================================== */}
           {/* VIEW 1: FIRST SCREEN ON SITE LAUNCH - KAAM LOGIN MAIN     */}
           {/* ======================================================== */}
           {viewState === 'LOGIN_MAIN' && (
             <div className="space-y-4">
               <div className="text-center sm:text-left">
-                <h1 className="text-2xl font-bold text-[#2d1b4e] font-['Outfit']">KAAM Login</h1>
+                <h1 className="text-2xl font-bold text-[#2d1b4e] font-['Outfit']">Connect Login</h1>
                 <p className="text-xs text-slate-500 mt-1">Authenticate via Google or Email & Password.</p>
               </div>
 
               {/* Option 1: DIRECT GOOGLE AUTHENTICATION */}
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={isLoading}
-                className="w-full py-3.5 px-4 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-3 transition-all shadow-sm active:scale-95"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                </svg>
-                <span>Google Authentication</span>
-              </button>
+              <div>
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={isLoading}
+                  className="w-full py-3.5 px-4 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-3 transition-all shadow-sm active:scale-95"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                  <span>Google Authentication</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGoogleRedirectSignIn}
+                  disabled={isLoading}
+                  className="w-full text-center text-[10.5px] text-slate-400 hover:text-amber-600 hover:underline pt-1.5 transition-colors font-medium"
+                >
+                  Pop-up blocked? Use Google Redirect Sign-In
+                </button>
+              </div>
 
               <div className="relative flex items-center justify-center my-2">
                 <div className="border-t border-slate-200 w-full"></div>
@@ -582,14 +704,14 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1 ml-3">Email</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1 ml-3">Email or Mobile Number</label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-pink-400 absolute left-4 top-3.5" />
                   <input
-                    type="email"
+                    type="text"
                     name="email"
                     required
-                    placeholder="name@example.com"
+                    placeholder="name@example.com or 10-digit mobile"
                     value={formData.email}
                     onChange={handleChange}
                     className="w-full pl-11 pr-4 py-3 rounded-full bg-pink-100/60 border border-pink-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"
@@ -646,24 +768,34 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
             <div className="space-y-4">
               <div className="text-center sm:text-left">
                 <h1 className="text-2xl font-bold text-[#2d1b4e] font-['Outfit']">Sign-up / Create Account</h1>
-                <p className="text-xs text-slate-500 mt-1">Choose Google or Email to create your Kaam account.</p>
+                <p className="text-xs text-slate-500 mt-1">Choose Google or Email to create your Connect account.</p>
               </div>
 
               {/* Case I: DIRECT GOOGLE BUTTON */}
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={isLoading}
-                className="w-full py-3.5 px-4 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-3 transition-all shadow-sm active:scale-95"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                </svg>
-                <span>Google Verification</span>
-              </button>
+              <div>
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={isLoading}
+                  className="w-full py-3.5 px-4 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-3 transition-all shadow-sm active:scale-95"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                  <span>Google Verification</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGoogleRedirectSignIn}
+                  disabled={isLoading}
+                  className="w-full text-center text-[10.5px] text-slate-400 hover:text-amber-600 hover:underline pt-1.5 transition-colors font-medium"
+                >
+                  Pop-up blocked? Use Google Redirect Sign-In
+                </button>
+              </div>
 
               <div className="relative flex items-center justify-center my-2">
                 <div className="border-t border-slate-200 w-full"></div>

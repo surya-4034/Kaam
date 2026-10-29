@@ -789,11 +789,11 @@ export const WorkerProfileDetail = ({
           {/* ======================================================== */}
           <div className="lg:col-span-3 space-y-5 sticky top-[130px]">
             
-            {/* UC / KAAM PROMISE CARD */}
+            {/* UC / CONNECT PROMISE CARD */}
             <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-base font-black text-slate-900 font-['Outfit']">KAAM Promise</h4>
+                  <h4 className="text-base font-black text-slate-900 font-['Outfit']">Connect Promise</h4>
                   <p className="text-[11px] text-slate-400">Guaranteed quality assurance</p>
                 </div>
 

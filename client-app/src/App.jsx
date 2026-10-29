@@ -5,7 +5,8 @@ import { AuthPage } from './components/auth/AuthPage';
 import { ClientOnboardingWizard } from './components/onboarding/ClientOnboardingWizard';
 import { WorkerProfileDetail } from './components/profile/WorkerProfileDetail';
 import { CheckoutPage } from './components/checkout/CheckoutPage';
-import { auth } from './config/firebase';
+import { auth, browserPopupRedirectResolver } from './config/firebase';
+import { getRedirectResult } from 'firebase/auth';
 import { API_BASE_URL } from './config/api';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -129,6 +130,43 @@ export default function App() {
       });
     }
   }, [user]);
+
+  // Handle Google OAuth Redirect Result on mount (in case popup was blocked)
+  useEffect(() => {
+    let isMounted = true;
+    const processGoogleRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth, browserPopupRedirectResolver);
+        if (result && result.user && isMounted) {
+          const syncRes = await fetch(`${API_BASE_URL}/api/auth/google-sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              googleUid: result.user.uid,
+              email: result.user.email,
+              fullName: result.user.displayName || result.user.email.split('@')[0],
+              photoURL: result.user.photoURL,
+              role: 'CLIENT'
+            }),
+          });
+          const syncData = await syncRes.json();
+          if (syncRes.ok && syncData.user && isMounted) {
+            if (syncData.token) {
+              localStorage.setItem('kaam_token', syncData.token);
+              localStorage.setItem('kaam_user', JSON.stringify(syncData.user));
+              localStorage.setItem('kaam_client_user', JSON.stringify(syncData.user));
+            }
+            setUser(syncData.user);
+            setShowAuthModal(false);
+          }
+        }
+      } catch (err) {
+        console.warn('Root Google redirect notice:', err);
+      }
+    };
+    processGoogleRedirect();
+    return () => { isMounted = false; };
+  }, []);
 
   const handleOpenProfileModal = async () => {
     setProfileMessage('');
@@ -691,10 +729,10 @@ export default function App() {
                   className="flex items-center gap-2.5 cursor-pointer"
                 >
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-tr from-amber-400 via-amber-500 to-yellow-400 text-[20px] font-black text-slate-950 shadow-md shadow-amber-500/20">
-                    K
+                    C
                   </span>
                   <span className="text-2xl font-black text-slate-900 font-['Outfit'] tracking-tight">
-                    kaam
+                    connect
                   </span>
                 </div>
 
@@ -773,7 +811,7 @@ export default function App() {
 
         {/* Studio Footer */}
         <footer className="bg-slate-950 text-slate-400 border-t border-slate-800 py-6 text-center text-xs">
-          © 2026 KAAM Platform • Urban Company Studio Standard
+          © 2026 Connect Platform • Urban Company Studio Standard
         </footer>
 
         {/* Auth Modal if triggered in studio */}
@@ -838,10 +876,10 @@ export default function App() {
                 className="flex items-center gap-2.5 cursor-pointer"
               >
                 <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-tr from-amber-400 via-amber-500 to-yellow-400 text-[20px] font-black text-slate-950 shadow-md shadow-amber-500/20">
-                  K
+                  C
                 </span>
                 <span className="text-2xl font-black text-slate-900 font-['Outfit'] tracking-tight">
-                  kaam
+                  connect
                 </span>
               </div>
 
@@ -1143,13 +1181,13 @@ export default function App() {
                 return (
                   <div className="space-y-4">
                     {displayJobs.map((j) => {
-                    const workerName = j.worker_name || j.workerName || 'KAAM Service Partner';
+                    const workerName = j.worker_name || j.workerName || 'Connect Service Partner';
                     const tradeTitle = j.trade_title || j.tradeTitle || 'Home Service Professional';
                     const workerPhone = j.worker_phone || j.workerPhone || '+91 98765 43210';
                     const workDesc = j.work_description || j.workDescription;
                     const location = j.location_address || j.location;
                     const fee = j.agreed_total_fee || j.agreedFee;
-                    const clientEmail = j.client_email || user?.email || 'client@kaam.com';
+                    const clientEmail = j.client_email || user?.email || 'client@connect.com';
                     const isCompleted = j.status === 'COMPLETED';
                     const isAccepted = j.status === 'ACCEPTED';
                     const isRejected = j.status === 'REJECTED';
@@ -1401,7 +1439,7 @@ export default function App() {
                         
                         <div className="absolute left-3.5 top-3.5 flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md text-slate-950 text-[10px] font-black tracking-wide shadow-sm">
                           <Briefcase className="w-3.5 h-3.5 text-amber-700" />
-                          <span>KAAM PROFESSIONAL</span>
+                          <span>CONNECT PROFESSIONAL</span>
                         </div>
 
                         <div className="absolute bottom-3 left-3.5 flex items-center gap-1.5 text-white">
@@ -1518,7 +1556,7 @@ export default function App() {
               {/* SECTION 3: WHY CHOOSE KAAM (URBAN COMPANY TRUST BENCHMARK) */}
               <section className="bg-gradient-to-r from-[#042e2b] via-[#08453f] to-[#04332d] rounded-3xl p-8 sm:p-12 text-white space-y-8 shadow-xl">
                 <div className="max-w-2xl">
-                  <span className="text-xs font-black uppercase tracking-widest text-amber-400">Why Customers Trust KAAM</span>
+                  <span className="text-xs font-black uppercase tracking-widest text-amber-400">Why Customers Trust Connect</span>
                   <h2 className="text-2xl sm:text-4xl font-black font-['Outfit'] mt-1">
                     Quality service, transparent rates, zero guesswork.
                   </h2>
@@ -1582,8 +1620,8 @@ export default function App() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <span className="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 font-black grid place-items-center text-sm">K</span>
-                <span className="text-xl font-black text-white font-['Outfit']">kaam</span>
+                <span className="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 font-black grid place-items-center text-sm">C</span>
+                <span className="text-xl font-black text-white font-['Outfit']">connect</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
                 A simple service marketplace connecting customers with skilled independent professionals.
@@ -1623,7 +1661,7 @@ export default function App() {
           </div>
 
           <div className="pt-8 border-t border-slate-900 text-center text-[11px] text-slate-500">
-            © 2026 KAAM Platform. All rights reserved. Urban Company Benchmark Standard.
+            © 2026 Connect Platform. All rights reserved. Urban Company Benchmark Standard.
           </div>
 
         </div>
@@ -1640,7 +1678,7 @@ export default function App() {
 
       {/* POPUP MODAL: BOOKING & PARTNER DETAILS (WITH LIVE PAYMENT QR & CHOSEN PACKAGES) */}
       {selectedJobDetails && (() => {
-        const workerName = selectedJobDetails.worker_name || selectedJobDetails.workerName || 'KAAM Service Partner';
+        const workerName = selectedJobDetails.worker_name || selectedJobDetails.workerName || 'Connect Service Partner';
         const tradeTitle = selectedJobDetails.trade_title || selectedJobDetails.tradeTitle || selectedJobDetails.category_title || 'Home Service Professional';
         const workerPhone = selectedJobDetails.worker_phone || selectedJobDetails.workerPhone || '+91 98765 43210';
         const workerLocality = selectedJobDetails.worker_locality || selectedJobDetails.locality || 'Mumbai, Maharashtra';
@@ -1653,7 +1691,7 @@ export default function App() {
         const workerUpi = selectedJobDetails.worker_upi || selectedJobDetails.workerUpi || (workerPhone ? `${workerPhone.replace(/\D/g, '')}@paytm` : '9653192752@kotakbank');
         const workerUpiHolder = selectedJobDetails.worker_upi_holder || selectedJobDetails.workerUpiHolder || workerName;
         const workerUpiPhone = selectedJobDetails.worker_upi_phone || selectedJobDetails.workerUpiPhone || workerPhone;
-        const upiUri = `upi://pay?pa=${encodeURIComponent(workerUpi)}&pn=${encodeURIComponent(workerUpiHolder)}&am=${totalFee}&cu=INR&tn=${encodeURIComponent(`KAAM-Booking-${selectedJobDetails.id}`)}`;
+        const upiUri = `upi://pay?pa=${encodeURIComponent(workerUpi)}&pn=${encodeURIComponent(workerUpiHolder)}&am=${totalFee}&cu=INR&tn=${encodeURIComponent(`Connect-Booking-${selectedJobDetails.id}`)}`;
 
         // Parse packages
         let parsedPackages = [];

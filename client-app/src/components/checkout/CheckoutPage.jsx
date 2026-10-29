@@ -278,9 +278,9 @@ export const CheckoutPage = ({
       workerEmail: worker?.email || '',
       workerUpi: partnerUpi || worker?.bank?.upi || worker?.upiId || '',
       workerUpiPhone: worker?.bank?.upiPhone || worker?.phone || '',
-      workerUpiHolder: worker?.bank?.holder || worker?.name || 'KAAM Partner',
+      workerUpiHolder: worker?.bank?.holder || worker?.name || 'Connect Partner',
       clientName: user?.fullName || user?.full_name || 'Homeowner',
-      clientEmail: user?.email || 'client@kaam.com',
+      clientEmail: user?.email || 'client@connect.com',
       clientPhone: phone,
       locationAddress: address,
       coordinates: selectedAddressCoordinates || null,
@@ -614,7 +614,7 @@ export const CheckoutPage = ({
                   <p className="text-xs text-amber-700 font-bold">{worker?.tradeTitle || 'Specialist'} • {worker?.locality || 'Mumbai'}</p>
                 </div>
                 <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200 flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" /> KAAM PARTNER
+                  <ShieldCheck className="w-3 h-3" /> CONNECT PARTNER
                 </span>
               </div>
 
