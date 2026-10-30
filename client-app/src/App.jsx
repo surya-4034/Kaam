@@ -6,7 +6,7 @@ import { ClientOnboardingWizard } from './components/onboarding/ClientOnboarding
 import { WorkerProfileDetail } from './components/profile/WorkerProfileDetail';
 import { CheckoutPage } from './components/checkout/CheckoutPage';
 import { auth, browserPopupRedirectResolver } from './config/firebase';
-import { getRedirectResult } from 'firebase/auth';
+import { getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 import { API_BASE_URL } from './config/api';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -131,9 +131,44 @@ export default function App() {
     }
   }, [user]);
 
-  // Handle Google OAuth Redirect Result on mount (in case popup was blocked)
+  // Handle Google OAuth Redirect and background Firebase Auth session on mount
   useEffect(() => {
     let isMounted = true;
+
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser && isMounted) {
+        const saved = localStorage.getItem('kaam_client_user');
+        if (!saved || !user) {
+          try {
+            const syncRes = await fetch(`${API_BASE_URL}/api/auth/google-sync`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                googleUid: fbUser.uid,
+                email: fbUser.email,
+                fullName: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'Connect Customer'),
+                photoURL: fbUser.photoURL,
+                role: 'CLIENT'
+              }),
+            });
+            const syncData = await syncRes.json();
+            if (syncRes.ok && syncData.user && isMounted) {
+              if (syncData.token) {
+                localStorage.setItem('kaam_token', syncData.token);
+                localStorage.setItem('kaam_user', JSON.stringify(syncData.user));
+                localStorage.setItem('kaam_client_user', JSON.stringify(syncData.user));
+              }
+              setUser(syncData.user);
+              setShowAuthModal(false);
+              sessionStorage.removeItem('connect_auth_redirect_role');
+            }
+          } catch (e) {
+            console.warn('Background client Google user sync note:', e);
+          }
+        }
+      }
+    });
+
     const processGoogleRedirect = async () => {
       try {
         const result = await getRedirectResult(auth, browserPopupRedirectResolver);
@@ -158,6 +193,7 @@ export default function App() {
             }
             setUser(syncData.user);
             setShowAuthModal(false);
+            sessionStorage.removeItem('connect_auth_redirect_role');
           }
         }
       } catch (err) {
@@ -165,7 +201,11 @@ export default function App() {
       }
     };
     processGoogleRedirect();
-    return () => { isMounted = false; };
+
+    return () => {
+      isMounted = false;
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, []);
 
   const handleOpenProfileModal = async () => {

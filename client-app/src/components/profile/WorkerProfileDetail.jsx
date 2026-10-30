@@ -100,7 +100,6 @@ export const WorkerProfileDetail = ({
   const effectiveCatalogKey = (selectedTrade !== 'all' && TRADE_SERVICES[selectedTrade]) ? selectedTrade : (TRADE_SERVICES[tradeKey] ? tradeKey : 'plumber');
   const catalog = TRADE_SERVICES[effectiveCatalogKey] || TRADE_SERVICES.plumber;
 
-  const [activeSubcat, setActiveSubcat] = useState(catalog.subcategories[0]?.id || 'packages');
   const [cartItems, setCartItems] = useState([]);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
@@ -147,8 +146,8 @@ export const WorkerProfileDetail = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeLightboxImage, lightboxIndex, pastWorkImages]);
 
-  // Filter items by selected subcategory
-  const displayedItems = catalog.items.filter(item => item.subcatId === activeSubcat);
+  // All catalog items for the trade
+  const displayedItems = catalog.items || [];
 
   const handleAddToCart = (item) => {
     setCartItems(prev => {
@@ -248,47 +247,14 @@ export const WorkerProfileDetail = ({
         </div>
       </div>
 
-      {/* Main 3-Column Studio Layout */}
+      {/* Main 2-Column Studio Layout */}
       <div className="max-w-[1440px] mx-auto px-4 sm:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* ======================================================== */}
-          {/* LEFT COLUMN: 2-COLUMN SELECT A SERVICE GRID (EXACT IMAGE) */}
+          {/* MAIN COLUMN: PHOTO SHOWCASE & PACKAGES CATALOG           */}
           {/* ======================================================== */}
-          <div className="lg:col-span-3 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm sticky top-[130px]">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100">
-              Select a service
-            </h3>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-3">
-              {catalog.subcategories.map((subcat) => {
-                const isSelected = activeSubcat === subcat.id;
-                return (
-                  <button
-                    key={subcat.id}
-                    onClick={() => setActiveSubcat(subcat.id)}
-                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-center transition-all duration-200 group ${
-                      isSelected
-                        ? 'border-amber-500 bg-amber-50/60 shadow-sm ring-2 ring-amber-400/20'
-                        : 'border-slate-100 bg-slate-50/50 hover:bg-slate-100 hover:border-slate-200'
-                    }`}
-                  >
-                    <div className="w-14 h-14 rounded-2xl overflow-hidden mb-2 bg-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <img src={subcat.image} alt={subcat.name} className="w-full h-full object-cover" />
-                    </div>
-                    <span className={`text-[11px] font-bold leading-tight ${isSelected ? 'text-amber-950 font-black' : 'text-slate-700'}`}>
-                      {subcat.name}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ======================================================== */}
-          {/* CENTER COLUMN: HERO VIDEO PLAYER & PACKAGES CATALOG      */}
-          {/* ======================================================== */}
-          <div className="lg:col-span-6 space-y-6">
+          <div className="lg:col-span-8 space-y-6">
             
             {/* ======================================================== */}
             {/* WHATSAPP-STYLE PHOTO SHOWCASE (REPLACES VIDEO PLAYER)     */}
@@ -658,7 +624,7 @@ export const WorkerProfileDetail = ({
                   <h2 className="text-2xl font-black text-slate-950 font-['Outfit'] capitalize">
                     {hasCustomPackages
                       ? (selectedTrade !== 'all' ? `${worker.name}'s ${selectedTrade} Packages` : `${worker.name}'s Custom Service Packages`)
-                      : (catalog.subcategories.find(s => s.id === activeSubcat)?.name || 'Service Packages')}
+                      : `${worker.name}'s Service Packages`}
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">Customized for {worker.name}'s listed trade expertise</p>
                 </div>
@@ -787,7 +753,7 @@ export const WorkerProfileDetail = ({
           {/* ======================================================== */}
           {/* RIGHT COLUMN: UC PROMISE CARD & FLOATING VIEW CART BAR   */}
           {/* ======================================================== */}
-          <div className="lg:col-span-3 space-y-5 sticky top-[130px]">
+          <div className="lg:col-span-4 space-y-5 sticky top-[130px]">
             
             {/* UC / CONNECT PROMISE CARD */}
             <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
