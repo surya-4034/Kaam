@@ -3,7 +3,7 @@ import { AuthPage } from './components/auth/AuthPage';
 import { WorkerLandingPage } from './components/landing/WorkerLandingPage';
 import { WorkerOnboardingWizard } from './components/onboarding/WorkerOnboardingWizard';
 import { SERVICE_CATEGORIES_50 } from './data/serviceCategories';
-import { auth, browserPopupRedirectResolver } from './config/firebase';
+import { auth } from './config/firebase';
 import { getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 import {
   HardHat,
@@ -880,7 +880,7 @@ export default function App() {
     // 2. Also check one-time getRedirectResult as additional fallback
     const processWorkerRedirect = async () => {
       try {
-        const result = await getRedirectResult(auth, browserPopupRedirectResolver);
+        const result = await getRedirectResult(auth);
         if (result && result.user && isMounted) {
           const syncRes = await fetch(`${API_BASE}/auth/google-sync`, {
             method: 'POST',

@@ -5,7 +5,7 @@ import { AuthPage } from './components/auth/AuthPage';
 import { ClientOnboardingWizard } from './components/onboarding/ClientOnboardingWizard';
 import { WorkerProfileDetail } from './components/profile/WorkerProfileDetail';
 import { CheckoutPage } from './components/checkout/CheckoutPage';
-import { auth, browserPopupRedirectResolver } from './config/firebase';
+import { auth } from './config/firebase';
 import { getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 import { API_BASE_URL } from './config/api';
 import { QRCodeSVG } from 'qrcode.react';
@@ -171,7 +171,7 @@ export default function App() {
 
     const processGoogleRedirect = async () => {
       try {
-        const result = await getRedirectResult(auth, browserPopupRedirectResolver);
+        const result = await getRedirectResult(auth);
         if (result && result.user && isMounted) {
           const syncRes = await fetch(`${API_BASE_URL}/api/auth/google-sync`, {
             method: 'POST',
