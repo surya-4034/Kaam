@@ -4,7 +4,7 @@ import { WorkerLandingPage } from './components/landing/WorkerLandingPage';
 import { WorkerOnboardingWizard } from './components/onboarding/WorkerOnboardingWizard';
 import { SERVICE_CATEGORIES_50 } from './data/serviceCategories';
 import { auth, browserPopupRedirectResolver } from './config/firebase';
-import { getRedirectResult } from 'firebase/auth';
+import { getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 import {
   HardHat,
   Inbox,
@@ -103,7 +103,13 @@ export default function App() {
     }
   });
 
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(() => {
+    try {
+      return sessionStorage.getItem('connect_auth_redirect_role') === 'WORKER';
+    } catch (e) {
+      return false;
+    }
+  });
   const [authModalOptions, setAuthModalOptions] = useState({ mode: 'SIGNUP_MAIN' });
 
   // Live Worker State (Account-Isolated default for logged in worker)
@@ -834,9 +840,44 @@ export default function App() {
     fetchWorkerProfileFromDB(userData.id);
   };
 
-  // Handle Google OAuth Redirect Result on mount (in case popup was blocked)
+  // Handle Google OAuth and background Firebase Auth persistence on mount
   useEffect(() => {
     let isMounted = true;
+
+    // 1. Listen for Firebase user state (catches redirect and persistent background sessions)
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser && isMounted) {
+        const savedWorker = localStorage.getItem('kaam_worker_user');
+        if (!savedWorker || !user) {
+          try {
+            const syncRes = await fetch(`${API_BASE}/auth/google-sync`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                googleUid: firebaseUser.uid,
+                email: firebaseUser.email,
+                fullName: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Connect Worker'),
+                photoURL: firebaseUser.photoURL,
+                role: 'WORKER'
+              }),
+            });
+            const syncData = await syncRes.json();
+            if (syncRes.ok && syncData.user && isMounted) {
+              if (syncData.token) {
+                localStorage.setItem('kaam_worker_token', syncData.token);
+                localStorage.setItem('kaam_token', syncData.token);
+              }
+              handleWorkerLoginSuccess(syncData.user, syncData.workerProfile);
+              sessionStorage.removeItem('connect_auth_redirect_role');
+            }
+          } catch (e) {
+            console.warn('Background Firebase user sync note:', e);
+          }
+        }
+      }
+    });
+
+    // 2. Also check one-time getRedirectResult as additional fallback
     const processWorkerRedirect = async () => {
       try {
         const result = await getRedirectResult(auth, browserPopupRedirectResolver);
@@ -854,7 +895,12 @@ export default function App() {
           });
           const syncData = await syncRes.json();
           if (syncRes.ok && syncData.user && isMounted) {
+            if (syncData.token) {
+              localStorage.setItem('kaam_worker_token', syncData.token);
+              localStorage.setItem('kaam_token', syncData.token);
+            }
             handleWorkerLoginSuccess(syncData.user, syncData.workerProfile);
+            sessionStorage.removeItem('connect_auth_redirect_role');
           }
         }
       } catch (err) {
@@ -862,7 +908,11 @@ export default function App() {
       }
     };
     processWorkerRedirect();
-    return () => { isMounted = false; };
+
+    return () => {
+      isMounted = false;
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, []);
 
   if (!user) {
