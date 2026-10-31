@@ -335,22 +335,30 @@ export const createJobPublic = (req, res) => {
   const inputWorkerId = String(workerId || '').trim();
   const digitsOnly = inputWorkerId.replace(/\D/g, '');
 
-  db.get(
-    `SELECT wp.id as profile_id, wp.user_id, wp.trade_title, wp.locality, u.full_name, u.phone, u.email 
-     FROM worker_profiles wp 
-     LEFT JOIN users u ON wp.user_id = u.id 
-     WHERE wp.id = ? OR wp.user_id = ? OR wp.id = ? OR wp.user_id = ?
-        OR (? != '' AND (u.phone LIKE ? OR wp.id LIKE ?))`,
-    [
-      inputWorkerId,
-      inputWorkerId,
-      `w-${inputWorkerId}`,
-      `u-${inputWorkerId}`,
-      digitsOnly,
-      `%${digitsOnly}%`,
-      `%${digitsOnly}%`
-    ],
-    (wErr, wpRow) => {
+  db.get(`SELECT id, is_active FROM users WHERE id = ?`, [finalClientId], (cErr, cUser) => {
+    if (cUser && (cUser.is_active === 0 || cUser.is_active === false)) {
+      return res.status(403).json({ error: 'Your account has been blocked by platform administration. Please contact support.' });
+    }
+
+    db.get(
+      `SELECT wp.id as profile_id, wp.user_id, wp.is_account_locked, wp.trade_title, wp.locality, u.full_name, u.phone, u.email, u.is_active 
+       FROM worker_profiles wp 
+       LEFT JOIN users u ON wp.user_id = u.id 
+       WHERE wp.id = ? OR wp.user_id = ? OR wp.id = ? OR wp.user_id = ?
+          OR (? != '' AND (u.phone LIKE ? OR wp.id LIKE ?))`,
+      [
+        inputWorkerId,
+        inputWorkerId,
+        `w-${inputWorkerId}`,
+        `u-${inputWorkerId}`,
+        digitsOnly,
+        `%${digitsOnly}%`,
+        `%${digitsOnly}%`
+      ],
+      (wErr, wpRow) => {
+        if (wpRow && (wpRow.is_account_locked === 1 || wpRow.is_active === 0)) {
+          return res.status(400).json({ error: 'This service partner is currently blocked or unavailable.' });
+        }
       let effectiveWorkerId = inputWorkerId;
       let finalWorkerName = workerName || 'Verified Service Partner';
       let finalWorkerPhone = workerPhone || '+91 98765 43210';
@@ -607,6 +615,7 @@ export const createJobPublic = (req, res) => {
       );
     }
   );
+  });
 };
 
 // Universal Helper to resolve client's real email from SQLite or Atlas and dispatch status emails
