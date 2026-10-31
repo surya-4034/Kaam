@@ -675,6 +675,10 @@ export const googleSync = (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
 
     if (existingUser) {
+      if (existingUser.is_active === 0 || existingUser.is_active === false) {
+        return res.status(403).json({ error: 'Your account has been blocked by platform administration. Please contact support.' });
+      }
+
       // User exists in database, generate token and return profile
       const token = generateToken({
         id: existingUser.id,
@@ -744,6 +748,9 @@ export const googleSync = (req, res) => {
 
           let workerData = null;
           if (targetWp) {
+            if (targetWp.is_account_locked === 1 || targetWp.is_account_locked === true) {
+              return res.status(403).json({ error: 'Your partner account has been blocked by platform administration. Please contact support.' });
+            }
             let pkgs = [];
             let cats = [targetWp.trade_category || 'plumber'];
             try { if (targetWp.packages_json) pkgs = JSON.parse(targetWp.packages_json); } catch (e) {}
