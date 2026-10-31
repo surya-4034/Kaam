@@ -2,7 +2,7 @@ export const CATEGORIES = [
   { id: 'all', name: 'All Services', icon: 'Wrench', count: 48 },
   { id: 'plumber', name: 'Plumbers', icon: 'Droplets', count: 12, desc: 'Pipe fitting, bathroom leakages, tap repairs, motor setup' },
   { id: 'electrician', name: 'Electricians', icon: 'Zap', count: 15, desc: 'Wiring, MCB switches, ceiling fan, main breaker repair' },
-  { id: 'mistry', name: 'Construction Mistry', icon: 'HardHat', count: 8, desc: 'Brickwork, slab casting, concrete plastering, column mistry' },
+  { id: 'mistry', name: 'Construction Mason', icon: 'HardHat', count: 8, desc: 'Brickwork, slab casting, concrete plastering, structural masonry' },
   { id: 'painter', name: 'House Painters', icon: 'Paintbrush', count: 6, desc: 'Wall putty, primer coat, texture paint, exterior waterproofing' },
   { id: 'carpenter', name: 'Carpenters', icon: 'Hammer', count: 7, desc: 'Wooden doors, modular kitchen, bed framing, lock repair' },
   { id: 'mason', name: 'Tile & Mason Workers', icon: 'Grid', count: 5, desc: 'Marble flooring, wall tiles, bathroom slates, granite fitting' },
@@ -37,7 +37,7 @@ export const TRADE_WORK_IMAGES = {
     'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=600&q=80', // construction brickwork & masonry
   ],
   mistry: [
-    'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=600&q=80', // construction mistry
+    'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=600&q=80', // construction masonry
   ],
   welder: [
     'https://images.unsplash.com/photo-1504917599217-d4dc5ebe6122?auto=format&fit=crop&w=600&q=80', // metal welding & torch
@@ -68,7 +68,7 @@ const GENERIC_HEADSHOTS = [
 export function getTradeWorkImage(trade, index = 0, currentPhoto = '') {
   if (currentPhoto && typeof currentPhoto === 'string') {
     const isHeadshot = GENERIC_HEADSHOTS.some(shot => currentPhoto.includes(shot));
-    if (!isHeadshot && currentPhoto.startsWith('http')) {
+    if (!isHeadshot && (currentPhoto.startsWith('http') || currentPhoto.startsWith('data:image'))) {
       return currentPhoto;
     }
   }

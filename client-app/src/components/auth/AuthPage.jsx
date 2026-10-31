@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { User, Lock, Mail, MapPin, Eye, EyeOff, Wrench, ShieldCheck, ArrowRight, CheckCircle2, KeyRound, ArrowLeft, Send, AlertCircle, Zap, X } from 'lucide-react';
 import { auth, googleProvider } from '../../config/firebase';
 import { API_BASE_URL } from '../../config/api';
-import { signInWithPopup, onAuthStateChanged } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 
 export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }) => {
-  // View State
-  // 'LOGIN_MAIN' | 'LOGIN_EMAIL_FORM' | 'SIGNUP_MAIN' | 'SIGNUP_EMAIL_FORM' | 'FORGOT_REQUEST' | 'FORGOT_RESET'
+  // View State: 'LOGIN_MAIN' | 'LOGIN_EMAIL_FORM' | 'SIGNUP_MAIN' | 'SIGNUP_EMAIL_FORM' | 'FORGOT_REQUEST' | 'FORGOT_RESET'
   const [viewState, setViewState] = useState('LOGIN_MAIN');
 
   const [showPassword, setShowPassword] = useState(false);
@@ -32,7 +31,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     email: '',
     password: '',
     confirmPassword: '',
-    locality: 'Andheri West, Mumbai',
+    locality: 'Bandra West, Mumbai',
     otpCode: '',
     newPassword: '',
     tradeCategory: 'plumber',
@@ -96,61 +95,30 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     }
   };
 
-  // GOOGLE IDENTITY SERVICES (GIS) BUTTON MOUNT
-  useEffect(() => {
-    const initGIS = () => {
-      if (window.google?.accounts?.id) {
-        try {
-          window.google.accounts.id.initialize({
-            client_id: "602825840265-n4sivo8o1sfvr33gdbmsihncdatsficb.apps.googleusercontent.com",
-            callback: async (response) => {
-              try {
-                if (response && response.credential) {
-                  const base64Url = response.credential.split('.')[1];
-                  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                  const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-                  const payload = JSON.parse(jsonPayload);
-                  setIsLoading(true);
-                  await syncGoogleUserWithBackend({
-                    googleUid: payload.sub,
-                    email: payload.email,
-                    fullName: payload.name || (payload.email ? payload.email.split('@')[0] : 'Connect Customer'),
-                    photoURL: payload.picture,
-                    role: isWorkerApp ? 'WORKER' : 'CLIENT'
-                  });
-                }
-              } catch (decErr) {
-                console.error('GIS token decode error:', decErr);
-              }
-            },
-            auto_select: false,
-            cancel_on_tap_outside: true,
-          });
-
-          const slot = document.getElementById('client-gis-slot');
-          if (slot) {
-            slot.innerHTML = '';
-            window.google.accounts.id.renderButton(slot, {
-              theme: 'outline',
-              size: 'large',
-              width: 320,
-              text: 'continue_with',
-              shape: 'pill'
-            });
-          }
-        } catch (gisErr) {
-          console.warn('GIS init notice:', gisErr);
-        }
-      }
-    };
-
-    const timer = setTimeout(initGIS, 300);
-    return () => clearTimeout(timer);
-  }, [viewState]);
-
-  // LISTEN FOR ACTIVE FIREBASE SESSION
+  // LISTEN FOR ACTIVE FIREBASE SESSION OR REDIRECT SIGN-IN RESULT
   useEffect(() => {
     let isMounted = true;
+
+    // Handle return from Google Full-Page Redirect
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result && result.user && isMounted) {
+          setIsLoading(true);
+          setSuccessMessage('Google sign-in verified! Connecting to customer dashboard...');
+          await syncGoogleUserWithBackend({
+            googleUid: result.user.uid,
+            email: result.user.email,
+            fullName: result.user.displayName || (result.user.email ? result.user.email.split('@')[0] : 'Connect Customer'),
+            photoURL: result.user.photoURL,
+            role: 'CLIENT',
+          });
+        }
+      })
+      .catch((rErr) => {
+        console.warn('Redirect result notice:', rErr);
+      });
+
+    // Handle standard auth state changes
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser && isMounted) {
         setIsLoading(true);
@@ -159,6 +127,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
           email: fbUser.email,
           fullName: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'Connect Customer'),
           photoURL: fbUser.photoURL,
+          role: 'CLIENT',
         });
       }
     });
@@ -169,13 +138,29 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     };
   }, []);
 
-  // DIRECT GOOGLE AUTHENTICATION (AUTHENTICATES DIRECTLY WITH GOOGLE POPUP)
+  // FULL-PAGE REDIRECT GOOGLE SIGN-IN (100% IMMUNE TO POP-UP BLOCKERS)
+  const handleGoogleRedirectSignIn = async () => {
+    try {
+      setIsLoading(true);
+      setErrorMessage('');
+      setSuccessMessage('Redirecting to Google securely...');
+      sessionStorage.setItem('connect_auth_redirect_role', 'CLIENT');
+      await signInWithRedirect(auth, googleProvider);
+    } catch (err) {
+      console.warn('Google redirect sign-in error:', err);
+      setIsLoading(false);
+      setErrorMessage(err.message || 'Redirect sign-in failed. Please try direct email sign-in.');
+    }
+  };
+
+  // STANDARD FIREBASE GOOGLE SIGN-IN (NO ORIGIN_MISMATCH, DIRECT GOOGLE ACCOUNT PICKER)
   const handleGoogleSignIn = async () => {
     setErrorMessage('');
+    setSuccessMessage('Opening Google account picker...');
     setIsLoading(true);
-    setSuccessMessage('Connecting to Google...');
 
     try {
+      // Firebase routes OAuth through whitelisted kaam-app-d348a.firebaseapp.com domain
       const result = await signInWithPopup(auth, googleProvider);
       if (result && result.user) {
         await syncGoogleUserWithBackend({
@@ -183,29 +168,29 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
           email: result.user.email,
           fullName: result.user.displayName || (result.user.email ? result.user.email.split('@')[0] : 'Connect Customer'),
           photoURL: result.user.photoURL,
-          role: isWorkerApp ? 'WORKER' : 'CLIENT',
+          role: 'CLIENT',
         });
       }
     } catch (fbErr) {
-      console.warn('Google Sign-In notice:', fbErr);
+      console.warn('Firebase popup notice:', fbErr);
       setIsLoading(false);
       const rawCode = fbErr.code || '';
       const rawMsg = (fbErr.message || '').toLowerCase();
 
-      if (rawCode === 'auth/popup-blocked' || rawMsg.includes('popup-blocked') || rawMsg.includes('pop-up was blocked')) {
-        setPopupBlocked(true);
-        setErrorMessage('Pop-up was blocked by your browser. Please allow pop-ups for localhost in your browser address bar, or use the direct sign-in below.');
-      } else if (rawCode === 'auth/popup-closed-by-user' || rawCode === 'auth/cancelled-popup-request') {
+      if (rawCode === 'auth/popup-closed-by-user' || rawCode === 'auth/cancelled-popup-request') {
         setSuccessMessage('');
-      } else if (rawCode === 'auth/unauthorized-domain') {
-        setErrorMessage(`Domain '${window.location.hostname}' is not authorized in Firebase.`);
+      } else if (rawCode === 'auth/popup-blocked') {
+        setPopupBlocked(true);
+        setErrorMessage('Your browser blocked the popup. Click "Continue with Google (Redirect Mode)" or enter your email below.');
+      } else if (rawMsg.includes('database is closing') || rawMsg.includes('closing/hidden')) {
+        handleQuickDemoLogin(directGoogleEmail || 'anika.shah@example.com');
       } else {
         setErrorMessage(fbErr.message || 'Google Sign-In failed. Please try again.');
       }
     }
   };
 
-  // DIRECT GOOGLE EMAIL SUBMISSION (WHEN POPUP IS BLOCKED BY BROWSER)
+  // DIRECT GOOGLE EMAIL SUBMISSION (FALLBACK)
   const handleDirectGoogleEmailLogin = async (e) => {
     if (e) e.preventDefault();
     if (!directGoogleEmail || !directGoogleEmail.includes('@')) {
@@ -218,27 +203,27 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     await syncGoogleUserWithBackend({
       email: directGoogleEmail.trim().toLowerCase(),
       fullName: directGoogleEmail.split('@')[0],
+      role: isWorkerApp ? 'WORKER' : 'CLIENT',
+    });
+  };
+
+  // 1-CLICK INSTANT CLIENT DEMO LOGIN
+  const handleQuickDemoLogin = async (email = 'anika.shah@example.com') => {
+    setIsLoading(true);
+    setErrorMessage('');
+    setSuccessMessage('Signing in to customer dashboard...');
+
+    await syncGoogleUserWithBackend({
+      email,
+      fullName: 'Anika Shah',
       role: isWorkerApp ? 'WORKER' : 'CLIENT'
     });
   };
 
-  // 1-CLICK INSTANT VERIFIED CLIENT LOGIN
-  const handleQuickDemoLogin = async (email = 'anika@example.com') => {
-    setIsLoading(true);
-    setErrorMessage('');
-    setSuccessMessage('Signing in to customer account...');
-
-    await syncGoogleUserWithBackend({
-      email,
-      fullName: 'Anika Shah (Homeowner)',
-      role: 'CLIENT'
-    });
-  };
-
-  // SEND 6-DIGIT EMAIL VERIFICATION CODE (SIGNUP)
+  // SEND 6-DIGIT EMAIL VERIFICATION CODE
   const handleSendEmailVerification = async () => {
     if (!formData.email || !formData.email.includes('@')) {
-      setErrorMessage('Please enter a valid email address before clicking Verify Mail.');
+      setErrorMessage('Please enter a valid email address before requesting verification code.');
       return;
     }
 
@@ -257,7 +242,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
 
       if (response.ok) {
         setCodeSent(true);
-        setSuccessMessage(`Verification code sent to ${formData.email}! Please check your email inbox.`);
+        setSuccessMessage(`Verification code sent to ${formData.email}! Please check your email.`);
       } else {
         setErrorMessage(data.error || 'Failed to send verification code.');
       }
@@ -269,7 +254,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     }
   };
 
-  // CONFIRM 6-DIGIT EMAIL VERIFICATION CODE (SIGNUP)
+  // CONFIRM 6-DIGIT EMAIL VERIFICATION CODE
   const handleConfirmEmailCode = async () => {
     if (!emailOtpCode || emailOtpCode.length < 6) {
       setErrorMessage('Please enter the full 6-digit verification code.');
@@ -291,25 +276,25 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
       if (response.ok) {
         setIsEmailVerified(true);
         setCodeSent(false);
-        setSuccessMessage('✓ Email Address Verified Successfully!');
+        setSuccessMessage('✓ Email address verified successfully!');
       } else {
         setErrorMessage(data.error || 'Incorrect verification code.');
       }
     } catch (err) {
       setIsEmailVerified(true);
       setCodeSent(false);
-      setSuccessMessage('✓ Email Address Verified Successfully!');
+      setSuccessMessage('✓ Email address verified successfully!');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // CREATE ACCOUNT WITH CREDENTIALS
+  // CREATE CLIENT ACCOUNT WITH CREDENTIALS
   const handleCreateAccountWithEmail = async (e) => {
     e.preventDefault();
 
     if (!isEmailVerified) {
-      setErrorMessage('Please click "Verify Mail" and enter the 6-digit code before creating account.');
+      setErrorMessage('Please click "Verify Email" and enter the 6-digit code before creating your account.');
       return;
     }
 
@@ -331,45 +316,41 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
           password: formData.password,
           locality: formData.locality,
           role: isWorkerApp ? 'WORKER' : 'CLIENT',
-          tradeCategory: formData.tradeCategory,
-          dailyRate: formData.dailyRate,
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setSuccessMessage('Account Created Successfully! Directing to dashboard...');
+        setSuccessMessage('Account created successfully! Directing to dashboard...');
         if (data.token) {
           localStorage.setItem('kaam_client_token', data.token);
           localStorage.setItem('kaam_client_user', JSON.stringify(data.user));
           localStorage.setItem('kaam_token', data.token);
           localStorage.setItem('kaam_user', JSON.stringify(data.user));
         }
-        setTimeout(() => onLoginSuccess(data.user), 1000);
+
+        setTimeout(() => {
+          if (typeof onLoginSuccess === 'function') {
+            onLoginSuccess(data.user);
+          }
+        }, 1200);
       } else {
-        setErrorMessage(data.error || 'Failed to create account.');
+        setErrorMessage(data.error || 'Registration failed.');
       }
     } catch (err) {
-      const mockUser = {
-        id: `u-${Date.now()}`,
-        fullName: formData.fullName,
-        email: formData.email,
-        locality: formData.locality,
-        role: isWorkerApp ? 'WORKER' : 'CLIENT',
-      };
-      setSuccessMessage('Welcome to Connect!');
-      setTimeout(() => onLoginSuccess(mockUser), 800);
+      console.error(err);
+      setErrorMessage('Connection failed. Please verify server status.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // EMAIL & PASSWORD LOGIN
+  // LOGIN WITH EMAIL OR MOBILE
   const handleLoginWithEmail = async (e) => {
     e.preventDefault();
     if (!formData.email || !formData.password) {
-      setErrorMessage('Please enter both Email and Password.');
+      setErrorMessage('Please enter both your email/phone and password.');
       return;
     }
 
@@ -383,42 +364,46 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
-          role: isWorkerApp ? 'WORKER' : 'CLIENT'
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setSuccessMessage('Login Successful! Directing to account dashboard...');
+        setSuccessMessage(`Welcome back, ${data.user.fullName}!`);
         if (data.token) {
           localStorage.setItem('kaam_client_token', data.token);
           localStorage.setItem('kaam_client_user', JSON.stringify(data.user));
           localStorage.setItem('kaam_token', data.token);
           localStorage.setItem('kaam_user', JSON.stringify(data.user));
         }
-        setTimeout(() => onLoginSuccess(data.user), 800);
+
+        setTimeout(() => {
+          if (typeof onLoginSuccess === 'function') {
+            onLoginSuccess(data.user);
+          }
+        }, 800);
       } else {
-        setErrorMessage(data.error || 'Incorrect Id / Pass');
+        setErrorMessage(data.error || 'Invalid email or password.');
       }
     } catch (err) {
-      setErrorMessage('Incorrect Id / Pass');
+      console.error(err);
+      setErrorMessage('Connection failed. Please ensure the backend is running.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // FORGOT PASSWORD: STEP 1 - REQUEST RESET CODE TO EMAIL
+  // FORGOT PASSWORD STEP 1: REQUEST OTP
   const handleForgotPasswordRequest = async (e) => {
     if (e) e.preventDefault();
     if (!formData.email || !formData.email.includes('@')) {
-      setErrorMessage('Please enter your account email address.');
+      setErrorMessage('Please enter your registered email address.');
       return;
     }
 
     setIsLoading(true);
     setErrorMessage('');
-    setSuccessMessage('');
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
@@ -431,22 +416,22 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
 
       if (response.ok) {
         setForgotCodeSent(true);
-        setSuccessMessage(`✓ 6-Digit confirmation code sent to ${formData.email}. Please check your inbox.`);
+        setSuccessMessage(`6-digit reset code sent to ${formData.email}!`);
       } else {
-        setErrorMessage(data.error || 'Failed to send confirmation code.');
+        setErrorMessage(data.error || 'Failed to send reset code.');
       }
     } catch (err) {
       setForgotCodeSent(true);
-      setSuccessMessage(`✓ 6-Digit confirmation code sent to ${formData.email}. Please check your inbox.`);
+      setSuccessMessage(`Reset code sent to ${formData.email}!`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // FORGOT PASSWORD: STEP 1 SUB-ACTION - CONFIRM 6-DIGIT CODE ON SAME PAGE
+  // FORGOT PASSWORD: CONFIRM OTP
   const handleConfirmForgotCode = async () => {
     if (!forgotOtpCode || forgotOtpCode.length < 6) {
-      setErrorMessage('Please enter the full 6-digit verification code sent to your email.');
+      setErrorMessage('Please enter the full 6-digit code.');
       return;
     }
 
@@ -476,7 +461,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
     }
   };
 
-  // FORGOT PASSWORD: STEP 2 - CONFIRM RESET PASSWORD (TRANSFER TO LOGIN PAGE & DISPATCH EMAIL)
+  // FORGOT PASSWORD STEP 2: RESET PASSWORD
   const handleResetPasswordSubmit = async (e) => {
     e.preventDefault();
     if (!formData.newPassword) {
@@ -506,23 +491,21 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
       const data = await response.json();
 
       if (response.ok) {
-        setSuccessMessage('✓ Password updated successfully! Confirmation email sent to your inbox. Transferring to login page...');
+        setSuccessMessage('✓ Password updated successfully! Please log in with your new password.');
         setTimeout(() => {
           setViewState('LOGIN_EMAIL_FORM');
           setForgotCodeSent(false);
           setForgotOtpCode('');
-          setSuccessMessage('Password updated successfully. Please log in with your new password.');
         }, 1500);
       } else {
         setErrorMessage(data.error || 'Failed to update password.');
       }
     } catch (err) {
-      setSuccessMessage('✓ Password updated successfully! Transferring to login page...');
+      setSuccessMessage('✓ Password updated successfully!');
       setTimeout(() => {
         setViewState('LOGIN_EMAIL_FORM');
         setForgotCodeSent(false);
         setForgotOtpCode('');
-        setSuccessMessage('Password updated successfully. Please log in with your new password.');
       }, 1500);
     } finally {
       setIsLoading(false);
@@ -530,97 +513,76 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
   };
 
   return (
-    <div className={onClose ? "fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-md font-['Plus_Jakarta_Sans',sans-serif] overflow-y-auto" : "min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-[#042e2b] via-[#0b4d45] to-[#04332d] font-['Plus_Jakarta_Sans',sans-serif] relative overflow-hidden"}>
+    <div className={onClose 
+      ? "fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-xl font-['Plus_Jakarta_Sans',sans-serif] overflow-y-auto text-slate-100" 
+      : "min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-[#07080f] font-['Plus_Jakarta_Sans',sans-serif] relative overflow-hidden text-slate-100"
+    }>
       
-      {/* Background Dim / Image */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center opacity-25 mix-blend-overlay pointer-events-none scale-105" 
-        style={{ 
-          backgroundImage: `url('${isWorkerApp ? "https://images.unsplash.com/photo-1581092160607-ee22621dd758?q=80&w=2070&auto=format&fit=crop" : "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2070&auto=format&fit=crop"}')` 
-        }}
-      ></div>
-      {!onClose && <div className="absolute inset-0 bg-gradient-to-b from-[#042e2b]/90 via-[#0b4d45]/85 to-[#04332d]/95 pointer-events-none"></div>}
+      {/* AI Glow Ambient Canvas (Matching Reference Theme) */}
+      <div className="absolute top-1/4 -left-20 w-96 h-96 rounded-full bg-violet-600/15 blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-1/4 -right-20 w-96 h-96 rounded-full bg-cyan-500/15 blur-[120px] pointer-events-none"></div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-indigo-900/10 blur-[150px] pointer-events-none"></div>
 
-      {/* Main Container Card */}
-      <div className="relative z-10 w-full max-w-md bg-white rounded-3xl shadow-2xl shadow-black/80 overflow-hidden transition-all duration-300 my-auto">
+      {/* Main Glassmorphic Container Card */}
+      <div className="relative z-10 w-full max-w-md bg-[#0d0f18]/90 backdrop-blur-2xl border border-slate-800/80 rounded-3xl shadow-2xl shadow-violet-950/50 overflow-hidden transition-all duration-300 my-auto">
         
-        {/* Header Illustration - Deep Teal & Warm Gold Accent */}
-        <div className="h-44 sm:h-50 w-full bg-gradient-to-b from-[#064e43] via-[#0a5c52] to-[#127a6e] relative flex flex-col justify-end p-6 text-white overflow-hidden">
+        {/* Header Banner */}
+        <div className="p-6 pb-4 border-b border-slate-800/60 bg-gradient-to-b from-slate-900/80 to-transparent relative">
           
-          {/* Close Button if Modal Mode */}
+          {/* Close button if modal */}
           {onClose && (
             <button
               onClick={onClose}
               type="button"
-              className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center text-xs font-black transition-all"
+              className="absolute top-5 right-5 z-20 w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center text-xs font-bold transition-all border border-slate-700 active:scale-95"
             >
-              ✕
+              <X className="w-4 h-4" />
             </button>
           )}
 
-          <div className="absolute top-6 right-14 w-14 h-14 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-300 opacity-90 shadow-lg shadow-amber-500/40 ring-4 ring-amber-300/20"></div>
-          <div className="absolute top-4 left-10 w-24 h-0.5 bg-gradient-to-r from-transparent via-amber-300 to-transparent transform -rotate-45 opacity-60"></div>
-
-          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 200" preserveAspectRatio="none">
-            <path d="M0 160 Q 120 100 240 160 T 400 160 L 400 200 L 0 200 Z" fill="#0b4d45" opacity="0.6" />
-            <path d="M0 175 Q 180 120 360 185 T 400 185 L 400 200 L 0 200 Z" fill="#042e2b" opacity="0.9" />
-          </svg>
-
-          <div className="relative z-10 space-y-1">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 backdrop-blur-md border border-amber-300/30 text-xs font-black tracking-wider text-amber-300 uppercase">
-              <Wrench className="w-3.5 h-3.5 text-amber-400" />
-              <span>Connect • {isWorkerApp ? 'Worker Site' : 'Client Site'}</span>
-            </div>
-            
-            <h2 className="text-2xl font-black font-['Outfit'] text-white tracking-tight">
-              {viewState === 'LOGIN_MAIN' || viewState === 'LOGIN_EMAIL_FORM' || viewState === 'FORGOT_REQUEST' || viewState === 'FORGOT_RESET' ? 'Connect Login' : 'Create Connect Account'}
-            </h2>
-            <p className="text-xs text-amber-100/90 font-medium">
-              {isWorkerApp ? 'Connect with homeowners & accept daily jobs' : 'Hire skilled local tradespeople and service professionals'}
-            </p>
-          </div>
+          <h2 className="text-2xl font-black font-['Outfit'] text-white tracking-tight">
+            {viewState === 'LOGIN_MAIN' || viewState === 'LOGIN_EMAIL_FORM' || viewState === 'FORGOT_REQUEST' || viewState === 'FORGOT_RESET' ? 'Customer Sign In' : 'Create Customer Account'}
+          </h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Hire background-verified home service specialists on-demand
+          </p>
         </div>
 
         {/* Card Body */}
-        <div className="p-6 sm:p-8 bg-white text-slate-800 space-y-4">
+        <div className="p-6 sm:p-7 space-y-4">
 
           {/* Feedback Banners */}
           {errorMessage && (
-            <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-red-600 text-xs font-semibold flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-red-500 shrink-0"></span>
+            <div className="p-3.5 rounded-2xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs font-semibold flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-red-400 shrink-0"></span>
               <span>{errorMessage}</span>
             </div>
           )}
 
           {successMessage && (
-            <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
               <span>{successMessage}</span>
             </div>
           )}
 
-
-
           {/* ======================================================== */}
-          {/* VIEW 1: FIRST SCREEN ON SITE LAUNCH - CONNECT LOGIN MAIN  */}
+          {/* VIEW 1: FIRST SCREEN ON SITE LAUNCH - CLIENT LOGIN MAIN  */}
           {/* ======================================================== */}
           {viewState === 'LOGIN_MAIN' && (
             <div className="space-y-4">
               <div className="text-center sm:text-left">
-                <h1 className="text-2xl font-bold text-[#2d1b4e] font-['Outfit']">Connect Login</h1>
-                <p className="text-xs text-slate-500 mt-1">Authenticate via Google or Email & Password.</p>
+                <h1 className="text-xl font-bold text-white font-['Outfit']">Welcome Back</h1>
+                <p className="text-xs text-slate-400 mt-0.5">Sign in to track orders, manage bookings and schedule services.</p>
               </div>
 
-              {/* Option 1: GOOGLE IDENTITY SERVICES (GIS) OFFICIAL BUTTON SLOT */}
-              <div id="client-gis-slot" className="flex justify-center empty:hidden"></div>
-
-              {/* Option 1B: DIRECT GOOGLE BUTTON */}
+              {/* SINGLE CLEAN GOOGLE BUTTON */}
               <div>
                 <button
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={isLoading}
-                  className="w-full py-3.5 px-4 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-3 transition-all shadow-sm active:scale-95"
+                  className="w-full py-3.5 px-4 rounded-full bg-white hover:bg-slate-100 text-slate-950 font-bold text-xs flex items-center justify-center gap-3 transition-all shadow-lg shadow-white/10 active:scale-95"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -628,73 +590,85 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                   </svg>
-                  <span>Continue with Google</span>
+                  <span>Sign In with Google</span>
                 </button>
               </div>
 
               {/* POP-UP BLOCKED INLINE GOOGLE HELPER */}
               {popupBlocked && (
-                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2">
-                  <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Pop-up was blocked by browser</span>
+                <div className="p-4 rounded-2xl bg-cyan-950/40 border border-cyan-500/40 text-slate-200 text-xs space-y-3 shadow-lg animate-in fade-in">
+                  <div className="flex items-center gap-2 font-bold text-cyan-300">
+                    <AlertCircle className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span>Browser Blocked the Google Pop-Up</span>
                   </div>
-                  <p className="text-[11px] text-amber-700">
-                    Enter your Google email to sign in directly without pop-up:
-                  </p>
-                  <form onSubmit={handleDirectGoogleEmailLogin} className="flex gap-2">
-                    <input
-                      type="email"
-                      value={directGoogleEmail}
-                      onChange={(e) => setDirectGoogleEmail(e.target.value)}
-                      placeholder="your.email@gmail.com"
-                      className="flex-1 px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition active:scale-95 shrink-0"
-                    >
-                      Sign In
-                    </button>
-                  </form>
+
+                  {/* Option 1: Full-Page Redirect Mode */}
+                  <button
+                    type="button"
+                    onClick={handleGoogleRedirectSignIn}
+                    disabled={isLoading}
+                    className="w-full py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-cyan-500 via-indigo-600 to-violet-600 hover:opacity-95 text-white font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-md shadow-cyan-500/20"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>Continue with Google (Redirect Mode — No Pop-up)</span>
+                  </button>
+
+                  {/* Option 2: Direct Email Form */}
+                  <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                    <p className="text-[11px] text-slate-300 font-medium">
+                      Or sign in directly with your Google email address:
+                    </p>
+                    <form onSubmit={handleDirectGoogleEmailLogin} className="flex gap-2">
+                      <input
+                        type="email"
+                        value={directGoogleEmail}
+                        onChange={(e) => setDirectGoogleEmail(e.target.value)}
+                        placeholder="your.email@gmail.com"
+                        className="flex-1 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono font-bold"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition active:scale-95 shrink-0"
+                      >
+                        Sign In
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Visual Tip: How to unblock in browser */}
+                  <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[10.5px] text-slate-400 space-y-1">
+                    <span className="font-bold text-slate-200">💡 To allow pop-ups in your browser:</span>
+                    <p className="leading-relaxed">
+                      Look at the right side of your address bar (URL bar). Click the small icon with the red &apos;x&apos; (<span className="text-red-400 font-bold">🚫 Pop-up blocked</span>) &rarr; select <strong>&quot;Always allow pop-ups and redirects from this site&quot;</strong> &rarr; click <strong>Done</strong>.
+                    </p>
+                  </div>
                 </div>
               )}
 
-              {/* Option 2: 1-CLICK INSTANT CLIENT DEMO LOGIN */}
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin()}
-                disabled={isLoading}
-                className="w-full py-3 px-4 rounded-full bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-900 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
-              >
-                <Zap className="w-3.5 h-3.5 text-purple-600" />
-                <span>1-Click Client Login (Anika Shah)</span>
-              </button>
-
-              <div className="relative flex items-center justify-center my-2">
-                <div className="border-t border-slate-200 w-full"></div>
-                <span className="bg-white px-3 text-[10px] uppercase font-bold text-slate-400">or</span>
+              <div className="relative flex items-center justify-center my-1">
+                <div className="border-t border-slate-800 w-full"></div>
+                <span className="bg-[#0d0f18] px-3 text-[10px] uppercase font-bold text-slate-500">or</span>
               </div>
 
-              {/* Option 3: EMAIL BUTTON */}
+              {/* EMAIL / MOBILE BUTTON */}
               <button
                 type="button"
                 onClick={() => { setViewState('LOGIN_EMAIL_FORM'); setErrorMessage(''); }}
-                className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-[#472268] via-[#672c84] to-[#913b82] text-white font-bold text-sm shadow-xl shadow-purple-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                className="w-full py-3.5 px-6 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all"
               >
-                <Mail className="w-4 h-4" />
-                <span>Email Login</span>
+                <Mail className="w-4 h-4 text-cyan-400" />
+                <span>Sign In with Email or Mobile</span>
               </button>
 
               {/* Link to Create Account */}
-              <div className="pt-2 text-center border-t border-slate-100">
+              <div className="pt-2 text-center border-t border-slate-800/60">
                 <button
                   type="button"
                   onClick={() => { setViewState('SIGNUP_MAIN'); setErrorMessage(''); setSuccessMessage(''); }}
-                  className="text-xs font-semibold text-[#59267c] hover:text-[#3b1654] hover:underline"
+                  className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 hover:underline"
                 >
-                  Not having account? create account
+                  Don't have an account? Register as Customer
                 </button>
               </div>
             </div>
@@ -706,20 +680,20 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
           {viewState === 'LOGIN_EMAIL_FORM' && (
             <form onSubmit={handleLoginWithEmail} className="space-y-4">
               <div className="flex items-center justify-between">
-                <h1 className="text-xl font-bold text-[#2d1b4e] font-['Outfit']">Email Sign In</h1>
+                <h1 className="text-xl font-bold text-white font-['Outfit']">Customer Email Sign In</h1>
                 <button
                   type="button"
                   onClick={() => setViewState('LOGIN_MAIN')}
-                  className="text-xs font-bold text-purple-700 hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Back
                 </button>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1 ml-3">Email or Mobile Number</label>
+                <label className="block text-xs font-bold text-slate-400 mb-1 ml-3">Email or Mobile Number</label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-pink-400 absolute left-4 top-3.5" />
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-4 top-3.5" />
                   <input
                     type="text"
                     name="email"
@@ -727,24 +701,24 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                     placeholder="name@example.com or 10-digit mobile"
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full pl-11 pr-4 py-3 rounded-full bg-pink-100/60 border border-pink-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"
+                    className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950/70 border border-slate-800 text-white text-xs placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
                   />
                 </div>
               </div>
 
               <div>
                 <div className="flex justify-between items-center mb-1 px-3">
-                  <label className="text-xs font-bold text-slate-600">Password</label>
+                  <label className="text-xs font-bold text-slate-400">Password</label>
                   <button
                     type="button"
                     onClick={() => { setViewState('FORGOT_REQUEST'); setForgotCodeSent(false); setErrorMessage(''); setSuccessMessage(''); }}
-                    className="text-[11px] font-bold text-purple-700 hover:underline"
+                    className="text-[11px] font-bold text-cyan-400 hover:underline"
                   >
                     Forgot Password?
                   </button>
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-pink-400 absolute left-4 top-3.5" />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-4 top-3.5" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
@@ -752,12 +726,12 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={handleChange}
-                    className="w-full pl-11 pr-11 py-3 rounded-full bg-pink-100/60 border border-pink-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"
+                    className="w-full pl-11 pr-11 py-3 rounded-full bg-slate-950/70 border border-slate-800 text-white text-xs placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-3.5 text-slate-400 hover:text-purple-600"
+                    className="absolute right-4 top-3.5 text-slate-500 hover:text-slate-300"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -767,9 +741,9 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-[#472268] via-[#672c84] to-[#913b82] text-white font-bold text-sm shadow-xl shadow-purple-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-cyan-500 via-indigo-600 to-violet-600 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 active:scale-95 transition-all"
               >
-                {isLoading ? <span>Verifying...</span> : <span>Login</span>}
+                {isLoading ? <span>Verifying...</span> : <span>Sign In to Customer Account</span>}
               </button>
             </form>
           )}
@@ -780,17 +754,17 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
           {viewState === 'SIGNUP_MAIN' && (
             <div className="space-y-4">
               <div className="text-center sm:text-left">
-                <h1 className="text-2xl font-bold text-[#2d1b4e] font-['Outfit']">Sign-up / Create Account</h1>
-                <p className="text-xs text-slate-500 mt-1">Choose Google or Email to create your Connect account.</p>
+                <h1 className="text-xl font-bold text-white font-['Outfit']">Create Customer Account</h1>
+                <p className="text-xs text-slate-400 mt-0.5">Book verified plumbers, electricians, carpenters and painters with 1 click.</p>
               </div>
 
-              {/* Case I: DIRECT GOOGLE BUTTON */}
+              {/* SINGLE CLEAN GOOGLE BUTTON */}
               <div>
                 <button
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={isLoading}
-                  className="w-full py-3.5 px-4 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-3 transition-all shadow-sm active:scale-95"
+                  className="w-full py-3.5 px-4 rounded-full bg-white hover:bg-slate-100 text-slate-950 font-bold text-xs flex items-center justify-center gap-3 transition-all shadow-lg shadow-white/10 active:scale-95"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -798,62 +772,85 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                   </svg>
-                  <span>Sign up with Google</span>
+                  <span>Sign Up with Google</span>
                 </button>
               </div>
 
               {/* POP-UP BLOCKED INLINE GOOGLE HELPER */}
               {popupBlocked && (
-                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2">
-                  <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Pop-up was blocked by browser</span>
+                <div className="p-4 rounded-2xl bg-cyan-950/40 border border-cyan-500/40 text-slate-200 text-xs space-y-3 shadow-lg animate-in fade-in">
+                  <div className="flex items-center gap-2 font-bold text-cyan-300">
+                    <AlertCircle className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span>Browser Blocked the Google Pop-Up</span>
                   </div>
-                  <p className="text-[11px] text-amber-700">
-                    Enter your Google email to sign up directly without pop-up:
-                  </p>
-                  <form onSubmit={handleDirectGoogleEmailLogin} className="flex gap-2">
-                    <input
-                      type="email"
-                      value={directGoogleEmail}
-                      onChange={(e) => setDirectGoogleEmail(e.target.value)}
-                      placeholder="your.email@gmail.com"
-                      className="flex-1 px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition active:scale-95 shrink-0"
-                    >
-                      Sign Up
-                    </button>
-                  </form>
+
+                  {/* Option 1: Full-Page Redirect Mode */}
+                  <button
+                    type="button"
+                    onClick={handleGoogleRedirectSignIn}
+                    disabled={isLoading}
+                    className="w-full py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-cyan-500 via-indigo-600 to-violet-600 hover:opacity-95 text-white font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-md shadow-cyan-500/20"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>Continue with Google (Redirect Mode — No Pop-up)</span>
+                  </button>
+
+                  {/* Option 2: Direct Email Form */}
+                  <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                    <p className="text-[11px] text-slate-300 font-medium">
+                      Or sign up directly with your Google email address:
+                    </p>
+                    <form onSubmit={handleDirectGoogleEmailLogin} className="flex gap-2">
+                      <input
+                        type="email"
+                        value={directGoogleEmail}
+                        onChange={(e) => setDirectGoogleEmail(e.target.value)}
+                        placeholder="your.email@gmail.com"
+                        className="flex-1 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono font-bold"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition active:scale-95 shrink-0"
+                      >
+                        Sign Up
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Visual Tip: How to unblock in browser */}
+                  <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[10.5px] text-slate-400 space-y-1">
+                    <span className="font-bold text-slate-200">💡 To allow pop-ups in your browser:</span>
+                    <p className="leading-relaxed">
+                      Look at the right side of your address bar (URL bar). Click the small icon with the red &apos;x&apos; (<span className="text-red-400 font-bold">🚫 Pop-up blocked</span>) &rarr; select <strong>&quot;Always allow pop-ups and redirects from this site&quot;</strong> &rarr; click <strong>Done</strong>.
+                    </p>
+                  </div>
                 </div>
               )}
 
-              <div className="relative flex items-center justify-center my-2">
-                <div className="border-t border-slate-200 w-full"></div>
-                <span className="bg-white px-3 text-[10px] uppercase font-bold text-slate-400">or</span>
+              <div className="relative flex items-center justify-center my-1">
+                <div className="border-t border-slate-800 w-full"></div>
+                <span className="bg-[#0d0f18] px-3 text-[10px] uppercase font-bold text-slate-500">or</span>
               </div>
 
-              {/* Case II: BY E-MAIL BUTTON */}
+              {/* BY EMAIL BUTTON */}
               <button
                 type="button"
                 onClick={() => { setViewState('SIGNUP_EMAIL_FORM'); setErrorMessage(''); }}
-                className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-[#472268] via-[#672c84] to-[#913b82] text-white font-bold text-sm shadow-xl shadow-purple-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                className="w-full py-3.5 px-6 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all"
               >
-                <Mail className="w-4 h-4" />
-                <span>By E-mail</span>
+                <Mail className="w-4 h-4 text-cyan-400" />
+                <span>Register with Email & Verification</span>
               </button>
 
               {/* Footer Transfer to Login */}
-              <div className="pt-2 text-center border-t border-slate-100">
+              <div className="pt-2 text-center border-t border-slate-800/60">
                 <button
                   type="button"
                   onClick={() => { setViewState('LOGIN_MAIN'); setErrorMessage(''); setSuccessMessage(''); }}
-                  className="text-xs font-semibold text-[#59267c] hover:text-[#3b1654] hover:underline"
+                  className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 hover:underline"
                 >
-                  Already have an account? Login
+                  Already have an account? Sign In
                 </button>
               </div>
             </div>
@@ -865,11 +862,11 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
           {viewState === 'SIGNUP_EMAIL_FORM' && (
             <form onSubmit={handleCreateAccountWithEmail} className="space-y-4">
               <div className="flex items-center justify-between">
-                <h1 className="text-xl font-bold text-[#2d1b4e] font-['Outfit']">Fill Credentials</h1>
+                <h1 className="text-xl font-bold text-white font-['Outfit']">Customer Credentials</h1>
                 <button
                   type="button"
                   onClick={() => setViewState('SIGNUP_MAIN')}
-                  className="text-xs font-bold text-purple-700 hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Back
                 </button>
@@ -877,17 +874,17 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
 
               {/* FIELD 1: NAME */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1 ml-3">Name</label>
+                <label className="block text-xs font-bold text-slate-400 mb-1 ml-3">Full Name</label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-purple-400 absolute left-4 top-3.5" />
+                  <User className="w-4 h-4 text-slate-500 absolute left-4 top-3.5" />
                   <input
                     type="text"
                     name="fullName"
                     required
-                    placeholder="Enter your name"
+                    placeholder="e.g. Anika Shah"
                     value={formData.fullName}
                     onChange={handleChange}
-                    className="w-full pl-11 pr-4 py-3 rounded-full bg-purple-50/70 border border-purple-100 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"
+                    className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950/70 border border-slate-800 text-white text-xs placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
                   />
                 </div>
               </div>
@@ -895,9 +892,9 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
               {/* FIELD 2: EMAIL + VERIFY MAIL BUTTON */}
               <div>
                 <div className="flex justify-between items-center mb-1 px-3">
-                  <label className="text-xs font-bold text-slate-600">E-mail</label>
+                  <label className="text-xs font-bold text-slate-400">Email Address</label>
                   {isEmailVerified ? (
-                    <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                    <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Verified
                     </span>
                   ) : (
@@ -905,7 +902,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                       type="button"
                       onClick={handleSendEmailVerification}
                       disabled={isSendingCode}
-                      className="text-[11px] font-bold text-pink-600 hover:text-purple-800 hover:underline flex items-center gap-1"
+                      className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 hover:underline flex items-center gap-1"
                     >
                       <Send className="w-3 h-3" />
                       <span>{isSendingCode ? 'Sending...' : 'Verify Mail'}</span>
@@ -913,17 +910,19 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                   )}
                 </div>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-pink-400 absolute left-4 top-3.5" />
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-4 top-3.5" />
                   <input
                     type="email"
                     name="email"
                     required
                     disabled={isEmailVerified}
-                    placeholder="name@example.com"
+                    placeholder="customer@example.com"
                     value={formData.email}
                     onChange={handleChange}
-                    className={`w-full pl-11 pr-4 py-3 rounded-full border text-xs focus:outline-none focus:ring-2 focus:ring-purple-600 ${
-                      isEmailVerified ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold' : 'bg-pink-100/60 border-pink-200 text-slate-800'
+                    className={`w-full pl-11 pr-4 py-3 rounded-full text-xs focus:outline-none focus:ring-1 ${
+                      isEmailVerified 
+                        ? 'bg-emerald-950/40 border border-emerald-500/50 text-emerald-300 font-bold' 
+                        : 'bg-slate-950/70 border border-slate-800 text-white placeholder-slate-600 focus:border-cyan-500 focus:ring-cyan-500/50'
                     }`}
                   />
                 </div>
@@ -931,8 +930,8 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
 
               {/* SUB-SECTION: ENTER EMAIL VERIFICATION CODE */}
               {codeSent && !isEmailVerified && (
-                <div className="p-3 bg-pink-50 rounded-2xl border border-pink-200 space-y-2">
-                  <label className="block text-[11px] font-bold text-pink-900">
+                <div className="p-3.5 bg-cyan-950/40 rounded-2xl border border-cyan-500/30 space-y-2">
+                  <label className="block text-[11px] font-bold text-cyan-300">
                     Enter 6-Digit Email Code sent to {formData.email}:
                   </label>
                   <div className="flex gap-2">
@@ -942,13 +941,13 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                       placeholder="123456"
                       value={emailOtpCode}
                       onChange={(e) => setEmailOtpCode(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-full bg-white border border-pink-300 text-slate-900 text-xs font-black tracking-widest text-center"
+                      className="w-full px-4 py-2.5 rounded-full bg-slate-950 border border-slate-700 text-white text-xs font-black tracking-widest text-center focus:outline-none focus:border-cyan-500"
                     />
                     <button
                       type="button"
                       onClick={handleConfirmEmailCode}
                       disabled={isLoading}
-                      className="px-4 py-2.5 rounded-full bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs shrink-0"
+                      className="px-4 py-2.5 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shrink-0 active:scale-95 transition"
                     >
                       Confirm
                     </button>
@@ -958,9 +957,9 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
 
               {/* FIELD 3: ADDRESS / LOCALITY */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1 ml-3">Address / Locality</label>
+                <label className="block text-xs font-bold text-slate-400 mb-1 ml-3">Service Address / Locality</label>
                 <div className="relative">
-                  <MapPin className="w-4 h-4 text-purple-400 absolute left-4 top-3.5" />
+                  <MapPin className="w-4 h-4 text-slate-500 absolute left-4 top-3.5" />
                   <input
                     type="text"
                     name="locality"
@@ -968,16 +967,16 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                     placeholder="e.g. Bandra West, Mumbai"
                     value={formData.locality}
                     onChange={handleChange}
-                    className="w-full pl-11 pr-4 py-3 rounded-full bg-purple-50/70 border border-purple-100 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"
+                    className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950/70 border border-slate-800 text-white text-xs placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
                   />
                 </div>
               </div>
 
               {/* FIELD 4: PASSWORD */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1 ml-3">Password</label>
+                <label className="block text-xs font-bold text-slate-400 mb-1 ml-3">Password</label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-pink-400 absolute left-4 top-3.5" />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-4 top-3.5" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
@@ -985,12 +984,12 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={handleChange}
-                    className="w-full pl-11 pr-11 py-3 rounded-full bg-pink-100/60 border border-pink-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"
+                    className="w-full pl-11 pr-11 py-3 rounded-full bg-slate-950/70 border border-slate-800 text-white text-xs placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-3.5 text-slate-400 hover:text-purple-600"
+                    className="absolute right-4 top-3.5 text-slate-500 hover:text-slate-300"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -1001,16 +1000,16 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
               <button
                 type="submit"
                 disabled={isLoading || !isEmailVerified}
-                className={`w-full py-3.5 px-6 rounded-full font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-transform ${
+                className={`w-full py-3.5 px-6 rounded-full font-bold text-xs flex items-center justify-center gap-2 transition-all ${
                   isEmailVerified
-                    ? 'bg-gradient-to-r from-[#472268] via-[#672c84] to-[#913b82] text-white shadow-purple-900/30 active:scale-95'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    ? 'bg-gradient-to-r from-cyan-500 via-indigo-600 to-violet-600 text-white shadow-lg shadow-cyan-500/20 active:scale-95'
+                    : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
                 }`}
               >
                 {isLoading ? (
                   <span>Creating Account...</span>
                 ) : isEmailVerified ? (
-                  <span>Create Account</span>
+                  <span>Complete Customer Registration</span>
                 ) : (
                   <span>Verify Email Above First</span>
                 )}
@@ -1019,38 +1018,38 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
           )}
 
           {/* ======================================================== */}
-          {/* VIEW 5: FORGOT PASSWORD REQUEST & CODE ENTRY (SAME PAGE)  */}
+          {/* VIEW 5: FORGOT PASSWORD REQUEST                           */}
           {/* ======================================================== */}
           {viewState === 'FORGOT_REQUEST' && (
             <form onSubmit={handleForgotPasswordRequest} className="space-y-4">
               <div className="flex items-center justify-between">
-                <h1 className="text-xl font-bold text-[#2d1b4e] font-['Outfit']">Forgot Password</h1>
+                <h1 className="text-xl font-bold text-white font-['Outfit']">Reset Password</h1>
                 <button
                   type="button"
                   onClick={() => { setViewState('LOGIN_EMAIL_FORM'); setForgotCodeSent(false); setErrorMessage(''); }}
-                  className="text-xs font-bold text-purple-700 hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Back to Login
                 </button>
               </div>
 
-              <p className="text-xs text-slate-500">
-                Type account e-mail address. We will send a confirmation code to verify your account & reset the password.
+              <p className="text-xs text-slate-400">
+                Enter your account email. We will send a 6-digit confirmation code to verify your identity.
               </p>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1 ml-3">Type Account E-mail</label>
+                <label className="block text-xs font-bold text-slate-400 mb-1 ml-3">Account Email Address</label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-pink-400 absolute left-4 top-3.5" />
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-4 top-3.5" />
                   <input
                     type="email"
                     name="email"
                     required
                     disabled={forgotCodeSent}
-                    placeholder="name@example.com"
+                    placeholder="customer@example.com"
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full pl-11 pr-4 py-3 rounded-full bg-pink-100/60 border border-pink-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"
+                    className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950/70 border border-slate-800 text-white text-xs placeholder-slate-600 focus:outline-none focus:border-cyan-500"
                   />
                 </div>
               </div>
@@ -1059,35 +1058,34 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-[#472268] via-[#672c84] to-[#913b82] text-white font-bold text-sm shadow-xl shadow-purple-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                  className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-cyan-500 via-indigo-600 to-violet-600 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 active:scale-95 transition-all"
                 >
-                  {isLoading ? <span>Sending Code...</span> : <span>Send OTP / Code</span>}
+                  {isLoading ? <span>Sending Code...</span> : <span>Send Reset Code</span>}
                 </button>
               ) : (
-                /* CLEAN ACCOUNT VERIFICATION CODE WRITING CARD */
-                <div className="p-4 bg-purple-50 rounded-2xl border border-purple-200 space-y-3">
+                <div className="p-4 bg-cyan-950/40 rounded-2xl border border-cyan-500/30 space-y-3">
                   <div className="flex justify-between items-center">
-                    <label className="block text-xs font-bold text-purple-950">
+                    <label className="block text-xs font-bold text-cyan-200">
                       Enter 6-Digit Code sent to {formData.email}:
                     </label>
                     <button
                       type="button"
                       onClick={handleForgotPasswordRequest}
-                      className="text-[11px] font-bold text-pink-600 hover:underline flex items-center gap-1"
+                      className="text-[11px] font-bold text-cyan-400 hover:underline flex items-center gap-1"
                     >
                       <Send className="w-3 h-3" /> Resend Code
                     </button>
                   </div>
 
                   <div className="relative">
-                    <KeyRound className="w-4 h-4 text-purple-500 absolute left-4 top-3.5" />
+                    <KeyRound className="w-4 h-4 text-slate-500 absolute left-4 top-3.5" />
                     <input
                       type="text"
                       maxLength={6}
                       placeholder="123456"
                       value={forgotOtpCode}
                       onChange={(e) => setForgotOtpCode(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 rounded-full bg-white border border-purple-300 text-slate-900 text-xs font-black tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-purple-600"
+                      className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950 border border-slate-700 text-white text-xs font-black tracking-widest text-center focus:outline-none focus:border-cyan-500"
                     />
                   </div>
 
@@ -1095,9 +1093,9 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                     type="button"
                     onClick={handleConfirmForgotCode}
                     disabled={isLoading || forgotOtpCode.length < 6}
-                    className="w-full py-3 rounded-full bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-50"
+                    className="w-full py-3 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-50"
                   >
-                    {isLoading ? 'Verifying Code...' : 'Confirm Code & Continue to Reset Password'}
+                    {isLoading ? 'Verifying Code...' : 'Confirm Code & Proceed to Reset'}
                   </button>
                 </div>
               )}
@@ -1105,25 +1103,25 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
           )}
 
           {/* ======================================================== */}
-          {/* VIEW 6: RESET PASSWORD CONFIRMATION (STEP 2 RESET PAGE)  */}
+          {/* VIEW 6: RESET PASSWORD CONFIRMATION                       */}
           {/* ======================================================== */}
           {viewState === 'FORGOT_RESET' && (
             <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
               <div className="flex items-center justify-between">
-                <h1 className="text-xl font-bold text-[#2d1b4e] font-['Outfit']">Reset Password</h1>
+                <h1 className="text-xl font-bold text-white font-['Outfit']">Set New Password</h1>
                 <button
                   type="button"
                   onClick={() => { setViewState('FORGOT_REQUEST'); setForgotCodeSent(false); }}
-                  className="text-xs font-bold text-purple-700 hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Change Email
                 </button>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1 ml-3">New Reset Password</label>
+                <label className="block text-xs font-bold text-slate-400 mb-1 ml-3">New Password</label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-pink-400 absolute left-4 top-3.5" />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-4 top-3.5" />
                   <input
                     type="password"
                     name="newPassword"
@@ -1131,15 +1129,15 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                     placeholder="Enter new password"
                     value={formData.newPassword}
                     onChange={handleChange}
-                    className="w-full pl-11 pr-4 py-3 rounded-full bg-pink-100/60 border border-pink-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"
+                    className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950/70 border border-slate-800 text-white text-xs placeholder-slate-600 focus:outline-none focus:border-cyan-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1 ml-3">Confirm Reset Password</label>
+                <label className="block text-xs font-bold text-slate-400 mb-1 ml-3">Confirm New Password</label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-pink-400 absolute left-4 top-3.5" />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-4 top-3.5" />
                   <input
                     type="password"
                     name="confirmPassword"
@@ -1147,7 +1145,7 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
                     placeholder="Confirm new password"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className="w-full pl-11 pr-4 py-3 rounded-full bg-pink-100/60 border border-pink-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"
+                    className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950/70 border border-slate-800 text-white text-xs placeholder-slate-600 focus:outline-none focus:border-cyan-500"
                   />
                 </div>
               </div>
@@ -1155,9 +1153,9 @@ export const AuthPage = ({ onLoginSuccess, isWorkerApp = false, onClose = null }
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-[#472268] via-[#672c84] to-[#913b82] text-white font-bold text-sm shadow-xl shadow-purple-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-cyan-500 via-indigo-600 to-violet-600 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 active:scale-95 transition-all"
               >
-                {isLoading ? <span>Updating Password...</span> : <span>Confirm Reset-Password</span>}
+                {isLoading ? <span>Updating Password...</span> : <span>Confirm & Update Password</span>}
               </button>
             </form>
           )}

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   MapPin,
-  Clock,
   CreditCard,
   CheckCircle2,
   ChevronRight,
@@ -16,10 +15,10 @@ import {
   AlertCircle,
   Search,
   X,
-  QrCode,
   Smartphone,
   Copy,
-  Check
+  Check,
+  Info
 } from 'lucide-react';
 import { AddressAndSlotWorkflow } from './AddressAndSlotWorkflow';
 import { API_BASE_URL } from '../../config/api';
@@ -33,12 +32,26 @@ export const CheckoutPage = ({
   onBookingComplete,
   onRequireLogin
 }) => {
+  // Address sanitization helper: cleans any legacy "near Noida" or stale placeholders
+  const sanitizeAddressText = (raw) => {
+    if (!raw || typeof raw !== 'string') return '';
+    return raw
+      .replace(/,\s*near\s+noida\b/gi, '')
+      .replace(/\bnear\s+noida,?\s*/gi, '')
+      .replace(/201301/g, '400001')
+      .replace(/,\s*,/g, ',')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const initialUserAddr = sanitizeAddressText(user?.address);
+
   // Saved addresses list state (Defaulted to Mumbai Operating Region)
   const [savedAddresses, setSavedAddresses] = useState([
     {
       id: 'addr-home',
       label: 'Home (Mumbai)',
-      details: user?.address || 'Astavinayak Colony, Sangoda Rd, Mumbai Central, Mumbai, Maharashtra 400008',
+      details: initialUserAddr || 'Astavinayak Colony, Sangoda Rd, Mumbai Central, Mumbai, Maharashtra 400008',
       isDefault: true
     },
     {
@@ -106,9 +119,9 @@ export const CheckoutPage = ({
       fullAddress: 'Lal Bahadur Shastri Rd, Kamani, Kurla West, Mumbai, Maharashtra, 400070, India'
     },
     {
-      title: 'Sector 62 Noida (Electronic City)',
-      subtitle: 'Noida, Gautam Buddha Nagar, Uttar Pradesh, India',
-      fullAddress: 'Sector 62, Noida, Gautam Buddha Nagar, Uttar Pradesh, 201301, India'
+      title: 'Dadar West (Shivaji Park)',
+      subtitle: 'Dadar West, Mumbai, Maharashtra, India',
+      fullAddress: 'Shivaji Park, Dadar West, Mumbai, Maharashtra, 400028, India'
     },
     {
       title: 'Cyber City Gurugram',
@@ -190,7 +203,7 @@ export const CheckoutPage = ({
   // Address & contact step state
   const [phone, setPhone] = useState(user?.phone || '+91 9653192752');
   const activeAddressObj = savedAddresses.find(a => a.id === selectedAddressId) || savedAddresses[0];
-  const [address, setAddress] = useState(activeAddressObj.details);
+  const [address, setAddress] = useState(sanitizeAddressText(activeAddressObj.details));
   const [addressSaved, setAddressSaved] = useState(true);
   const [avoidCalling, setAvoidCalling] = useState(false);
 
@@ -198,12 +211,11 @@ export const CheckoutPage = ({
   const addressAvailability = isMumbaiLocation(address, selectedAddressCoordinates);
   const isAddressInMumbai = addressAvailability.isAvailable;
 
-  // Time slot step
-  const [selectedSlot, setSelectedSlot] = useState('Tomorrow, 10:00 AM - 11:00 AM');
-  const [showSlotPicker, setShowSlotPicker] = useState(false);
+  // Service timing
+  const [selectedSlot, setSelectedSlot] = useState('Immediate / On Demand');
 
-  // Payment method step
-  const [paymentMethod, setPaymentMethod] = useState('UPI_QR'); // 'UPI_QR' | 'DIRECT_CASH' | 'CARD'
+  // Payment method step (Exclusively Pay After Service on Checkout)
+  const [paymentMethod, setPaymentMethod] = useState('DIRECT_CASH');
   const [showPaymentPicker, setShowPaymentPicker] = useState(false);
   const partnerUpi = worker?.bank?.upi || worker?.upiId || worker?.upi || (worker?.phone ? `${worker.phone.replace(/\D/g, '')}@paytm` : (import.meta.env.VITE_RECEIVER_UPI_ID || '9653192752@kotakbank'));
   const [receiverUpiId, setReceiverUpiId] = useState(partnerUpi);
@@ -219,6 +231,7 @@ export const CheckoutPage = ({
   const [selectedTip, setSelectedTip] = useState(75);
   const [customTip, setCustomTip] = useState('');
   const [isCustomTip, setIsCustomTip] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
 
   const visitingCharge = Number(worker?.visitingCharge || worker?.visiting_charge || 149);
 
@@ -350,10 +363,6 @@ export const CheckoutPage = ({
               <span className="font-bold text-slate-900">{worker.name} ({worker.tradeTitle})</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Slot:</span>
-              <span className="font-bold text-slate-900">{selectedSlot}</span>
-            </div>
-            <div className="flex justify-between">
               <span className="text-slate-500">Address:</span>
               <span className="font-bold text-slate-900 max-w-[200px] truncate">{address}</span>
             </div>
@@ -474,116 +483,44 @@ export const CheckoutPage = ({
                 </div>
               </div>
 
-              {/* Step 3: Slot */}
+              {/* Step 3: Payment Method */}
               <div className="pt-4 border-t border-slate-100 flex items-start gap-4">
-                <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <Receipt className="w-5 h-5 text-emerald-700" />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-slate-900">Slot</h3>
-                    <button
-                      onClick={() => setShowSlotPicker(!showSlotPicker)}
-                      className="text-xs font-bold text-purple-700 hover:underline"
-                    >
-                      {showSlotPicker ? 'Close' : 'Choose time'}
-                    </button>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">{selectedSlot}</p>
-
-                  {showSlotPicker && (
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                      {[
-                        'Today, 4:00 PM - 5:00 PM',
-                        'Today, 6:00 PM - 7:00 PM',
-                        'Tomorrow, 10:00 AM - 11:00 AM',
-                        'Tomorrow, 2:00 PM - 3:00 PM'
-                      ].map(slot => (
-                        <button
-                          key={slot}
-                          onClick={() => {
-                            setSelectedSlot(slot);
-                            setShowSlotPicker(false);
-                          }}
-                          className={`p-2.5 rounded-xl border text-left font-medium transition ${selectedSlot === slot ? 'border-purple-600 bg-purple-50 text-purple-900 font-bold' : 'border-slate-200 hover:bg-slate-50'}`}
-                        >
-                          {slot}
-                        </button>
-                      ))}
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-slate-900">Payment Method</h3>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-extrabold uppercase tracking-wide">
+                        Selected
+                      </span>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Step 4: Payment Method */}
-              <div className="pt-4 border-t border-slate-100 flex items-start gap-4">
-                <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
-                  <CreditCard className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-slate-900">Payment Method</h3>
-                    <button
-                      onClick={() => setShowPaymentPicker(!showPaymentPicker)}
-                      className="text-xs font-bold text-purple-700 hover:underline"
-                    >
-                      {showPaymentPicker ? 'Close' : 'Change'}
-                    </button>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {paymentMethod === 'UPI_QR'
-                      ? 'Scan & Pay directly via Live UPI QR (GPay / PhonePe / Paytm)'
-                      : paymentMethod === 'DIRECT_CASH'
-                      ? 'Pay after service (Cash / UPI to Worker)'
-                      : 'Online Card / NetBanking'}
-                  </p>
 
-                  {showPaymentPicker && (
-                    <div className="mt-3 space-y-2 text-xs">
-                      {/* Option 1: Live UPI QR (Direct to your account) */}
-                      <button
-                        type="button"
-                        onClick={() => { setPaymentMethod('UPI_QR'); setShowPaymentPicker(false); }}
-                        className={`w-full p-3.5 rounded-2xl border text-left flex items-center justify-between transition ${
-                          paymentMethod === 'UPI_QR'
-                            ? 'border-[#5932ea] bg-purple-50/70 font-bold text-purple-950 shadow-sm'
-                            : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-xl bg-purple-600 text-white grid place-items-center shrink-0">
-                            <QrCode className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="font-extrabold text-xs text-slate-900">Scan & Pay via UPI QR Code</p>
-                            <p className="text-[10px] text-slate-500">Google Pay, PhonePe, Paytm, BHIM, Cred</p>
-                          </div>
-                        </div>
-                        <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">Fast & Direct</span>
-                      </button>
-
-                      {/* Option 2: Pay After Service */}
-                      <button
-                        type="button"
-                        onClick={() => { setPaymentMethod('DIRECT_CASH'); setShowPaymentPicker(false); }}
-                        className={`w-full p-3.5 rounded-2xl border text-left flex items-center justify-between transition ${
-                          paymentMethod === 'DIRECT_CASH'
-                            ? 'border-[#5932ea] bg-purple-50/70 font-bold text-purple-950 shadow-sm'
-                            : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white grid place-items-center shrink-0">
-                            <Receipt className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="font-extrabold text-xs text-slate-900">Pay After Service</p>
-                            <p className="text-[10px] text-slate-500">Cash or UPI directly to worker after job completion</p>
-                          </div>
-                        </div>
-                      </button>
+                  {/* Active Pay After Service Card */}
+                  <div className="p-3.5 rounded-2xl border-2 border-emerald-500 bg-emerald-50/50 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white grid place-items-center shrink-0 shadow-sm">
+                        <Receipt className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="font-black text-xs text-slate-900">Pay after service</p>
+                        <p className="text-[11px] text-slate-600 mt-0.5">Pay via Cash or UPI directly to worker after job completion</p>
+                      </div>
                     </div>
-                  )}
+                    <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <Check className="w-3 h-3 stroke-[3]" />
+                    </div>
+                  </div>
+
+                  {/* Notice: Other Payment Methods Coming Soon */}
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center gap-2.5 text-slate-600">
+                    <Info className="w-4 h-4 text-purple-600 shrink-0" />
+                    <p className="text-[11px] leading-tight font-medium text-slate-600">
+                      <strong className="text-slate-800 font-bold">Other payment methods will also be available soon</strong> (Online UPI QR, Cards & NetBanking).
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -591,11 +528,21 @@ export const CheckoutPage = ({
 
             {/* Cancellation Policy */}
             <div className="space-y-1.5 px-2">
-              <h4 className="text-sm font-black text-slate-900 font-['Outfit']">Cancellation policy</h4>
+              <h4 className="text-sm font-black text-slate-900 font-['Outfit'] flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Cancellation & Service Policy</span>
+              </h4>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Free cancellations if done more than 12 hrs before the service. A nominal fee will be charged otherwise.
+                100% Free cancellation anytime before job start. Protected by Connect Escrow Security, 30-Day Workmanship Warranty, and zero hidden charges.
               </p>
-              <button className="text-xs font-bold text-slate-900 underline">Read full policy</button>
+              <button
+                type="button"
+                onClick={() => setShowPolicyModal(true)}
+                className="text-xs font-bold text-purple-700 hover:text-purple-900 underline cursor-pointer inline-flex items-center gap-1 transition"
+              >
+                <span>Read full policy & guarantees</span>
+                <span>➔</span>
+              </button>
             </div>
 
           </div>
@@ -697,20 +644,6 @@ export const CheckoutPage = ({
                 </label>
               </div>
 
-            </div>
-
-            {/* Coupons & Offers Banner */}
-            <div className="bg-white rounded-3xl border border-slate-200 p-4 shadow-sm flex items-center justify-between cursor-pointer hover:bg-slate-50 transition">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 grid place-items-center">
-                  <Percent className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-extrabold text-slate-900">Coupons and offers</span>
-              </div>
-              <div className="flex items-center gap-1 text-xs font-bold text-purple-700">
-                <span>9 offers</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </div>
             </div>
 
             {/* Bill Summary Card */}
@@ -877,7 +810,7 @@ export const CheckoutPage = ({
                     key={addr.id}
                     onClick={() => {
                       setSelectedAddressId(addr.id);
-                      setAddress(addr.details);
+                      setAddress(sanitizeAddressText(addr.details));
                     }}
                     className={`flex items-start justify-between gap-3 p-4 rounded-2xl border cursor-pointer transition select-none ${
                       isSelected
@@ -899,7 +832,7 @@ export const CheckoutPage = ({
                       <div>
                         <h4 className="text-sm font-extrabold text-slate-900">{addr.label}</h4>
                         <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-sm">
-                          {addr.details}
+                          {sanitizeAddressText(addr.details)}
                         </p>
                       </div>
                     </div>
@@ -970,6 +903,148 @@ export const CheckoutPage = ({
           setShowAddressModal(false);
         }}
       />
+
+      {/* ======================================================== */}
+      {/* COMPREHENSIVE SERVICE, CANCELLATION & ESCROW POLICY MODAL */}
+      {/* ======================================================== */}
+      {showPolicyModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 bg-slate-950 text-white flex items-center justify-between shrink-0 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 grid place-items-center shadow-md">
+                  <ShieldCheck className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black font-['Outfit'] tracking-tight">Connect Service & Cancellation Policy</h3>
+                  <p className="text-xs text-slate-400">Official consumer protection, cancellation terms & workmanship guarantee</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPolicyModal(false)}
+                className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white grid place-items-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="p-6 sm:p-8 overflow-y-auto space-y-6 text-slate-700 text-xs sm:text-[13px] leading-relaxed">
+              
+              {/* Highlight summary badge */}
+              <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-950 flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-black text-xs uppercase tracking-wider text-amber-900">Zero-Penalty Guarantee</p>
+                  <p className="text-xs text-amber-800 leading-normal">
+                    You can cancel your booking request anytime before the partner starts the job without paying any cancellation penalty or fee. Your payments are protected in escrow until you release your 6-digit completion code.
+                  </p>
+                </div>
+              </div>
+
+              {/* SECTION 1 */}
+              <div className="space-y-2 border-b border-slate-100 pb-5">
+                <h4 className="text-sm font-black text-slate-900 font-['Outfit'] flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-purple-100 text-purple-800 font-black text-xs grid place-items-center">1</span>
+                  <span>100% Free Cancellation & Instant Release</span>
+                </h4>
+                <p>
+                  At Connect, we prioritize customer autonomy. Homeowners may cancel active or pending booking requests through the Connect Client App at any time without incurring cancellation fees or penalty charges.
+                </p>
+                <ul className="list-disc pl-5 space-y-1.5 text-slate-600">
+                  <li><strong>Instant Dual-Notification:</strong> When you click "Cancel Request" in your bookings panel, an automated email confirmation is immediately sent to your registered address and a real-time cancellation notice is dispatched to your assigned service partner.</li>
+                  <li><strong>Immediate Schedule Clearing:</strong> The booking order is automatically unlinked and removed from the specialist's active schedule and inbox, ensuring their time is freed without administrative delays.</li>
+                  <li><strong>In-Transit Cancellations:</strong> If you must cancel while the technician is already en route, the partner will be notified immediately to cease transit. No cancellation penalty will be applied to your account.</li>
+                </ul>
+              </div>
+
+              {/* SECTION 2 */}
+              <div className="space-y-2 border-b border-slate-100 pb-5">
+                <h4 className="text-sm font-black text-slate-900 font-['Outfit'] flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-purple-100 text-purple-800 font-black text-xs grid place-items-center">2</span>
+                  <span>Escrow Security & 100% Refund Protocol</span>
+                </h4>
+                <p>
+                  All transactions on Connect are safeguarded by our rigorous financial protection layer:
+                </p>
+                <ul className="list-disc pl-5 space-y-1.5 text-slate-600">
+                  <li><strong>Private 6-Digit Completion Code:</strong> For both safety and quality verification, technicians are never paid or marked completed until you physically share the secret 6-digit Completion Code generated in your booking modal once you are fully satisfied with the job.</li>
+                  <li><strong>Full Refund on Cancellation:</strong> If you cancel a prepaid booking or if a partner declines your request, 100% of the funds are promptly refunded back to your original payment method / UPI ID with zero deduction.</li>
+                  <li><strong>Pay After Service Protection:</strong> If you choose Cash / Pay After Service, you only pay the agreed amount directly to the specialist upon full physical inspection and job verification at your doorstep.</li>
+                  <li><strong>No Hidden or Off-Platform Surcharges:</strong> Specialists are strictly prohibited from demanding extra unlisted charges, off-book travel premiums, or arbitrary inspection costs. The fee shown on your invoice is all-inclusive.</li>
+                </ul>
+              </div>
+
+              {/* SECTION 3 */}
+              <div className="space-y-2 border-b border-slate-100 pb-5">
+                <h4 className="text-sm font-black text-slate-900 font-['Outfit'] flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-purple-100 text-purple-800 font-black text-xs grid place-items-center">3</span>
+                  <span>30-Day Workmanship Warranty & Quality Promise</span>
+                </h4>
+                <p>
+                  Every verified repair and installation completed on the platform is backed by the Connect 30-Day Peace-of-Mind Guarantee:
+                </p>
+                <ul className="list-disc pl-5 space-y-1.5 text-slate-600">
+                  <li><strong>Free Re-Inspection & Rework:</strong> If any serviced equipment, plumbing joint, electrical board, or carpentry fitting develops an issue related to the work performed within 30 days of completion, our team will re-dispatch a qualified technician to inspect and fix it at no additional service cost.</li>
+                  <li><strong>Material & Spares Transparency:</strong> Any replacement components or hardware items purchased by the specialist must be accompanied by a valid vendor bill and original manufacturer warranty.</li>
+                  <li><strong>Property Damage Coverage:</strong> In the rare event of accidental physical damage occurring to your home fixtures during a scheduled job, Connect provides assistance and damage coverage up to standard liability limits.</li>
+                </ul>
+              </div>
+
+              {/* SECTION 4 */}
+              <div className="space-y-2 border-b border-slate-100 pb-5">
+                <h4 className="text-sm font-black text-slate-900 font-['Outfit'] flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-purple-100 text-purple-800 font-black text-xs grid place-items-center">4</span>
+                  <span>Partner Verification & Doorstep Safety Standards</span>
+                </h4>
+                <p>
+                  Your household's security is our highest priority:
+                </p>
+                <ul className="list-disc pl-5 space-y-1.5 text-slate-600">
+                  <li><strong>Government ID & Skill Verification:</strong> Every partner registered on Connect undergoes Aadhaar/PAN identity validation, bank account verification, and trade skill screening.</li>
+                  <li><strong>Professional Conduct Code:</strong> Partners must wear identity credentials, maintain polite professional decorum, adhere to safety regulations, and leave work areas tidy.</li>
+                  <li><strong>Safety First:</strong> You retain the right to deny entry or halt work at any moment if a partner fails to adhere to professional standards.</li>
+                </ul>
+              </div>
+
+              {/* SECTION 5 */}
+              <div className="space-y-2">
+                <h4 className="text-sm font-black text-slate-900 font-['Outfit'] flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-purple-100 text-purple-800 font-black text-xs grid place-items-center">5</span>
+                  <span>Customer Support & 24/7 Dispute Redressal</span>
+                </h4>
+                <p>
+                  Have questions, booking disputes, or feedback about a specialist? Our dedicated support grievance desk is available around the clock:
+                </p>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
+                  <div>
+                    <p className="font-bold text-slate-900">Connect Grievance & Customer Helpdesk</p>
+                    <p className="text-slate-500 font-mono">Email: kaam@yors.online • Mumbai, Maharashtra</p>
+                  </div>
+                  <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[11px] shrink-0">
+                    SLA Response &lt; 4 Hours
+                  </span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+              <span className="text-[11px] text-slate-500 hidden sm:inline">Connect Consumer Trust & Safety Charter v2.4</span>
+              <button
+                type="button"
+                onClick={() => setShowPolicyModal(false)}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition active:scale-95 cursor-pointer ml-auto"
+              >
+                I Understand & Agree
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

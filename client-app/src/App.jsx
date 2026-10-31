@@ -39,6 +39,7 @@ import {
   Layers,
   AlertCircle,
   Mail,
+  X,
   XCircle,
   FileText,
   Copy,
@@ -89,7 +90,25 @@ const API_URL = `${API_BASE_URL}/api/jobs`;
 export default function App() {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('kaam_client_user');
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed.address === 'string') {
+        const cleaned = parsed.address
+          .replace(/,\s*near\s+noida\b/gi, '')
+          .replace(/\bnear\s+noida,?\s*/gi, '')
+          .replace(/201301/g, '400001')
+          .replace(/,\s*,/g, ',')
+          .trim();
+        if (cleaned !== parsed.address) {
+          parsed.address = cleaned;
+          localStorage.setItem('kaam_client_user', JSON.stringify(parsed));
+        }
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
   });
 
   // Auth Modal State (Triggered on Login click or Booking)
@@ -98,6 +117,15 @@ export default function App() {
   // Accepted Booking Details & Partner QR Modal State
   const [selectedJobDetails, setSelectedJobDetails] = useState(null);
   const [copiedJobUpi, setCopiedJobUpi] = useState(false);
+
+  // Give Review Modal State
+  const [reviewModalJob, setReviewModalJob] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewHoverRating, setReviewHoverRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewSuccess, setReviewSuccess] = useState('');
 
   // Edit Profile Modal State
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -380,8 +408,8 @@ export default function App() {
             rating: w.ratingAverage || 4.9,
             reviewCount: w.completedJobsCount ? w.completedJobsCount + 20 : 35,
             completedJobsCount: w.completedJobsCount || 10,
-            isAvailable: Boolean(w.isAvailable),
-            photo: getTradeWorkImage(w.tradeCategory || w.trade, idx, w.photo),
+            isAvailable: w.isAvailable !== false && w.is_available !== 0,
+            photo: (w.photo && (w.photo.startsWith('http') || w.photo.startsWith('data:image'))) ? w.photo : getTradeWorkImage(w.tradeCategory || w.trade, idx, w.photo),
             bio: w.bio || 'Certified specialist with proven track record in residential and commercial repairs.',
             portfolio: (() => {
               const raw = (Array.isArray(w.portfolio) && w.portfolio.length > 0)
@@ -448,6 +476,113 @@ export default function App() {
       }
     } catch (err) {
       console.error('Error fetching jobs:', err);
+    }
+  };
+
+  const handleCancelJob = async (jobId) => {
+    if (!window.confirm('Are you sure you want to cancel this booking request? This will notify your specialist and cancel the order.')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/jobs/${jobId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (res.ok) {
+        setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'CANCELLED' } : j));
+        if (selectedJobDetails && selectedJobDetails.id === jobId) {
+          setSelectedJobDetails(null);
+        }
+        alert('Booking request cancelled. Confirmation emails dispatched to you and the specialist.');
+        fetchJobsFromAPI();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'Failed to cancel request. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error cancelling job:', err);
+      alert('Unable to reach server. Please check your connection.');
+    }
+  };
+
+  const handleOpenReviewModal = (job) => {
+    setReviewModalJob(job);
+    setReviewRating(5);
+    setReviewHoverRating(0);
+    setReviewComment('');
+    setReviewError('');
+    setReviewSuccess('');
+  };
+
+  const handleSubmitReview = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!reviewModalJob) return;
+    setIsSubmittingReview(true);
+    setReviewError('');
+    setReviewSuccess('');
+
+    try {
+      const clientName = user?.fullName || user?.displayName || user?.name || clientOnboardingProfile?.fullName || 'Client';
+      const res = await fetch(`${API_BASE_URL}/api/jobs/${reviewModalJob.id}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rating: reviewRating,
+          comment: reviewComment,
+          clientName
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to submit review');
+      }
+
+      setReviewSuccess('Review and rating submitted successfully! Thank you for supporting our verified partner.');
+
+      // Update local jobs list so the button transforms immediately into "Rated ★X/5"
+      setJobs(prev => prev.map(job => {
+        if (job.id === reviewModalJob.id) {
+          return {
+            ...job,
+            is_reviewed: 1,
+            isReviewed: true,
+            review_rating: reviewRating,
+            reviewRating: reviewRating,
+            review_comment: reviewComment,
+            reviewComment: reviewComment
+          };
+        }
+        return job;
+      }));
+
+      // Update workers list so the partner card immediately displays the newly recalculated average rating
+      if (data.ratingAverage !== undefined) {
+        setDbWorkers(prev => prev.map(w => {
+          if (w.id === reviewModalJob.worker_id || w.id === reviewModalJob.workerId || w.userId === reviewModalJob.worker_id) {
+            return {
+              ...w,
+              ratingAverage: data.ratingAverage,
+              rating: data.ratingAverage,
+              reviewCount: data.reviewCount || ((w.reviewCount || 0) + 1)
+            };
+          }
+          return w;
+        }));
+      }
+
+      setTimeout(() => {
+        setReviewModalJob(null);
+        setReviewSuccess('');
+        setReviewComment('');
+        setReviewRating(5);
+      }, 1500);
+    } catch (err) {
+      setReviewError(err.message || 'Error submitting review');
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -585,6 +720,9 @@ export default function App() {
   const workerList = (dbWorkers && dbWorkers.length > 0) ? dbWorkers : (INITIAL_WORKERS || []);
 
   const filteredWorkers = workerList.filter((worker) => {
+    // 0. Availability Rule: Hide partner if switched to offline
+    if (worker.isAvailable === false || worker.is_available === 0) return false;
+
     const selCat = (selectedCategory || 'all').toLowerCase().trim();
     const q = (searchQuery || '').toLowerCase().trim();
 
@@ -1231,7 +1369,8 @@ export default function App() {
                     const isCompleted = j.status === 'COMPLETED';
                     const isAccepted = j.status === 'ACCEPTED';
                     const isRejected = j.status === 'REJECTED';
-                    const isPending = !isAccepted && !isRejected && !isCompleted;
+                    const isCancelled = j.status === 'CANCELLED';
+                    const isPending = !isAccepted && !isRejected && !isCompleted && !isCancelled;
 
                     return (
                       <div key={j.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 hover:shadow-md transition">
@@ -1256,12 +1395,16 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* EXACT STATUS BADGE */}
+                          {/* EXACT STATUS BADGE & CANCEL ACTION */}
                           <div>
                             {isCompleted ? (
                               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-900 font-black text-xs border border-emerald-300 shadow-sm">
                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                                 <span>🟢 Work Completed & Verified</span>
+                              </div>
+                            ) : isCancelled ? (
+                              <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 text-slate-600 font-bold text-xs border border-slate-200">
+                                <span>🔴 Request Cancelled</span>
                               </div>
                             ) : isAccepted ? (
                               <div className="flex items-center gap-2 flex-wrap">
@@ -1272,23 +1415,41 @@ export default function App() {
                                   <FileText className="w-3.5 h-3.5" />
                                   <span>View Details</span>
                                 </button>
+                                <button
+                                  onClick={() => handleCancelJob(j.id)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-red-200 hover:border-red-400 bg-red-50/60 hover:bg-red-50 text-red-600 font-bold text-xs transition active:scale-95 cursor-pointer shadow-xs"
+                                  title="Cancel this booking request"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>Cancel Request</span>
+                                </button>
                                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 font-black text-xs border border-emerald-300 shadow-sm">
                                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                                   <span>🟢 Booking Confirmed • Partner on the way</span>
                                 </div>
                               </div>
                             ) : isRejected ? (
-                              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-50 text-red-800 font-black text-xs border border-red-300 shadow-sm">
+                              <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-red-50 text-red-800 font-black text-xs border border-red-300 shadow-sm">
                                 <span className="w-2 h-2 rounded-full bg-red-500"></span>
                                 <span>🔴 Request Declined by Partner</span>
                               </div>
                             ) : (
-                              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-50 text-amber-950 font-black text-xs border border-amber-300 shadow-sm animate-pulse">
-                                <span className="relative flex h-2 w-2">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                                </span>
-                                <span>⏳ Waiting for confirmation</span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                  onClick={() => handleCancelJob(j.id)}
+                                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-red-300 hover:border-red-500 bg-white hover:bg-red-50 text-red-600 font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer"
+                                  title="Cancel this pending booking request"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>Cancel Request</span>
+                                </button>
+                                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-50 text-amber-950 font-black text-xs border border-amber-300 shadow-sm animate-pulse">
+                                  <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                  </span>
+                                  <span>⏳ Waiting for confirmation</span>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1334,7 +1495,7 @@ export default function App() {
                               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                               <span>Work completed and code-verified! Completion confirmation receipt sent to <strong>{clientEmail}</strong>.</span>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-2 shrink-0 flex-wrap">
                               <button
                                 onClick={() => setSelectedJobDetails(j)}
                                 className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
@@ -1342,7 +1503,23 @@ export default function App() {
                                 <FileText className="w-3.5 h-3.5" />
                                 <span>Details</span>
                               </button>
-                              <span className="px-3 py-1 rounded-xl bg-emerald-600 text-white font-bold text-xs">
+
+                              {j.is_reviewed || j.isReviewed ? (
+                                <div className="px-3.5 py-1.5 rounded-xl bg-amber-100 text-amber-900 font-black text-xs border border-amber-300 flex items-center gap-1 shadow-xs">
+                                  <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                                  <span>Rated {j.review_rating || j.reviewRating || 5}/5</span>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleOpenReviewModal(j)}
+                                  className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:brightness-105 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/25 active:scale-95 transition cursor-pointer"
+                                >
+                                  <Star className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
+                                  <span>Give Review</span>
+                                </button>
+                              )}
+
+                              <span className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-xs">
                                 Job Completed
                               </span>
                             </div>
@@ -1500,12 +1677,12 @@ export default function App() {
                             
                             <div className="flex items-center gap-1 text-xs font-black text-amber-900 bg-amber-100 px-2 py-1 rounded-lg">
                               <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                              <span>{w.rating}</span>
+                              <span>{w.ratingAverage || w.rating || '5.0'}</span>
                             </div>
                           </div>
 
                           <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
-                            <span className="font-semibold">{w.reviewCount} reviews</span>
+                            <span className="font-semibold">{w.reviewCount || 0} reviews</span>
                             <span>•</span>
                             <span className="text-emerald-700 font-bold flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3 text-emerald-600" /> {w.completedJobsCount || 0} completed jobs
@@ -1949,13 +2126,27 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Close Button at bottom */}
-              <button
-                onClick={() => setSelectedJobDetails(null)}
-                className="w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
-              >
-                Close Details
-              </button>
+              {/* Actions at bottom */}
+              <div className="flex gap-2">
+                {['REQUESTED', 'PENDING', 'ACCEPTED'].includes(String(selectedJobDetails.status || '').toUpperCase()) && (
+                  <button
+                    onClick={() => {
+                      const id = selectedJobDetails.id;
+                      handleCancelJob(id);
+                    }}
+                    className="flex-1 py-3 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-98"
+                  >
+                    <XCircle className="w-4 h-4 text-rose-600" />
+                    <span>Cancel Booking Request</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedJobDetails(null)}
+                  className="flex-1 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer active:scale-98"
+                >
+                  Close Details
+                </button>
+              </div>
 
             </div>
           </div>
@@ -2195,6 +2386,137 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP MODAL: GIVE REVIEW & RATING */}
+      {reviewModalJob && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-5 border border-slate-200">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+              <div>
+                <span className="text-[10px] uppercase font-black tracking-wider bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
+                  Rate Completed Work
+                </span>
+                <h3 className="text-xl font-black text-slate-950 font-['Outfit'] mt-1">
+                  Give Review to Partner
+                </h3>
+              </div>
+              <button
+                onClick={() => setReviewModalJob(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold grid place-items-center transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Partner Info Banner */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 font-black text-sm flex items-center justify-center shadow-xs">
+                ★
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-slate-900 truncate">
+                  {reviewModalJob.worker_name || reviewModalJob.workerName || 'Connect Partner'}
+                </p>
+                <p className="text-[11px] text-amber-800 font-semibold truncate">
+                  {reviewModalJob.category_title || reviewModalJob.trade_title || 'Home Service'}
+                </p>
+              </div>
+            </div>
+
+            {/* Error / Success Alerts */}
+            {reviewError && (
+              <div className="p-3 rounded-xl bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
+                {reviewError}
+              </div>
+            )}
+            {reviewSuccess && (
+              <div className="p-3.5 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{reviewSuccess}</span>
+              </div>
+            )}
+
+            {!reviewSuccess && (
+              <form onSubmit={handleSubmitReview} className="space-y-4 text-xs">
+                {/* 5-Star Rating Selector */}
+                <div className="space-y-2 text-center py-2">
+                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wider">
+                    Select Your Rating
+                  </label>
+                  
+                  <div className="flex items-center justify-center gap-2">
+                    {[1, 2, 3, 4, 5].map((starValue) => {
+                      const isFilled = (reviewHoverRating || reviewRating) >= starValue;
+                      return (
+                        <button
+                          key={starValue}
+                          type="button"
+                          onMouseEnter={() => setReviewHoverRating(starValue)}
+                          onMouseLeave={() => setReviewHoverRating(0)}
+                          onClick={() => setReviewRating(starValue)}
+                          className="p-1 text-2xl transition-transform hover:scale-125 active:scale-95 cursor-pointer focus:outline-hidden"
+                          title={`${starValue} Star${starValue > 1 ? 's' : ''}`}
+                        >
+                          <Star
+                            className={`w-8 h-8 transition-colors ${
+                              isFilled
+                                ? 'fill-amber-400 text-amber-500 drop-shadow-sm'
+                                : 'text-slate-300 hover:text-amber-200'
+                            }`}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <p className="text-xs font-black text-amber-800 font-['Outfit']">
+                    {reviewRating === 5 && '★★★★★ Excellent Service! Highly Recommended'}
+                    {reviewRating === 4 && '★★★★☆ Great Job! Very Satisfied'}
+                    {reviewRating === 3 && '★★★☆☆ Good Work, Met Expectations'}
+                    {reviewRating === 2 && '★★☆☆☆ Fair, Room for Improvement'}
+                    {reviewRating === 1 && '★☆☆☆☆ Poor Service'}
+                  </p>
+                </div>
+
+                {/* Comment / Experience Textarea */}
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-slate-700">
+                    Your Feedback & Review <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="Describe your experience with the partner, punctuality, and work quality..."
+                    className="w-full p-3 rounded-2xl border border-slate-200 text-xs focus:ring-2 focus:ring-amber-400 focus:outline-hidden resize-none bg-slate-50 focus:bg-white"
+                  />
+                </div>
+
+                {/* Submit & Cancel Buttons */}
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setReviewModalJob(null)}
+                    className="flex-1 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReview}
+                    className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:brightness-105 text-slate-950 font-black text-xs shadow-md shadow-amber-400/25 active:scale-95 transition cursor-pointer disabled:opacity-50"
+                  >
+                    {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
+                  </button>
+                </div>
+              </form>
+            )}
+
           </div>
         </div>
       )}

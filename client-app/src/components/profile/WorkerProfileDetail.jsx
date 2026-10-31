@@ -22,6 +22,7 @@ import {
   Maximize2
 } from 'lucide-react';
 import { TRADE_SERVICES, getTradeWorkImage } from '../../data/mockData';
+import { API_BASE_URL } from '../../config/api';
 
 export const WorkerProfileDetail = ({
   worker,
@@ -114,6 +115,42 @@ export const WorkerProfileDetail = ({
   const [activeLightboxImage, setActiveLightboxImage] = useState(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
+  // Customer Reviews & Rating Stats
+  const [reviews, setReviews] = useState([]);
+  const [ratingStats, setRatingStats] = useState({
+    ratingAverage: worker.ratingAverage || worker.rating || 5.0,
+    reviewCount: worker.reviewCount || 0
+  });
+  const [loadingReviews, setLoadingReviews] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchReviews = async () => {
+      try {
+        setLoadingReviews(true);
+        const res = await fetch(`${API_BASE_URL}/api/workers/${worker.id}/reviews`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            setReviews(data.reviews || []);
+            setRatingStats({
+              ratingAverage: data.ratingAverage || worker.ratingAverage || worker.rating || 5.0,
+              reviewCount: data.reviewCount || (data.reviews ? data.reviews.length : 0)
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load reviews:', e);
+      } finally {
+        if (isMounted) setLoadingReviews(false);
+      }
+    };
+    if (worker?.id) {
+      fetchReviews();
+    }
+    return () => { isMounted = false; };
+  }, [worker?.id]);
+
   const openLightboxAt = (index) => {
     if (!pastWorkImages || pastWorkImages.length === 0) return;
     const safeIndex = Math.max(0, Math.min(index, pastWorkImages.length - 1));
@@ -202,7 +239,7 @@ export const WorkerProfileDetail = ({
     features: [pkg.description || 'Includes doorstep visit, inspection & complete service.']
   }));
 
-  const itemsToRender = hasCustomPackages ? customPackages : displayedItems;
+  const itemsToRender = customPackages;
 
   return (
     <div className="min-h-screen bg-[#fcfbf9] text-slate-900 font-['Plus_Jakarta_Sans',sans-serif] pb-24 animate-in fade-in">
@@ -240,7 +277,7 @@ export const WorkerProfileDetail = ({
             </div>
             <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg text-xs font-black text-amber-900">
               <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-              <span>{worker.rating}</span>
+              <span>{ratingStats.ratingAverage || worker.ratingAverage || worker.rating || '5.0'}</span>
             </div>
           </div>
 
@@ -633,8 +670,35 @@ export const WorkerProfileDetail = ({
                 </span>
               </div>
 
-              {/* Empty state if worker has packages for other trades, but not the selected trade */}
-              {hasCustomPackages && itemsToRender.length === 0 ? (
+              {/* Empty state: No packages at all OR no packages for selected trade */}
+              {!hasCustomPackages ? (
+                <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center space-y-4 shadow-sm">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-700 mx-auto flex items-center justify-center text-3xl font-bold shadow-xs">
+                    <Sparkles className="w-7 h-7 text-amber-600" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-extrabold text-slate-900">
+                      No Fixed Packages Listed Yet
+                    </h3>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto">
+                      {worker.name} accepts direct booking requests and provides custom diagnostic visits. You can book an initial doorstep visit directly.
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 max-w-sm mx-auto flex items-center justify-between">
+                    <div className="text-left">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Doorstep Visiting Fee</p>
+                      <p className="text-base font-black text-slate-900">₹{visitingCharge}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onBookNow?.({ ...worker, selectedCartItems: [] })}
+                      className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition active:scale-95 shadow-sm"
+                    >
+                      Book Visit Now
+                    </button>
+                  </div>
+                </div>
+              ) : itemsToRender.length === 0 ? (
                 <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center space-y-3">
                   <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-700 mx-auto flex items-center justify-center text-3xl font-bold shadow-xs">
                     {getTradeIcon(selectedTrade)}
@@ -745,6 +809,123 @@ export const WorkerProfileDetail = ({
                     </div>
                   );
                 })
+              )}
+            </div>
+
+            {/* ======================================================== */}
+            {/* SEPARATE SECTION: CUSTOMER REVIEWS & RATINGS             */}
+            {/* ======================================================== */}
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-sm space-y-6">
+              
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
+                      Verified Client Feedback
+                    </span>
+                    <span className="text-xs text-slate-400 font-semibold">• Past Experiences</span>
+                  </div>
+                  <h3 className="text-2xl font-black text-slate-950 font-['Outfit'] mt-1 tracking-tight">
+                    Customer Reviews & Ratings
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Authentic reviews from clients who booked and verified {worker.name}'s service.
+                  </p>
+                </div>
+
+                {/* Score & Stars Box */}
+                <div className="flex items-center gap-3 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/80 p-3.5 rounded-2xl shadow-inner shrink-0">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <Star className="w-5 h-5 fill-amber-500 text-amber-500" />
+                      <span className="text-2xl font-black text-slate-950 font-['Outfit']">
+                        {ratingStats.ratingAverage || '5.0'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-500 block mt-0.5">out of 5.0</span>
+                  </div>
+                  <div className="h-9 w-px bg-amber-200" />
+                  <div className="text-left">
+                    <p className="text-xs font-black text-slate-900">
+                      {ratingStats.reviewCount} {ratingStats.reviewCount === 1 ? 'Review' : 'Reviews'}
+                    </p>
+                    <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-1 mt-0.5">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> 100% Code-Verified
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Reviews List or Empty State */}
+              {loadingReviews ? (
+                <div className="py-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                  <span>Loading customer reviews...</span>
+                </div>
+              ) : reviews.length === 0 ? (
+                <div className="py-10 text-center space-y-3 bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 p-6">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 mx-auto flex items-center justify-center text-xl font-black shadow-xs">
+                    ★
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-bold text-slate-800">No Customer Reviews Yet</h4>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                      Be the first customer to book {worker.name} and share your experience once the service is completed!
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {reviews.map((rev) => {
+                    const stars = Math.max(1, Math.min(5, Math.round(Number(rev.rating) || 5)));
+                    const dateFormatted = rev.createdAt 
+                      ? new Date(rev.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : 'Recently';
+                    const initials = (rev.clientName || 'Client')
+                      .split(' ')
+                      .map(n => n[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2) || 'C';
+
+                    return (
+                      <div key={rev.id} className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:bg-slate-50 transition space-y-2.5">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
+                              {initials}
+                            </div>
+                            <div>
+                              <p className="text-xs font-black text-slate-900">{rev.clientName || 'Verified Homeowner'}</p>
+                              <p className="text-[10px] text-slate-400 font-medium">{dateFormatted} • Verified Service</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 bg-amber-100/90 px-2 py-0.5 rounded-lg border border-amber-200">
+                            {[...Array(5)].map((_, sIdx) => (
+                              <Star
+                                key={sIdx}
+                                className={`w-3.5 h-3.5 ${sIdx < stars ? 'fill-amber-400 text-amber-500' : 'text-slate-200'}`}
+                              />
+                            ))}
+                            <span className="text-xs font-black text-amber-950 ml-1">{stars}.0</span>
+                          </div>
+                        </div>
+
+                        {rev.comment ? (
+                          <p className="text-xs text-slate-700 leading-relaxed pl-12 italic">
+                            "{rev.comment}"
+                          </p>
+                        ) : (
+                          <p className="text-xs text-slate-400 italic pl-12">
+                            Provided a 5-star rating after completing verified work.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
 

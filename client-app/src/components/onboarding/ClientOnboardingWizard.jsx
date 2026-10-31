@@ -37,10 +37,10 @@ export const ClientOnboardingWizard = ({ user, onComplete }) => {
     phone: user?.phone || '',
     secondaryPhone: user?.secondaryPhone || '',
     locality: user?.locality || '',
-    landmark: user?.landmark || '',
-    state: user?.state || 'Uttar Pradesh',
+    landmark: (user?.landmark || '').replace(/noida/gi, '').trim(),
+    state: user?.state || 'Maharashtra',
     pincode: user?.pincode || '',
-    address: user?.address || ''
+    address: (user?.address || '').replace(/,\s*near\s+noida\b/gi, '').replace(/\bnear\s+noida,?\s*/gi, '').trim()
   });
 
   const handleChange = (e) => {
@@ -67,9 +67,11 @@ export const ClientOnboardingWizard = ({ user, onComplete }) => {
       setErrorMessage('Please enter a valid 6-digit Pincode.');
       return;
     }
+    const cleanLandmark = (formData.landmark || '').replace(/noida/gi, '').trim();
+    const landmarkStr = cleanLandmark ? `, near ${cleanLandmark}` : '';
     setFormData(prev => ({
       ...prev,
-      address: `${prev.locality}, near ${prev.landmark}, ${prev.state} - ${prev.pincode}`
+      address: `${prev.locality}${landmarkStr}, ${prev.state || 'Maharashtra'} - ${prev.pincode}`
     }));
     setStep(3);
   };
@@ -79,7 +81,9 @@ export const ClientOnboardingWizard = ({ user, onComplete }) => {
     setIsSubmitting(true);
     setErrorMessage('');
 
-    const fullAddress = `${formData.locality}, near ${formData.landmark}, ${formData.state} - ${formData.pincode}`;
+    const cleanLandmark = (formData.landmark || '').replace(/noida/gi, '').trim();
+    const landmarkStr = cleanLandmark ? `, near ${cleanLandmark}` : '';
+    const fullAddress = `${formData.locality}${landmarkStr}, ${formData.state || 'Maharashtra'} - ${formData.pincode}`;
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/update-profile`, {
@@ -258,7 +262,7 @@ export const ClientOnboardingWizard = ({ user, onComplete }) => {
                   type="text"
                   name="locality"
                   required
-                  placeholder="e.g. Sector 63, Indirapuram"
+                  placeholder="e.g. Bandra West, Andheri, Dadar"
                   value={formData.locality}
                   onChange={handleChange}
                   className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-teal-500"
@@ -275,7 +279,7 @@ export const ClientOnboardingWizard = ({ user, onComplete }) => {
                   type="text"
                   name="landmark"
                   required
-                  placeholder="e.g. Near Electronic City Metro Station"
+                  placeholder="e.g. Near Railway Station, Linking Road"
                   value={formData.landmark}
                   onChange={handleChange}
                   className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-teal-500"
@@ -309,7 +313,7 @@ export const ClientOnboardingWizard = ({ user, onComplete }) => {
                   name="pincode"
                   required
                   maxLength={6}
-                  placeholder="e.g. 201301"
+                  placeholder="e.g. 400050"
                   value={formData.pincode}
                   onChange={handleChange}
                   className="w-full px-4 py-3 rounded-full bg-slate-950 border border-slate-800 text-white text-xs font-mono focus:outline-none focus:border-teal-500"

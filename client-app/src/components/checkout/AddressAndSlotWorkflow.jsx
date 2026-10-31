@@ -319,7 +319,18 @@ export const AddressAndSlotWorkflow = ({
       alert('Service was unavailable at this place, sorry for inconvenience!');
       return;
     }
-    setCurrentStep('SLOT_PICKER');
+    const formattedAddress = `${saveAsType} - ${houseNumber}${landmarkDetail ? `, near ${landmarkDetail}` : ''}, ${selectedLocation.fullAddress}`;
+    onComplete({
+      addressString: formattedAddress,
+      areaName: selectedLocation.areaName,
+      houseNumber,
+      landmark: landmarkDetail,
+      saveAs: saveAsType,
+      coordinates: pinCoords,
+      slot: 'Immediate / On Demand',
+      slotSurgeFee: 0
+    });
+    onClose();
   };
 
   const handleFinalConfirm = () => {
@@ -664,7 +675,7 @@ export const AddressAndSlotWorkflow = ({
                 >
                   {isPinInMumbai ? (
                     <>
-                      <span>Save and proceed to slots</span>
+                      <span>Save Address & Continue</span>
                       <span>➔</span>
                     </>
                   ) : (
@@ -676,125 +687,6 @@ export const AddressAndSlotWorkflow = ({
             </form>
 
           </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* STEP 4: DATE & TIME SLOT PICKER MODAL                    */}
-      {/* ======================================================== */}
-      {currentStep === 'SLOT_PICKER' && (
-        <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-6 relative animate-in zoom-in-95 font-['Plus_Jakarta_Sans',sans-serif]">
-          
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            className="absolute -top-3 -right-3 sm:-top-4 sm:-right-4 w-9 h-9 rounded-full bg-white text-slate-700 hover:text-slate-950 shadow-xl border border-slate-200 grid place-items-center font-bold text-sm transition active:scale-95 z-10"
-          >
-            ✕
-          </button>
-
-          {/* Header */}
-          <div>
-            <h2 className="text-xl font-black text-slate-900 font-['Outfit'] tracking-tight">
-              When should the professional arrive?
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Service will take approx. 1 hr & 15 mins
-            </p>
-          </div>
-
-          {/* Date Selector Cards */}
-          <div className="flex gap-2.5">
-            {dynamicDates.map(item => {
-              const isSelected = selectedDate === item.key;
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => {
-                    setSelectedDate(item.key);
-                    setSlotErrorMsg('');
-                  }}
-                  className={`flex-1 py-3 px-2 rounded-2xl border text-center transition flex flex-col items-center justify-center ${
-                    isSelected
-                      ? 'border-[#5932ea] bg-purple-50/70 text-purple-950 font-black ring-2 ring-purple-600/20'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="text-[11px] font-bold text-slate-500">{item.day}</span>
-                  <span className="text-base font-black font-['Outfit']">{item.date}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Time Slot Header */}
-          <div>
-            <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
-              Select start time of service
-            </h3>
-          </div>
-
-          {/* 3-Column Time Slot Grid */}
-          <div className="grid grid-cols-3 gap-2 text-xs max-h-64 overflow-y-auto pr-1">
-            {ALL_TIME_SLOTS.map((slot, sIdx) => {
-              const isSelected = selectedTimeSlot === slot.time;
-              const isToday = dynamicDates.find(d => d.key === selectedDate)?.isToday;
-              const isUnder30 = isSlotUnder30Min(slot, isToday);
-
-              return (
-                <button
-                  key={sIdx}
-                  type="button"
-                  onClick={() => {
-                    if (isUnder30) {
-                      setSlotErrorMsg('Please choose 30 min after of current time');
-                      return;
-                    }
-                    setSlotErrorMsg('');
-                    setSelectedTimeSlot(slot.time);
-                    setSlotSurgeFee(slot.surge);
-                  }}
-                  className={`py-2.5 px-2 rounded-2xl border text-center transition flex flex-col items-center justify-center relative ${
-                    isUnder30
-                      ? 'border-slate-100 bg-slate-50/70 text-slate-400 opacity-50 cursor-pointer hover:bg-rose-50/50 hover:border-rose-200'
-                      : isSelected
-                        ? 'border-[#5932ea] bg-[#5932ea] text-white font-black shadow-md shadow-purple-600/20'
-                        : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 font-bold'
-                  }`}
-                >
-                  {slot.surge > 0 && (
-                    <span className={`text-[8px] font-black px-1.5 py-0.2 rounded-full mb-0.5 ${
-                      isSelected && !isUnder30 ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-900'
-                    }`}>
-                      + ₹{slot.surge}
-                    </span>
-                  )}
-                  <span>{slot.time}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Error Message when user attempts slot under 30 minutes */}
-          {slotErrorMsg && (
-            <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{slotErrorMsg}</span>
-            </div>
-          )}
-
-          {/* Bottom Proceed to Checkout CTA */}
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={handleFinalConfirm}
-              className="w-full py-4 rounded-2xl bg-slate-100 hover:bg-[#5932ea] hover:text-white text-slate-900 font-black text-xs transition-all active:scale-95 shadow-sm cursor-pointer"
-            >
-              Proceed to checkout
-            </button>
-          </div>
-
         </div>
       )}
 
