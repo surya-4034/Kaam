@@ -267,6 +267,10 @@ export const login = (req, res) => {
       return res.status(404).json({ error: 'Account not found. Please check your credentials or register a new account.' });
     }
 
+    if (user.is_active === 0 || user.is_active === false) {
+      return res.status(403).json({ error: 'Your account has been blocked by platform administration. Please contact support.' });
+    }
+
     let passwordValid = false;
     try {
       if (user.password_hash) {
@@ -387,6 +391,10 @@ export const login = (req, res) => {
               token,
               user: formattedUser
             });
+          }
+
+          if (targetWp && (targetWp.is_account_locked === 1 || targetWp.is_account_locked === true)) {
+            return res.status(403).json({ error: 'Your partner account has been blocked by platform administration. Please contact support.' });
           }
 
           db.get(`SELECT * FROM worker_bank_kyc WHERE worker_id = ?`, [targetWp.id], (kErr, kyc) => {
