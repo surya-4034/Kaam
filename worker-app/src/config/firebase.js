@@ -1,5 +1,11 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import {
+  getAuth,
+  initializeAuth,
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+  GoogleAuthProvider
+} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDfeL6rICld9rg4RihSrwwYhPkWgcbw0EM",
@@ -14,8 +20,18 @@ const firebaseConfig = {
 // Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Standard Firebase Auth instance
-export const auth = getAuth(app);
+// Use localStorage-based persistence so IndexedDB closing/hidden lifecycle error is completely eliminated
+export const auth = (() => {
+  try {
+    return initializeAuth(app, {
+      persistence: [browserLocalPersistence],
+      popupRedirectResolver: browserPopupRedirectResolver
+    });
+  } catch (e) {
+    return getAuth(app);
+  }
+})();
+
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 

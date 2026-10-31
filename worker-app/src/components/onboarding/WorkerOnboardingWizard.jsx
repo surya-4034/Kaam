@@ -83,9 +83,9 @@ export const WorkerOnboardingWizard = ({ user, workerProfile, onComplete, onCanc
   const categoryGroups = ['All', 'Home Repair', 'Appliances', 'Cleaning', 'Beauty & Personal', 'Domestic Help', 'Specialized'];
 
   const filteredCategories = SERVICE_CATEGORIES_50.filter(cat => {
-    const matchesSearch = cat.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          cat.hindi.includes(searchQuery) ||
-                          cat.id.includes(searchQuery.toLowerCase());
+    const matchesSearch = (cat.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (cat.group || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (cat.id || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesGroup = activeGroup === 'All' || cat.group === activeGroup;
     return matchesSearch && matchesGroup;
   });
@@ -141,7 +141,7 @@ export const WorkerOnboardingWizard = ({ user, workerProfile, onComplete, onCanc
       tradeCategory: selectedCategory.id,
       categories: selectedCategoryIds,
       tradeTitle: tradeTitle.trim() || selectedCategory.name,
-      hindiName: selectedCategory.hindi,
+      hindiName: selectedCategory?.hindi || '',
       locality: locality,
       city: 'Mumbai',
       bio: bio,
@@ -174,7 +174,7 @@ export const WorkerOnboardingWizard = ({ user, workerProfile, onComplete, onCanc
           tradeTitle: completedProfile.tradeTitle,
           tradeCategory: selectedCategory.id,
           categories: selectedCategoryIds,
-          hindiName: selectedCategory.hindi,
+          hindiName: selectedCategory?.hindi || '',
           locality: locality || 'Andheri West, Mumbai',
           city: 'Mumbai',
           bio: bio,
@@ -208,34 +208,34 @@ export const WorkerOnboardingWizard = ({ user, workerProfile, onComplete, onCanc
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm font-['Outfit',sans-serif]">
-      <div className="relative w-full max-w-2xl bg-[#fcfbf9] border border-slate-200 rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col text-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md font-['Plus_Jakarta_Sans',sans-serif]">
+      <div className="relative w-full max-w-2xl bg-[#0c0e18] border border-slate-800 rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col text-slate-100">
         
         {/* Top Header */}
-        <div className="p-5 sm:p-6 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
+        <div className="p-5 sm:p-6 bg-[#0c0e18] border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-md shadow-amber-500/20">
+            <div className="w-11 h-11 rounded-2xl bg-cyan-500 text-slate-950 flex items-center justify-center font-black shadow-md shadow-cyan-500/20">
               <Wrench className="w-6 h-6 stroke-[2.5]" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-slate-950">Partner Profile Setup</h2>
-              <p className="text-xs text-slate-500 font-medium">Step {step} of 3 • {
+              <h2 className="text-lg font-black text-white font-['Outfit']">Partner Profile Setup</h2>
+              <p className="text-xs text-slate-400 font-medium">Step {step} of 3 • {
                 step === 1 ? 'Select Category & Work Locality' :
                 step === 2 ? 'UPI Payout & Payment Method' : 'Review & Finish Setup'
               }</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full text-amber-800 text-xs font-bold">
+          <div className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/30 px-3 py-1.5 rounded-full text-cyan-300 text-xs font-bold">
             <span>Setup Progress</span>
-            <span className="font-black text-amber-600">{Math.round((step / 3) * 100)}%</span>
+            <span className="font-black text-cyan-400">{Math.round((step / 3) * 100)}%</span>
           </div>
         </div>
 
         {/* Step Progress Line */}
-        <div className="w-full bg-slate-100 h-1.5">
+        <div className="w-full bg-slate-800 h-1.5">
           <div 
-            className="bg-gradient-to-r from-amber-500 to-amber-600 h-full transition-all duration-300"
+            className="bg-gradient-to-r from-cyan-400 to-indigo-500 h-full transition-all duration-300"
             style={{ width: `${Math.round((step / 3) * 100)}%` }}
           ></div>
         </div>
@@ -578,12 +578,12 @@ export const WorkerOnboardingWizard = ({ user, workerProfile, onComplete, onCanc
         </div>
 
         {/* Footer Navigation Buttons */}
-        <div className="p-5 bg-white border-t border-slate-200 flex items-center justify-between shrink-0">
+        <div className="p-5 bg-[#0c0e18] border-t border-slate-800 flex items-center justify-between shrink-0">
           {step > 1 ? (
             <button
               type="button"
               onClick={() => setStep(step - 1)}
-              className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition-all flex items-center gap-1.5"
+              className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-800 transition-all flex items-center gap-1.5"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back</span>
@@ -592,7 +592,7 @@ export const WorkerOnboardingWizard = ({ user, workerProfile, onComplete, onCanc
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-500 text-xs font-bold hover:bg-slate-200 transition-all"
+              className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 text-xs font-bold hover:bg-slate-800 transition-all"
             >
               Cancel
             </button>
@@ -602,7 +602,7 @@ export const WorkerOnboardingWizard = ({ user, workerProfile, onComplete, onCanc
             <button
               type="button"
               onClick={handleNext}
-              className="px-6 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs hover:bg-amber-400 transition-all shadow-md shadow-amber-500/20 flex items-center gap-1.5"
+              className="px-6 py-2.5 rounded-xl bg-cyan-500 text-slate-950 font-black text-xs hover:bg-cyan-400 transition-all shadow-md shadow-cyan-500/20 flex items-center gap-1.5"
             >
               <span>Continue</span>
               <ArrowRight className="w-4 h-4" />
@@ -612,13 +612,13 @@ export const WorkerOnboardingWizard = ({ user, workerProfile, onComplete, onCanc
               type="button"
               disabled={isSubmitting}
               onClick={handleSubmitFinal}
-              className="px-7 py-2.5 rounded-xl bg-slate-950 text-white font-black text-xs hover:bg-slate-800 transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
+              className="px-7 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 via-indigo-600 to-violet-600 text-white font-black text-xs hover:opacity-95 transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
             >
               {isSubmitting ? (
                 <span>Saving Setup...</span>
               ) : (
                 <>
-                  <CheckCircle2 className="w-4 h-4 text-amber-400" />
+                  <CheckCircle2 className="w-4 h-4 text-cyan-300" />
                   <span>Launch My Partner Dashboard</span>
                 </>
               )}

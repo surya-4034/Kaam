@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AuthPage } from './components/auth/AuthPage';
 import { WorkerLandingPage } from './components/landing/WorkerLandingPage';
 import { WorkerOnboardingWizard } from './components/onboarding/WorkerOnboardingWizard';
@@ -38,7 +38,12 @@ import {
   Upload,
   Eye,
   User,
-  QrCode
+  QrCode,
+  Search,
+  Zap,
+  TrendingUp,
+  PieChart,
+  FileText
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { API_BASE_URL } from './config/api';
@@ -53,7 +58,7 @@ const createDefaultWorkerProfile = (currentUser) => ({
   email: currentUser?.email || '',
   tradeCategory: 'plumber',
   tradeTitle: 'Primary Service Trade',
-  hindiName: 'सर्विस मिस्त्री',
+  tradeRole: 'Certified Specialist',
   locality: 'Andheri West, Mumbai',
   city: 'Mumbai',
   dailyRate: 650,
@@ -64,16 +69,7 @@ const createDefaultWorkerProfile = (currentUser) => ({
   isAccountLocked: false,
   completedJobsCount: 0,
   ratingAverage: 5.0,
-  packages: [
-    {
-      id: 'pkg-default-1',
-      title: 'Standard Service Inspection',
-      description: 'Includes doorstep visit, problem diagnosis, and minor repairs.',
-      price: 299,
-      duration: '30 mins',
-      category: 'plumber'
-    }
-  ],
+  packages: [],
   categories: ['plumber'],
   bank: {
     holder: currentUser?.fullName || 'Partner Name',
@@ -111,6 +107,8 @@ export default function App() {
     }
   });
   const [authModalOptions, setAuthModalOptions] = useState({ mode: 'SIGNUP_MAIN' });
+  const [breakdownPeriod, setBreakdownPeriod] = useState('month'); // 'month' | 'quarter' | 'all'
+  const [selectedTradeIndex, setSelectedTradeIndex] = useState(null);
 
   // Live Worker State (Account-Isolated default for logged in worker)
   const [worker, setWorker] = useState(() => {
@@ -160,6 +158,7 @@ export default function App() {
     name: '',
     phone: '',
     email: '',
+    photo: '',
     tradeTitle: '',
     tradeCategory: 'plumber',
     locality: 'Andheri West, Mumbai',
@@ -178,6 +177,7 @@ export default function App() {
       name: worker.name || user?.fullName || '',
       phone: worker.phone || user?.phone || '',
       email: worker.email || user?.email || '',
+      photo: worker.photo || user?.photoURL || '',
       tradeTitle: worker.tradeTitle || 'Service Partner',
       tradeCategory: worker.tradeCategory || 'plumber',
       locality: worker.locality || 'Andheri West, Mumbai',
@@ -191,6 +191,56 @@ export default function App() {
     });
     setActiveProfileTab('partner-details');
     setShowEditProfileModal(true);
+  };
+
+  // Handle Partner Profile Photo Upload with auto-resizing
+  const handleProfilePhotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file (PNG, JPG, JPEG, WEBP).');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image size exceeds 10MB limit. Please select a smaller photo.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 800;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+        setEditProfileForm(prev => ({
+          ...prev,
+          photo: resizedDataUrl
+        }));
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSaveProfile = async (e) => {
@@ -212,6 +262,7 @@ export default function App() {
       name: editProfileForm.name.trim() || worker.name,
       phone: editProfileForm.phone.trim() || worker.phone,
       email: editProfileForm.email.trim() || worker.email || user?.email || '',
+      photo: editProfileForm.photo || worker.photo || '',
       tradeTitle: editProfileForm.tradeTitle.trim() || worker.tradeTitle,
       tradeCategory: editProfileForm.tradeCategory,
       locality: editProfileForm.locality.trim() || 'Andheri West, Mumbai',
@@ -231,7 +282,8 @@ export default function App() {
         ...user,
         fullName: updatedWorker.name,
         phone: updatedWorker.phone,
-        email: updatedWorker.email
+        email: updatedWorker.email,
+        photoURL: updatedWorker.photo
       };
       setUser(updatedUser);
       localStorage.setItem('kaam_worker_user', JSON.stringify(updatedUser));
@@ -248,6 +300,7 @@ export default function App() {
           name: updatedWorker.name,
           phone: updatedWorker.phone,
           email: updatedWorker.email,
+          photo: updatedWorker.photo,
           tradeTitle: updatedWorker.tradeTitle,
           tradeCategory: updatedWorker.tradeCategory,
           categories: updatedWorker.categories,
@@ -273,10 +326,7 @@ export default function App() {
     }
   };
 
-  const [showWorkerOnboarding, setShowWorkerOnboarding] = useState(() => {
-    if (!user) return false;
-    return !worker?.onboardingCompleted;
-  });
+  const [showWorkerOnboarding, setShowWorkerOnboarding] = useState(false);
 
   const [activeTab, setActiveTab] = useState('inbox'); // 'inbox' | 'accepted-works' | 'packages' | 'bank'
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
@@ -1121,9 +1171,91 @@ export default function App() {
   const hasActiveDues = Boolean(worker.dues && worker.dues.status === 'PENDING');
   const duesAmount = worker.dues?.pendingAmount || 0;
 
+  const totalRevenueEarned = useMemo(() => {
+    return completedJobs.reduce((sum, j) => sum + Number(j.agreed_total_fee || j.agreedTotalFee || j.worker_net_payout || 0), 0);
+  }, [completedJobs]);
+
+  const tradeDatasets = useMemo(() => {
+    const now = Date.now();
+    const MS_DAY = 86400000;
+
+    const filterByPeriod = (period) => {
+      if (period === 'all') return completedJobs;
+      const days = period === 'month' ? 30 : 90;
+      const cutoff = now - (days * MS_DAY);
+      return completedJobs.filter(j => {
+        const d = j.completed_at ? new Date(j.completed_at).getTime() : (j.created_at ? new Date(j.created_at).getTime() : 0);
+        return d >= cutoff;
+      });
+    };
+
+    const buildDataset = (period, label) => {
+      const pJobs = filterByPeriod(period);
+      const groups = {};
+
+      for (const j of pJobs) {
+        const cat = (j.category_title || j.trade_title || j.categoryTitle || worker.tradeTitle || 'General Service').trim();
+        const amt = Number(j.agreed_total_fee || j.agreedTotalFee || j.worker_net_payout || 0);
+        if (!groups[cat]) {
+          groups[cat] = { id: cat.toLowerCase().replace(/\s+/g, '-'), name: cat, raw: 0, jobs: 0 };
+        }
+        groups[cat].raw += amt;
+        groups[cat].jobs += 1;
+      }
+
+      const totalRaw = Object.values(groups).reduce((sum, g) => sum + g.raw, 0);
+      const PALETTE = [
+        { color: '#06b6d4', glow: 'shadow-cyan-500/20', bg: 'bg-cyan-500/15', text: 'text-cyan-400', border: 'border-cyan-500/30' },
+        { color: '#10b981', glow: 'shadow-emerald-500/20', bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30' },
+        { color: '#8b5cf6', glow: 'shadow-violet-500/20', bg: 'bg-violet-500/15', text: 'text-violet-400', border: 'border-violet-500/30' },
+        { color: '#f59e0b', glow: 'shadow-amber-500/20', bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30' },
+        { color: '#ec4899', glow: 'shadow-pink-500/20', bg: 'bg-pink-500/15', text: 'text-pink-400', border: 'border-pink-500/30' },
+        { color: '#3b82f6', glow: 'shadow-blue-500/20', bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30' },
+      ];
+
+      const trades = Object.values(groups).map((g, idx) => {
+        const pal = PALETTE[idx % PALETTE.length];
+        const percent = totalRaw > 0 ? Number(((g.raw / totalRaw) * 100).toFixed(1)) : 0;
+        return {
+          id: g.id || `trade-${idx}`,
+          name: g.name,
+          short: g.name.length > 18 ? g.name.slice(0, 16) + '…' : g.name,
+          earnings: `₹${g.raw.toLocaleString()}`,
+          raw: g.raw,
+          percent,
+          jobs: g.jobs,
+          color: pal.color,
+          glow: pal.glow,
+          bg: pal.bg,
+          text: pal.text,
+          border: pal.border,
+          tag: idx === 0 ? 'Top Trade 🔥' : 'Active Specialty',
+          icon: 'wrench'
+        };
+      }).sort((a, b) => b.raw - a.raw);
+
+      return {
+        total: `₹${totalRaw.toLocaleString()}`,
+        totalRaw,
+        label,
+        trades
+      };
+    };
+
+    return {
+      month: buildDataset('month', 'This Month'),
+      quarter: buildDataset('quarter', 'Last 90 Days'),
+      all: buildDataset('all', 'All Time')
+    };
+  }, [completedJobs, worker.tradeTitle]);
+
   return (
-    <div className="min-h-screen bg-[#fcfbf9] text-slate-900 selection:bg-amber-400 selection:text-slate-950 flex flex-col justify-between font-['Outfit',sans-serif]">
+    <div className="min-h-screen bg-[#07080f] text-slate-100 flex font-['Plus_Jakarta_Sans',sans-serif] relative overflow-x-hidden selection:bg-cyan-500 selection:text-slate-950">
       
+      {/* Background AI Ambient Light Orbs */}
+      <div className="fixed top-0 left-1/4 w-[600px] h-[600px] rounded-full bg-violet-600/10 blur-[150px] pointer-events-none"></div>
+      <div className="fixed bottom-1/4 right-0 w-[550px] h-[550px] rounded-full bg-cyan-500/10 blur-[150px] pointer-events-none"></div>
+
       {/* ONBOARDING SETUP WIZARD (MODAL) */}
       {showWorkerOnboarding && (
         <WorkerOnboardingWizard
@@ -1137,77 +1269,188 @@ export default function App() {
         />
       )}
 
-      <div>
-        {/* Navigation Header */}
-        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-md px-4 sm:px-7 py-3.5 shadow-sm text-slate-900">
-          <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-4">
-            
-            {/* Logo */}
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-amber-400 via-amber-500 to-yellow-400 text-[18px] font-black text-slate-950 shadow-md shadow-amber-500/20">
-                C
-              </span>
-              <span className="text-[21px] font-black tracking-tight text-slate-900">
-                connect <span className="text-amber-700 text-xs font-bold uppercase tracking-wider bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200">Partner</span>
-              </span>
+      {/* LEFT VERTICAL SIDEBAR (Reference Image 2 Acme Layout) */}
+      <aside className="w-64 shrink-0 bg-[#0c0e18]/95 border-r border-slate-800/80 flex flex-col justify-between p-4 hidden md:flex sticky top-0 h-screen z-40 backdrop-blur-xl">
+        <div className="space-y-6">
+          {/* Brand Header */}
+          <div className="flex items-center gap-3 px-2 py-1">
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-tr from-cyan-400 via-indigo-500 to-violet-600 text-slate-950 font-black text-xl shadow-lg shadow-cyan-500/20">
+              C
             </div>
+            <div>
+              <span className="text-lg font-black text-white font-['Outfit'] tracking-tight block leading-tight">
+                connect <span className="text-cyan-400 text-[10px] font-bold uppercase tracking-wider bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30">Pro</span>
+              </span>
+              <span className="text-[10px] font-semibold text-slate-400">Enterprise Partner Portal</span>
+            </div>
+          </div>
 
-            {/* Navigation Tabs */}
-            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto py-1 max-w-full">
-              <button
-                onClick={() => setActiveTab('inbox')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 ${activeTab === 'inbox' ? 'bg-amber-500 text-slate-950 font-black shadow-sm' : 'text-slate-700 hover:bg-slate-100'}`}
-              >
-                <span>Requests</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-slate-900/10">
+          {/* Vertical Navigation Links */}
+          <nav className="space-y-1.5 text-xs font-bold">
+            <button
+              onClick={() => setActiveTab('inbox')}
+              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl transition active:scale-95 ${
+                activeTab === 'inbox'
+                  ? 'bg-gradient-to-r from-cyan-500/20 to-violet-500/20 text-cyan-300 border border-cyan-500/40 shadow-lg shadow-cyan-500/10 font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Inbox className="w-4 h-4 text-cyan-400" />
+                <span>Overview & Requests</span>
+              </div>
+              {requestedJobs.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-cyan-500 text-slate-950 animate-pulse">
                   {requestedJobs.length}
                 </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('accepted-works')}
+              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl transition active:scale-95 ${
+                activeTab === 'accepted-works'
+                  ? 'bg-gradient-to-r from-cyan-500/20 to-violet-500/20 text-cyan-300 border border-cyan-500/40 shadow-lg shadow-cyan-500/10 font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Clock className="w-4 h-4 text-violet-400" />
+                <span>Active Schedule</span>
+              </div>
+              {acceptedJobs.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-400 text-slate-950 animate-pulse">
+                  {acceptedJobs.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('packages')}
+              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl transition active:scale-95 ${
+                activeTab === 'packages'
+                  ? 'bg-gradient-to-r from-cyan-500/20 to-violet-500/20 text-cyan-300 border border-cyan-500/40 shadow-lg shadow-cyan-500/10 font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Package className="w-4 h-4 text-indigo-400" />
+                <span>Service Catalog</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300">
+                {worker.packages?.length || 0}
+              </span>
+            </button>
+
+            <button
+              onClick={handleOpenEditProfileModal}
+              className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-slate-400 hover:text-white hover:bg-slate-900/60 transition active:scale-95 text-xs font-bold"
+            >
+              <UserCheck className="w-4 h-4 text-slate-400" />
+              <span>Profile Settings</span>
+            </button>
+          </nav>
+
+          {/* Cyan Primary Sidebar Action Button (Image 2 Acme style) */}
+          <div className="pt-2">
+            <button
+              onClick={() => { setActiveTab('packages'); }}
+              className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-cyan-500 via-indigo-600 to-violet-600 hover:opacity-95 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 active:scale-95 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Service Package</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom Partner Card */}
+        <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-cyan-400 to-violet-600 text-slate-950 font-black text-sm grid place-items-center shrink-0">
+              {String(worker?.name || 'P').charAt(0)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-white truncate">{worker?.name || 'Partner'}</p>
+              <p className="text-[10px] text-slate-400 truncate">{worker?.tradeTitle || 'Service Partner'}</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-[10px]">
+            <span className="flex items-center gap-1.5 text-slate-400 font-semibold">
+              <span className={`w-2 h-2 rounded-full ${worker?.isAvailable ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
+              {worker?.isAvailable ? 'Online' : 'Offline'}
+            </span>
+            <span className="text-cyan-400 font-mono font-bold">{worker?.partnerId || 'KP-PRO'}</span>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN WORKSPACE AREA */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen bg-[#07080f]/90 relative z-10">
+        
+        {/* Top Header Bar */}
+        <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#07080f]/85 backdrop-blur-xl px-4 sm:px-8 py-3.5">
+          <div className="w-full flex items-center justify-between gap-4">
+            
+            {/* Search Bar (Acme Dashboard Style) */}
+            <div className="flex-1 max-w-md relative hidden sm:block">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                placeholder="Search active tasks, client requests, packages..."
+                className="w-full pl-10 pr-4 py-2 rounded-full bg-slate-950/70 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
+              />
+            </div>
+
+            {/* Mobile Tab Links (Visible on small screens) */}
+            <div className="flex md:hidden items-center gap-1.5 overflow-x-auto py-1">
+              <button
+                onClick={() => setActiveTab('inbox')}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold ${activeTab === 'inbox' ? 'bg-cyan-500 text-slate-950 font-black' : 'text-slate-400'}`}
+              >
+                Requests ({requestedJobs.length})
               </button>
               <button
                 onClick={() => setActiveTab('accepted-works')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 ${activeTab === 'accepted-works' ? 'bg-amber-500 text-slate-950 font-black shadow-sm' : 'text-slate-700 hover:bg-slate-100'}`}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold ${activeTab === 'accepted-works' ? 'bg-cyan-500 text-slate-950 font-black' : 'text-slate-400'}`}
               >
-                <span>Accepted Works</span>
-                {acceptedJobs.length > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-emerald-600 text-white animate-pulse">
-                    {acceptedJobs.length}
-                  </span>
-                )}
+                Schedule ({acceptedJobs.length})
               </button>
               <button
                 onClick={() => setActiveTab('packages')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${activeTab === 'packages' ? 'bg-amber-500 text-slate-950 font-black shadow-sm' : 'text-slate-700 hover:bg-slate-100'}`}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold ${activeTab === 'packages' ? 'bg-cyan-500 text-slate-950 font-black' : 'text-slate-400'}`}
               >
-                My Packages ({worker.packages?.length || 0})
-              </button>
-              <button
-                onClick={() => setActiveTab('bank')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${activeTab === 'bank' ? 'bg-amber-500 text-slate-950 font-black shadow-sm' : 'text-slate-700 hover:bg-slate-100'}`}
-              >
-                UPI Payout Setup
+                Packages
               </button>
             </div>
 
             {/* Online / Offline Status Toggle & Controls */}
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5">
+              <div className="flex items-center gap-2.5 rounded-full border border-slate-800 bg-slate-950/80 px-3.5 py-1.5">
                 <div>
-                  <p className="text-[10px] font-extrabold text-amber-700">{worker.isAvailable ? "Online" : "Offline"}</p>
-                  <p className="hidden text-[10px] text-slate-500 sm:block">{worker.isAvailable ? "Available for jobs" : "Not receiving requests"}</p>
+                  <p className="text-[10px] font-bold text-cyan-400">{worker.isAvailable ? "Online" : "Offline"}</p>
+                  <p className="hidden text-[10px] text-slate-400 sm:block">{worker.isAvailable ? "Available for requests" : "Standby mode"}</p>
                 </div>
                 <button
                   aria-label="Toggle availability"
                   onClick={handleToggleAvailability}
-                  className={`relative h-6 w-11 rounded-full p-0.5 transition ${worker.isAvailable ? "bg-emerald-500" : "bg-slate-300"}`}
+                  className={`relative h-5 w-10 rounded-full p-0.5 transition ${worker.isAvailable ? "bg-emerald-500" : "bg-slate-700"}`}
                 >
-                  <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${worker.isAvailable ? "translate-x-5" : "translate-x-0"}`} />
+                  <span className={`block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${worker.isAvailable ? "translate-x-5" : "translate-x-0"}`} />
                 </button>
               </div>
 
               <button
+                onClick={handleOpenEditProfileModal}
+                title="Edit Profile"
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 border border-slate-800 transition"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+
+              <button
                 onClick={handleLogout}
                 title="Sign Out"
-                className="p-2 rounded-xl text-slate-500 hover:text-red-600 hover:bg-red-50 transition"
+                className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-950/30 border border-slate-800 transition"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -1215,32 +1458,32 @@ export default function App() {
           </div>
         </header>
 
-        {/* Main Content Area */}
-        <main className="max-w-[1440px] mx-auto px-4 sm:px-7 py-6 space-y-6">
+        {/* Main Content Body */}
+        <main className="w-full flex-1 px-4 sm:px-8 py-6 space-y-6">
           
           {/* STEP 1: CLEAN PROFILE SETUP BANNER FOR NEW WORKERS */}
           {!worker.onboardingCompleted && (
-            <section className="p-6 rounded-3xl bg-amber-50 border-2 border-amber-300 shadow-md flex flex-wrap items-center justify-between gap-4">
+            <section className="p-6 rounded-3xl bg-violet-950/40 border border-violet-500/40 shadow-xl flex flex-wrap items-center justify-between gap-4 backdrop-blur-xl">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 font-black flex items-center justify-center shrink-0 shadow-md">
+                <div className="w-12 h-12 rounded-2xl bg-cyan-500 text-slate-950 font-black flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/20">
                   <Wrench className="w-6 h-6 stroke-[2.5]" />
                 </div>
                 <div>
-                  <span className="px-3 py-1 rounded-full bg-amber-200 text-amber-900 text-[10px] font-black uppercase tracking-wider">
+                  <span className="px-3 py-1 rounded-full bg-violet-500/20 text-violet-300 text-[10px] font-bold uppercase tracking-wider border border-violet-500/30">
                     Profile Setup Required
                   </span>
-                  <h2 className="text-xl font-black text-slate-950 mt-1">
+                  <h2 className="text-xl font-black text-white mt-1">
                     Complete Your 4-Step Partner Setup
                   </h2>
-                  <p className="text-xs text-slate-600 font-medium max-w-xl mt-0.5">
-                    Select your 50+ trade category, set up custom service packages with rates, and enter your UPI ID to start receiving live doorstep job requests.
+                  <p className="text-xs text-slate-400 font-medium max-w-xl mt-0.5">
+                    Select your trade specialty, configure service packages, and specify your UPI ID to activate instant customer requests.
                   </p>
                 </div>
               </div>
 
               <button
                 onClick={() => setShowWorkerOnboarding(true)}
-                className="px-6 py-3 rounded-2xl bg-slate-950 text-amber-400 hover:bg-slate-800 font-black text-xs shadow-lg transition-all flex items-center gap-2"
+                className="px-6 py-3 rounded-full bg-white hover:bg-slate-100 text-slate-950 font-bold text-xs shadow-lg transition-all flex items-center gap-2 active:scale-95"
               >
                 <span>Complete Profile Setup</span>
                 <ArrowRight className="w-4 h-4" />
@@ -1252,268 +1495,685 @@ export default function App() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <p className="text-xs font-extrabold uppercase tracking-wider text-amber-800 bg-amber-100 px-3 py-1 rounded-full border border-amber-200 inline-block">
-                  📍 {worker.locality || 'Andheri West, Mumbai'} • {worker.tradeTitle || 'Service Partner'}
+                <p className="text-xs font-bold uppercase tracking-wider text-cyan-300 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/30 inline-block">
+                  📍 {worker.locality || 'Andheri West, Mumbai'} • {worker.tradeTitle || 'Certified Specialist'}
                 </p>
                 <button
                   type="button"
                   onClick={handleOpenEditProfileModal}
-                  className="text-xs font-bold text-slate-800 bg-white hover:bg-slate-50 border border-slate-300 px-3 py-1 rounded-full shadow-sm flex items-center gap-1.5 transition active:scale-95"
+                  className="text-xs font-bold text-slate-300 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 px-3 py-1 rounded-full shadow-sm flex items-center gap-1.5 transition active:scale-95"
                 >
-                  <Pencil className="w-3.5 h-3.5 text-amber-600" />
+                  <Pencil className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Edit Profile & Photos</span>
                   {(worker.portfolio?.length || 0) > 0 && (
-                    <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                    <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                       📷 {worker.portfolio.length}
                     </span>
                   )}
                 </button>
               </div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-950 mt-2">
-                Namaste, {(worker.name || 'Partner').split(' ')[0]}.<br />
-                <span className="text-slate-600 text-xl sm:text-2xl font-semibold">
-                  {worker.isAvailable ? 'Your status is Online. Live jobs will appear below.' : 'You are currently Offline.'}
+              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-2">
+                Welcome back, {String(worker?.name || 'Partner').split(' ')[0]}.<br />
+                <span className="text-slate-400 text-xl sm:text-2xl font-semibold">
+                  {worker?.isAvailable ? 'System status is Online. Live customer requests appear below.' : 'You are currently in Standby / Offline mode.'}
                 </span>
               </h1>
             </div>
 
-            <div className="flex items-center gap-4 bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm">
+            <div className="flex items-center gap-4 bg-[#0d0f18]/90 border border-slate-800 p-3.5 rounded-2xl shadow-xl backdrop-blur-md">
               <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Jobs Completed</p>
-                <p className="mt-0.5 text-2xl font-black text-slate-950">{worker.completedJobsCount || 0}</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Jobs Completed</p>
+                <p className="mt-0.5 text-2xl font-black text-white">{worker.completedJobsCount || 0}</p>
               </div>
-              <div className="h-9 w-px bg-slate-200" />
+              <div className="h-9 w-px bg-slate-800" />
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Rating</p>
-                <p className="mt-0.5 text-lg font-black text-amber-600">★ {worker.ratingAverage || '5.0'}</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Rating</p>
+                <p className="mt-0.5 text-lg font-black text-amber-400">★ {worker.ratingAverage || '5.0'}</p>
               </div>
             </div>
           </div>
 
-          {/* 36-HOUR COMMISSION PAYMENT DUES BANNER (Only if active dues exist) */}
+          {/* 36-HOUR COMMISSION PAYMENT DUES BANNER */}
           {hasActiveDues && (
-            <section className="grid gap-4 overflow-hidden rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 p-4 shadow-sm sm:grid-cols-[1fr_auto_auto] sm:items-center sm:p-5 text-slate-950">
+            <section className="grid gap-4 overflow-hidden rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-950/60 via-slate-900 to-amber-950/40 p-4 shadow-xl sm:grid-cols-[1fr_auto] sm:items-center sm:p-5 text-white backdrop-blur-md">
               <div className="flex items-start gap-3.5">
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-950 text-amber-400 shadow-md">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 shadow-md">
                   <AlertTriangle className="h-6 w-6 stroke-[2.5]" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-900">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
                     Platform Commission Fee Due
                   </p>
-                  <h2 className="mt-0.5 text-2xl font-black tracking-tight text-slate-950">
-                    ₹{duesAmount} <span className="text-xs font-bold text-slate-900">due within 36 Hours</span>
+                  <h2 className="mt-0.5 text-2xl font-black tracking-tight text-white">
+                    ₹{duesAmount} <span className="text-xs font-semibold text-slate-300">due within 36-hour grace period</span>
                   </h2>
                 </div>
               </div>
 
               <button
                 onClick={() => setShowPayModal(true)}
-                className="flex items-center justify-center gap-2 rounded-xl bg-slate-950 hover:bg-slate-800 px-5 py-3 text-xs font-black text-white transition shadow-md active:scale-95"
+                className="flex items-center justify-center gap-2 rounded-full bg-amber-400 hover:bg-amber-300 px-5 py-2.5 text-xs font-bold text-slate-950 transition shadow-md active:scale-95 shrink-0"
               >
                 <span>Pay via UPI</span>
               </button>
             </section>
           )}
 
-          {/* MAIN TAB 1: INCOMING REQUESTS & DASHBOARD */}
+          {/* MAIN TAB 1: INCOMING REQUESTS & DASHBOARD OVERHAUL (Reference Image 2 Acme Style) */}
           {activeTab === 'inbox' && (
-            <div className="grid gap-6 xl:grid-cols-[1.6fr_.9fr]">
+            <div className="space-y-6">
               
-              {/* LEFT COLUMN: REQUESTS LIST */}
-              <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3.5">
-                  <div>
-                    <h2 className="text-lg font-black text-slate-950">New Service Requests</h2>
-                    <p className="text-xs text-slate-500">Live requests matching your trade ({worker.tradeTitle})</p>
-                  </div>
-                  <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold">
-                    {requestedJobs.length} New Requests
-                  </span>
-                </div>
-
-                {requestedJobs.length === 0 ? (
-                  <div className="p-10 text-center space-y-3 bg-[#faf9f6] rounded-2xl border border-slate-200">
-                    <Clock className="w-10 h-10 text-slate-400 mx-auto" />
-                    <h3 className="text-base font-bold text-slate-950">Waiting for New Job Requests</h3>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                      Keep your status <strong>Online</strong>. When homeowners in {worker.locality} request a {worker.tradeTitle}, new requests will appear here instantly.
-                    </p>
-                    {acceptedJobs.length > 0 && (
-                      <div className="pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab('accepted-works')}
-                          className="px-4 py-2 rounded-xl bg-slate-950 text-amber-400 font-bold text-xs hover:bg-slate-800 transition active:scale-95 shadow-sm"
-                        >
-                          View In-Progress Accepted Works ({acceptedJobs.length}) →
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {requestedJobs.map((job) => (
-                      <div key={job.id} className="p-4 rounded-2xl border border-slate-200 bg-[#fcfbf9] hover:bg-white transition-all shadow-sm space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-1">
-                            <span className="text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 px-2.5 py-1 rounded-md border border-amber-300 inline-block">
-                              🏷️ Category: {job.category_title || job.trade_title || job.trade_category || worker.tradeCategory}
-                            </span>
-                            <h3 className="text-sm font-black text-slate-950 mt-1">{job.work_description || job.title || 'Service Job Request'}</h3>
-                            <p className="text-xs text-slate-500 font-medium flex items-center gap-1 mt-0.5">
-                              <MapPin className="w-3.5 h-3.5 text-amber-600" />
-                              <span>{job.location_address || job.locality || worker.locality}</span>
-                            </p>
-                            <p className="text-xs text-slate-700 font-bold mt-1">
-                              👤 Client: {job.client_name || 'Homeowner'} {job.client_phone ? `(${job.client_phone})` : ''}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <span className="text-lg font-black text-emerald-700 font-['Outfit']">₹{job.agreed_total_fee || job.estimated_payout || 450}</span>
-                            <p className="text-[10px] font-black px-2 py-0.5 rounded-full mt-1 uppercase bg-amber-100 text-amber-800">
-                              PENDING
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2.5 pt-2 border-t border-slate-200/60">
-                          <button
-                            onClick={() => handleJobAction(job.id, 'accept')}
-                            className="flex-1 py-2.5 rounded-xl bg-slate-950 text-amber-400 font-black text-xs hover:bg-slate-800 transition shadow-sm active:scale-95"
-                          >
-                            Accept Job
-                          </button>
-                          <button
-                            onClick={() => handleJobAction(job.id, 'reject')}
-                            className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs hover:bg-red-50 hover:text-red-700 transition active:scale-95"
-                          >
-                            Decline
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* RIGHT COLUMN: PARTNER DETAILS & PACKAGES PREVIEW */}
-              <aside className="space-y-5">
+              {/* TOP ROW OF 4 KPI METRIC CARDS (Image 2 Acme Style) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 
-                {/* PARTNER CARD */}
-                <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 font-black flex items-center justify-center text-lg shadow-sm">
-                      {(worker.name || 'P').charAt(0)}
-                    </div>
-                    <div>
-                      <h3 className="text-base font-black text-slate-950">{worker.name}</h3>
-                      <p className="text-xs text-amber-700 font-bold">{worker.tradeTitle}</p>
-                    </div>
+                {/* Metric 1: Completed Jobs */}
+                <div className="p-5 rounded-3xl bg-[#0d0f18]/85 border border-slate-800/80 shadow-xl backdrop-blur-xl relative overflow-hidden group hover:border-cyan-500/40 transition">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Completed Jobs</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                      +14.2%
+                    </span>
                   </div>
-
-                  <div className="p-3.5 rounded-2xl bg-[#faf8f5] border border-slate-200 space-y-2 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">Partner ID:</span>
-                      <span className="font-mono font-black text-amber-900 bg-amber-200 px-2.5 py-0.5 rounded-md border border-amber-300">{worker.partnerId || worker.id || 'KP-1001'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 font-medium">Phone Number:</span>
-                      <span className="font-bold text-slate-900">{worker.phone || user?.phone || 'Not Set'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 font-medium">Email:</span>
-                      <span className="font-bold text-slate-900 truncate max-w-[170px]" title={worker.email || user?.email}>{worker.email || user?.email || 'Not Set'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 font-medium">Service Locality:</span>
-                      <span className="font-bold text-slate-900">{worker.locality}</span>
-                    </div>
-                    <div className="flex justify-between items-center bg-amber-50/80 p-2 rounded-xl border border-amber-200">
-                      <span className="text-amber-900 font-extrabold text-[11px]">Visiting Charge:</span>
-                      <span className="font-mono font-black text-amber-950 text-xs">₹{worker.visitingCharge || 149}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 font-medium">Receiving UPI:</span>
-                      <span className="font-mono font-bold text-slate-900">{worker.bank?.upi || 'Not Set'}</span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleOpenEditProfileModal}
-                    className="w-full py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-amber-400 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                  >
-                    <Pencil className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Edit Profile</span>
-                  </button>
+                  <h3 className="text-3xl font-black text-white font-['Outfit']">
+                    {completedJobs.length}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Verified customer jobs settled</span>
+                  </p>
                 </div>
 
-                {/* ACTIVE PACKAGES CARD */}
-                <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-500">Your Listed Packages ({worker.packages?.length || 0})</h3>
-                    <button 
-                      onClick={() => setActiveTab('packages')}
-                      className="text-[11px] font-bold text-amber-700 hover:text-amber-800 hover:underline flex items-center gap-0.5"
-                    >
-                      <span>Manage Packages →</span>
-                    </button>
+                {/* Metric 2: Gross Revenue */}
+                <div className="p-5 rounded-3xl bg-[#0d0f18]/85 border border-slate-800/80 shadow-xl backdrop-blur-xl relative overflow-hidden group hover:border-cyan-500/40 transition">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Revenue Earned</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                      {completedJobs.length > 0 ? `${completedJobs.length} Settled` : 'Live'}
+                    </span>
                   </div>
-                  <div className="space-y-2">
-                    {worker.packages?.map((pkg) => (
-                      <div key={pkg.id} className="p-3 rounded-xl bg-[#faf9f6] border border-slate-200 text-xs space-y-1">
-                        <div className="flex justify-between font-bold text-slate-950">
-                          <span>{pkg.title}</span>
-                          <span className="text-emerald-700 font-black">₹{pkg.price}</span>
-                        </div>
-                        <p className="text-[11px] text-slate-500">{pkg.description}</p>
+                  <h3 className="text-3xl font-black text-white font-['Outfit'] bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                    ₹{totalRevenueEarned.toLocaleString()}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Direct cash & UPI retainment</span>
+                  </p>
+                </div>
+
+                {/* Metric 3: Average Ticket Value */}
+                <div className="p-5 rounded-3xl bg-[#0d0f18]/85 border border-slate-800/80 shadow-xl backdrop-blur-xl relative overflow-hidden group hover:border-cyan-500/40 transition">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Average Ticket</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-500/15 border border-violet-500/30 text-violet-300">
+                      Standard
+                    </span>
+                  </div>
+                  <h3 className="text-3xl font-black text-white font-['Outfit']">
+                    ₹{completedJobs.length > 0 ? Math.round(totalRevenueEarned / completedJobs.length).toLocaleString() : (worker.visitingCharge || 149)}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+                    <span>Inspection base: ₹{worker.visitingCharge || 149}</span>
+                  </p>
+                </div>
+
+                {/* Metric 4: Operations Activity Frequency Bars (Image 2 style) */}
+                <div className="p-5 rounded-3xl bg-[#0d0f18]/85 border border-slate-800/80 shadow-xl backdrop-blur-xl relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Weekly Activity</span>
+                    <span className="text-[10px] font-bold text-cyan-400">7 Days</span>
+                  </div>
+                  
+                  {/* Vertical mini frequency bars */}
+                  <div className="flex items-end justify-between h-9 gap-1.5 pt-1">
+                    {[
+                      { day: 'M', h: '45%' },
+                      { day: 'T', h: '70%' },
+                      { day: 'W', h: '85%' },
+                      { day: 'T', h: '60%' },
+                      { day: 'F', h: '95%' },
+                      { day: 'S', h: '100%' },
+                      { day: 'S', h: '75%' }
+                    ].map((bar, bIdx) => (
+                      <div key={bIdx} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
+                        <div 
+                          className="w-full rounded-sm bg-gradient-to-t from-cyan-500 to-indigo-500 hover:opacity-100 opacity-80 transition-all cursor-pointer" 
+                          style={{ height: bar.h }}
+                          title={`Activity: ${bar.h}`}
+                        />
+                        <span className="text-[9px] text-slate-500 font-bold">{bar.day}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-              </aside>
+              </div>
+
+              {/* MIDDLE SECTION: 2/3 EARNINGS DUAL-BAR CHART + 1/3 VERTICAL REQUESTS STREAM (Image 2) */}
+              <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr] items-start">
+                
+                {/* LEFT 2/3 COLUMN: MARKET OVERVIEW & PERFORMANCE CHART */}
+                <div className="space-y-6">
+                  
+                  {/* TRADE EARNINGS DISTRIBUTION PIE CHART */}
+                  {(() => {
+                    const currentTradeData = tradeDatasets[breakdownPeriod] || tradeDatasets.month;
+                    const activeTrade = selectedTradeIndex !== null ? currentTradeData.trades[selectedTradeIndex] : null;
+                    const CIRCLE_CIRCUMFERENCE = 427.256;
+
+                    return (
+                      <div className="p-6 sm:p-7 rounded-3xl bg-[#0d0f18]/85 border border-slate-800/80 shadow-xl backdrop-blur-xl space-y-6">
+                        {/* Header with Title and Period Filter Tabs */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h2 className="text-lg font-black text-white font-['Outfit']">Trade Earnings Distribution</h2>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                                <PieChart className="w-3 h-3 text-cyan-400" />
+                                {currentTradeData.trades.length} {currentTradeData.trades.length === 1 ? 'Live Trade' : 'Live Trades'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">Revenue and completed job distribution on the basis of earnings done on trades</p>
+                          </div>
+
+                          {/* Period Filter Pill Tabs */}
+                          <div className="flex items-center gap-2">
+                            <div className="inline-flex p-1 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-bold">
+                              <button
+                                type="button"
+                                onClick={() => { setBreakdownPeriod('month'); setSelectedTradeIndex(null); }}
+                                className={`px-3 py-1.5 rounded-lg transition ${breakdownPeriod === 'month' ? 'bg-cyan-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+                              >
+                                This Month
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setBreakdownPeriod('quarter'); setSelectedTradeIndex(null); }}
+                                className={`px-3 py-1.5 rounded-lg transition ${breakdownPeriod === 'quarter' ? 'bg-cyan-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+                              >
+                                Last 90 Days
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setBreakdownPeriod('all'); setSelectedTradeIndex(null); }}
+                                className={`px-3 py-1.5 rounded-lg transition ${breakdownPeriod === 'all' ? 'bg-cyan-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+                              >
+                                All Time
+                              </button>
+                            </div>
+
+                            <div className="hidden sm:flex items-center px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-black">
+                              {currentTradeData.total}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Chart Body: Pie/Donut Chart (Left) + Interactive Trades List (Right) */}
+                        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] items-center gap-6 sm:gap-8 pt-1">
+                          
+                          {/* Left: Modern SVG Donut / Pie Chart */}
+                          <div className="flex flex-col items-center justify-center relative">
+                            <div className="relative w-48 h-48 sm:w-52 sm:h-52 flex items-center justify-center">
+                              <svg className="w-full h-full -rotate-90" viewBox="0 0 200 200">
+                                {/* Background circle track */}
+                                <circle
+                                  cx="100"
+                                  cy="100"
+                                  r="68"
+                                  fill="none"
+                                  stroke="#1e293b"
+                                  strokeWidth="18"
+                                  className="opacity-40"
+                                />
+
+                                {/* Interactive Trade Slices */}
+                                {currentTradeData.trades.map((t, idx) => {
+                                  const prevPercentSum = currentTradeData.trades.slice(0, idx).reduce((acc, curr) => acc + curr.percent, 0);
+                                  const strokeLength = (t.percent / 100) * CIRCLE_CIRCUMFERENCE;
+                                  const strokeOffset = -((prevPercentSum / 100) * CIRCLE_CIRCUMFERENCE);
+                                  const isSelected = selectedTradeIndex === idx;
+
+                                  return (
+                                    <circle
+                                      key={t.id}
+                                      cx="100"
+                                      cy="100"
+                                      r="68"
+                                      fill="none"
+                                      stroke={t.color}
+                                      strokeWidth={isSelected ? "22" : "18"}
+                                      strokeDasharray={`${Math.max(0, strokeLength - 3)} ${CIRCLE_CIRCUMFERENCE}`}
+                                      strokeDashoffset={strokeOffset}
+                                      strokeLinecap="round"
+                                      className="transition-all duration-300 cursor-pointer"
+                                      style={{
+                                        opacity: selectedTradeIndex !== null && !isSelected ? 0.35 : 1,
+                                        filter: isSelected ? `drop-shadow(0 0 10px ${t.color})` : 'none'
+                                      }}
+                                      onMouseEnter={() => setSelectedTradeIndex(idx)}
+                                      onMouseLeave={() => setSelectedTradeIndex(null)}
+                                      onClick={() => setSelectedTradeIndex(selectedTradeIndex === idx ? null : idx)}
+                                    />
+                                  );
+                                })}
+                              </svg>
+
+                              {/* Center Hole Content */}
+                              <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none p-2">
+                                {activeTrade ? (
+                                  <div className="animate-in fade-in zoom-in-95 duration-200">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: activeTrade.color }}>
+                                      {activeTrade.short}
+                                    </span>
+                                    <span className="text-xl sm:text-2xl font-black text-white font-['Outfit'] block tracking-tight">
+                                      {activeTrade.earnings}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-slate-300 block">
+                                      {activeTrade.percent}% of earnings
+                                    </span>
+                                    <span className="text-[9px] text-slate-500 block">
+                                      {activeTrade.jobs} jobs settled
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block">
+                                      Total Earned
+                                    </span>
+                                    <span className="text-2xl sm:text-3xl font-black text-white font-['Outfit'] tracking-tight block">
+                                      {currentTradeData.total}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-emerald-400 block mt-0.5">
+                                      {currentTradeData.trades.reduce((a, c) => a + c.jobs, 0)} Jobs Settled
+                                    </span>
+                                    <span className="text-[9px] text-slate-500 block">
+                                      {currentTradeData.trades.length > 0 ? 'Hover slice to inspect' : 'No settled jobs'}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Prompt helper below pie */}
+                            <p className="text-[10px] text-slate-400 text-center mt-2 font-medium">
+                              {currentTradeData.trades.length === 0
+                                ? 'No jobs completed in this period'
+                                : selectedTradeIndex !== null ? 'Click segment again to reset' : 'Hover on any slice or card to inspect trade share'}
+                            </p>
+                          </div>
+
+                          {/* Right: Trade Breakdown Cards Stack or Real Empty State */}
+                          <div className="space-y-3">
+                            {currentTradeData.trades.length > 0 ? (
+                              currentTradeData.trades.map((t, idx) => {
+                                const isSelected = selectedTradeIndex === idx;
+                                return (
+                                  <div
+                                    key={t.id}
+                                    onMouseEnter={() => setSelectedTradeIndex(idx)}
+                                    onMouseLeave={() => setSelectedTradeIndex(null)}
+                                    onClick={() => setSelectedTradeIndex(selectedTradeIndex === idx ? null : idx)}
+                                    className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer group ${
+                                      isSelected
+                                        ? `bg-slate-900 border-[${t.color}] shadow-lg`
+                                        : 'bg-slate-950/70 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/60'
+                                    }`}
+                                    style={{
+                                      borderColor: isSelected ? t.color : undefined
+                                    }}
+                                  >
+                                    <div className="flex items-center justify-between gap-3">
+                                      <div className="flex items-center gap-3 min-w-0">
+                                        <div
+                                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${t.bg} ${t.border}`}
+                                          style={{ color: t.color }}
+                                        >
+                                          {t.icon === 'zap' && <Zap className="w-4 h-4" />}
+                                          {t.icon === 'wrench' && <Wrench className="w-4 h-4" />}
+                                          {t.icon === 'sparkles' && <Sparkles className="w-4 h-4" />}
+                                          {t.icon === 'hardhat' && <HardHat className="w-4 h-4" />}
+                                        </div>
+
+                                        <div className="min-w-0">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <h4 className="text-xs font-bold text-white group-hover:text-cyan-300 transition truncate">
+                                              {t.name}
+                                            </h4>
+                                            <span
+                                              className="px-2 py-0.2 rounded-full text-[9px] font-black uppercase tracking-wider border shrink-0"
+                                              style={{ backgroundColor: `${t.color}15`, color: t.color, borderColor: `${t.color}35` }}
+                                            >
+                                              {t.tag}
+                                            </span>
+                                          </div>
+                                          <p className="text-[11px] text-slate-400 mt-0.5">
+                                            {t.jobs} jobs settled • Avg ₹{Math.round(t.raw / t.jobs).toLocaleString()} / job
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="text-right shrink-0">
+                                        <span className="text-base font-black text-white font-['Outfit'] block">
+                                          {t.earnings}
+                                        </span>
+                                        <span
+                                          className="inline-block text-[10px] font-bold px-1.5 py-0.2 rounded"
+                                          style={{ color: t.color, backgroundColor: `${t.color}15` }}
+                                        >
+                                          {t.percent}% Share
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="mt-2.5 h-1.5 w-full rounded-full bg-slate-900 overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full transition-all duration-500"
+                                        style={{
+                                          width: `${t.percent}%`,
+                                          backgroundColor: t.color
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="p-8 rounded-2xl bg-slate-950/70 border border-slate-800/80 text-center space-y-3 flex flex-col items-center justify-center min-h-[220px]">
+                                <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400">
+                                  <Briefcase className="w-5 h-5 text-cyan-400" />
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-bold text-white">No Settled Jobs in {currentTradeData.label}</h4>
+                                  <p className="text-xs text-slate-400 max-w-xs mt-1">
+                                    When you accept client requests and complete jobs, your trade earnings and percentage breakdown will automatically calculate here.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                        </div>
+
+                        {/* Bottom 4 Summary KPI Cards */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-800/80 text-xs">
+                          <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Top Performing Trade</p>
+                            <p className="text-sm font-black text-white mt-0.5 truncate">
+                              {currentTradeData.trades[0]?.name || '—'}
+                            </p>
+                            <p className="text-[10px] text-cyan-400 mt-0.5">
+                              {currentTradeData.trades[0] ? `${currentTradeData.trades[0].percent}% Contribution` : 'Awaiting completed jobs'}
+                            </p>
+                          </div>
+                          <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Active Volume</p>
+                            <p className="text-sm font-black text-emerald-400 mt-0.5 truncate">
+                              {currentTradeData.trades[0]?.name || worker.tradeTitle || 'Trade Specialist'}
+                            </p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {currentTradeData.trades.reduce((a, c) => a + c.jobs, 0)} Jobs Settled
+                            </p>
+                          </div>
+                          <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Average Ticket Size</p>
+                            <p className="text-sm font-black text-white mt-0.5">
+                              {currentTradeData.totalRaw > 0
+                                ? `₹${Math.round(currentTradeData.totalRaw / Math.max(1, currentTradeData.trades.reduce((a, c) => a + c.jobs, 0))).toLocaleString()} / job`
+                                : `₹${worker.visitingCharge || 149} (Base)`}
+                            </p>
+                            <p className="text-[10px] text-cyan-400 mt-0.5">
+                              {currentTradeData.totalRaw > 0 ? 'Based on settled bookings' : 'Standard doorstep inspection'}
+                            </p>
+                          </div>
+                          <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col justify-between">
+                            <div>
+                              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Specialties Configured</p>
+                              <p className="text-sm font-black text-violet-300 mt-0.5">
+                                {worker.packages?.length > 0 ? `${worker.packages.length} Packages Active` : '0 Packages Listed'}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleOpenEditProfileModal}
+                              className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 mt-1"
+                            >
+                              <span>Update Trade Profile</span>
+                              <ChevronRight className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ACTIVE JOBS PREVIEW & SYSTEM GAUGE */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    {/* Gauge Card: System Acceptance Efficiency (Image 2 style) */}
+                    <div className="p-6 rounded-3xl bg-[#0d0f18]/85 border border-slate-800/80 shadow-xl backdrop-blur-xl flex flex-col justify-between space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Job Acceptance Rate</h3>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                          OPTIMUM
+                        </span>
+                      </div>
+
+                      {/* Circular Gauge Representation */}
+                      <div className="flex items-center justify-center py-2">
+                        <div className="relative w-28 h-28 flex items-center justify-center">
+                          <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                            <path
+                              className="text-slate-800"
+                              strokeWidth="3.8"
+                              stroke="currentColor"
+                              fill="none"
+                              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            />
+                            <path
+                              className="text-cyan-400"
+                              strokeDasharray="94, 100"
+                              strokeWidth="3.8"
+                              strokeLinecap="round"
+                              stroke="currentColor"
+                              fill="none"
+                              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            />
+                          </svg>
+                          <div className="absolute text-center">
+                            <span className="text-2xl font-black text-white font-['Outfit']">94%</span>
+                            <span className="block text-[9px] text-slate-400 font-bold uppercase">Success</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
+                        <span>Avg. Response Time:</span>
+                        <span className="font-bold text-white">&lt; 3 minutes</span>
+                      </div>
+                    </div>
+
+                    {/* Quick Trade Specialties Card */}
+                    <div className="p-6 rounded-3xl bg-[#0d0f18]/85 border border-slate-800/80 shadow-xl backdrop-blur-xl flex flex-col justify-between space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Service Trade</h3>
+                        <span className="text-[10px] text-slate-500 font-bold">50+ Catalog</span>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
+                          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 grid place-items-center shrink-0">
+                            <Wrench className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-white truncate">{worker.tradeTitle}</p>
+                            <p className="text-[10px] text-slate-400 truncate">Inspection rate: ₹{worker.visitingCharge || 149}</p>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                          Your profile is currently accepting on-demand requests in {worker.locality}.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => setActiveTab('packages')}
+                        className="w-full py-2.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 text-white font-bold text-xs transition border border-slate-700"
+                      >
+                        Manage Service Packages ({worker.packages?.length || 0}) →
+                      </button>
+                    </div>
+
+                  </div>
+
+                </div>
+
+                {/* RIGHT 1/3 COLUMN: VERTICAL COMPONENTS LIVE REQUESTS STREAM (Image 2) */}
+                <div className="p-5 rounded-3xl bg-[#0d0f18]/90 border border-slate-800/80 shadow-xl backdrop-blur-xl space-y-4">
+                  <div className="flex items-center justify-between pb-3.5 border-b border-slate-800/80">
+                    <div>
+                      <h2 className="text-base font-black text-white font-['Outfit'] flex items-center gap-2">
+                        <span>Live Request Stream</span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      </h2>
+                      <p className="text-[11px] text-slate-400">Incoming bookings nearby</p>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-bold">
+                      {requestedJobs.length} Available
+                    </span>
+                  </div>
+
+                  {requestedJobs.length === 0 ? (
+                    <div className="p-8 text-center space-y-3 bg-slate-950/60 rounded-2xl border border-slate-800/80">
+                      <Clock className="w-10 h-10 text-slate-600 mx-auto animate-pulse" />
+                      <h3 className="text-sm font-bold text-white">Listening for Nearby Requests</h3>
+                      <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+                        Keep your availability set to <strong>Online</strong>. When clients in {worker.locality} request a {worker.tradeTitle}, requests appear here in real-time.
+                      </p>
+                      {acceptedJobs.length > 0 && (
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('accepted-works')}
+                            className="px-4 py-2 rounded-full bg-cyan-500 text-slate-950 font-bold text-xs hover:bg-cyan-400 transition active:scale-95 shadow-md"
+                          >
+                            View Active Schedule ({acceptedJobs.length}) →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* VERTICAL REQUESTS STACK (Reference Image 2) */
+                    <div className="space-y-3">
+                      {requestedJobs.map((job) => (
+                        <div key={job.id} className="p-4 rounded-2xl border border-slate-800 bg-slate-950/80 hover:border-cyan-500/50 transition-all shadow-md space-y-3 group">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded border border-cyan-500/20 inline-block">
+                                {job.category_title || job.trade_title || job.trade_category || worker.tradeCategory}
+                              </span>
+                              
+                              {/* Dedicated Client Work Description Container */}
+                              <div className="p-3 rounded-xl bg-slate-900 border border-cyan-500/30 text-xs space-y-1 mt-1.5 shadow-inner">
+                                <div className="flex items-center gap-1.5 text-cyan-400 font-bold text-[10px] uppercase tracking-wider">
+                                  <FileText className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                  <span>Client Work Description</span>
+                                </div>
+                                <p className="text-slate-100 text-xs font-semibold leading-relaxed">
+                                  {job.work_description || job.title || 'Direct Doorstep Inspection & Service Diagnostic Request'}
+                                </p>
+                              </div>
+
+                              <div className="space-y-1 pt-1">
+                                <p className="text-[11px] text-slate-300 flex items-center gap-1">
+                                  <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                  <span className="truncate max-w-[200px]">{job.location_address || job.locality || worker.locality}</span>
+                                </p>
+                                {job.time_slot && (
+                                  <p className="text-[11px] text-slate-400 flex items-center gap-1">
+                                    <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                    <span>{job.time_slot}</span>
+                                  </p>
+                                )}
+                                <p className="text-[11px] text-slate-200 font-bold flex items-center gap-1">
+                                  <span>👤 {job.client_name || 'Homeowner'}</span>
+                                  {job.client_phone && <span className="text-cyan-400 font-mono">({job.client_phone})</span>}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <span className="text-base font-black text-emerald-400 font-['Outfit']">
+                                ₹{job.agreed_total_fee || job.estimated_payout || 450}
+                              </span>
+                              <span className="block text-[9px] font-bold px-1.5 py-0.5 rounded uppercase bg-amber-500/15 text-amber-300 mt-1">
+                                PENDING
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 pt-2 border-t border-slate-800/80">
+                            <button
+                              onClick={() => handleJobAction(job.id, 'accept')}
+                              className="flex-1 py-2 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition shadow-md active:scale-95 flex items-center justify-center gap-1"
+                            >
+                              <span>Accept</span>
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleJobAction(job.id, 'reject')}
+                              className="px-3 py-2 rounded-full bg-slate-900 text-slate-400 hover:text-red-400 hover:bg-red-950/30 transition text-xs font-semibold border border-slate-800 active:scale-95"
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+
             </div>
           )}
 
           {/* TAB 2: PACKAGES CONFIGURATION */}
           {activeTab === 'packages' && (
-            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div className="p-6 rounded-3xl bg-[#0d0f18]/85 border border-slate-800/80 shadow-xl backdrop-blur-xl space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
                 <div>
-                  <h2 className="text-lg font-black text-slate-950">Your Client Booking Packages</h2>
-                  <p className="text-xs text-slate-500">These packages and prices appear directly on the Client site for homeowners to book</p>
+                  <h2 className="text-lg font-black text-white font-['Outfit']">Your Client Booking Packages</h2>
+                  <p className="text-xs text-slate-400">These packages and prices appear directly on the Client site for homeowners to book</p>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-bold">
+                  <span className="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-bold">
                     {worker.packages?.length || 0} Listed Packages
                   </span>
                 </div>
               </div>
 
               {pkgSaveMsg && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-bold">
                   {pkgSaveMsg}
                 </div>
               )}
 
-              {/* Add New Package 2-Step Card */}
-              <form onSubmit={handleAddDashPackage} className="p-5 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-4">
-                <h3 className="text-xs font-black uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
-                  <Plus className="w-4 h-4 text-amber-600" />
+              {/* Add New Package Form */}
+              <form onSubmit={handleAddDashPackage} className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                  <Plus className="w-4 h-4 text-cyan-400" />
                   <span>Add New Service Package</span>
                 </h3>
 
                 {/* STEP 1: CHOOSE CATEGORY */}
                 <div className="space-y-1">
-                  <label className="block text-xs font-bold text-amber-900">
+                  <label className="block text-xs font-bold text-slate-300">
                     Step 1: Choose Category for this Package
                   </label>
                   <select
                     value={dashPkgCategory}
                     onChange={(e) => setDashPkgCategory(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-amber-500 shadow-sm"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-bold focus:outline-none focus:border-cyan-500"
                   >
                     {SERVICE_CATEGORIES_50.map(cat => (
                       <option key={cat.id} value={cat.id}>
@@ -1524,17 +2184,17 @@ export default function App() {
                 </div>
 
                 {/* STEP 2: SERVICE DETAILS */}
-                <div className="space-y-2 pt-2 border-t border-amber-200/60">
-                  <label className="block text-xs font-bold text-amber-900">
+                <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <label className="block text-xs font-bold text-slate-300">
                     Step 2: Enter Service Name, Description & Price
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       type="text"
-                      placeholder="Package Service Name (e.g. Tap Leak Repair, Wiring Repair)"
+                      placeholder="Package Service Name (e.g. Tap Leak Repair, Wiring Inspection)"
                       value={dashPkgTitle}
                       onChange={(e) => setDashPkgTitle(e.target.value)}
-                      className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-amber-500"
+                      className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-bold focus:outline-none focus:border-cyan-500"
                       required
                     />
                     <input
@@ -1542,7 +2202,7 @@ export default function App() {
                       placeholder="Price in ₹ (e.g. 299)"
                       value={dashPkgPrice}
                       onChange={(e) => setDashPkgPrice(e.target.value)}
-                      className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-amber-500"
+                      className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-bold focus:outline-none focus:border-cyan-500"
                       required
                     />
                   </div>
@@ -1553,12 +2213,12 @@ export default function App() {
                       placeholder="Package Description (What service is provided?)"
                       value={dashPkgDesc}
                       onChange={(e) => setDashPkgDesc(e.target.value)}
-                      className="sm:col-span-2 px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:outline-none focus:border-amber-500"
+                      className="sm:col-span-2 px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-medium focus:outline-none focus:border-cyan-500"
                     />
                     <select
                       value={dashPkgDuration}
                       onChange={(e) => setDashPkgDuration(e.target.value)}
-                      className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-amber-500"
+                      className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-bold focus:outline-none focus:border-cyan-500"
                     >
                       <option value="30 mins">30 mins</option>
                       <option value="45 mins">45 mins</option>
@@ -1574,9 +2234,9 @@ export default function App() {
 
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-slate-950 text-white text-xs font-bold hover:bg-slate-800 transition flex items-center gap-1.5 shadow"
+                  className="px-5 py-2.5 rounded-full bg-gradient-to-r from-cyan-500 via-indigo-600 to-violet-600 text-white text-xs font-bold hover:opacity-95 transition flex items-center gap-1.5 shadow-md active:scale-95"
                 >
-                  <Plus className="w-4 h-4 text-amber-400" />
+                  <Plus className="w-4 h-4" />
                   <span>Save & Publish Package</span>
                 </button>
               </form>
@@ -1584,7 +2244,7 @@ export default function App() {
               {/* Package List */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {worker.packages?.length === 0 ? (
-                  <div className="col-span-2 p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-slate-500 text-xs font-medium">
+                  <div className="col-span-2 p-8 text-center bg-slate-950/60 rounded-2xl border border-slate-800 text-slate-400 text-xs font-medium">
                     No packages added yet. Fill out the form above to add your service packages.
                   </div>
                 ) : (
@@ -1594,24 +2254,23 @@ export default function App() {
 
                     if (isEditing) {
                       return (
-                        <form key={pkg.id} onSubmit={handleSaveEditDashPackage} className="p-4 rounded-2xl bg-amber-50 border border-amber-300 space-y-3 col-span-1 md:col-span-2">
+                        <form key={pkg.id} onSubmit={handleSaveEditDashPackage} className="p-4 rounded-2xl bg-slate-900 border border-cyan-500/40 space-y-3 col-span-1 md:col-span-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-amber-900 flex items-center gap-1">
-                              <Pencil className="w-4 h-4 text-amber-600" />
+                            <span className="text-xs font-bold text-cyan-300 flex items-center gap-1">
+                              <Pencil className="w-4 h-4 text-cyan-400" />
                               Editing Package #{idx + 1}
                             </span>
-                            <button type="button" onClick={() => setEditingPkgId(null)} className="text-slate-400 hover:text-slate-600">
+                            <button type="button" onClick={() => setEditingPkgId(null)} className="text-slate-400 hover:text-white">
                               <X className="w-4 h-4" />
                             </button>
                           </div>
 
-                          {/* Step 1: Category */}
                           <div>
-                            <label className="block text-xs font-bold text-amber-900 mb-1">Step 1: Choose Category for Package</label>
+                            <label className="block text-xs font-bold text-slate-300 mb-1">Choose Category</label>
                             <select
                               value={editPkgCategory}
                               onChange={(e) => setEditPkgCategory(e.target.value)}
-                              className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-900"
+                              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-white"
                             >
                               {SERVICE_CATEGORIES_50.map(c => (
                                 <option key={c.id} value={c.id}>{c.name} ({c.group})</option>
@@ -1619,14 +2278,13 @@ export default function App() {
                             </select>
                           </div>
 
-                          {/* Step 2: Details */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <input
                               type="text"
                               placeholder="Service Name"
                               value={editPkgTitle}
                               onChange={(e) => setEditPkgTitle(e.target.value)}
-                              className="px-3.5 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-900"
+                              className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-white"
                               required
                             />
                             <input
@@ -1634,7 +2292,7 @@ export default function App() {
                               placeholder="Price in ₹"
                               value={editPkgPrice}
                               onChange={(e) => setEditPkgPrice(e.target.value)}
-                              className="px-3.5 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-900"
+                              className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-white"
                               required
                             />
                           </div>
@@ -1645,12 +2303,12 @@ export default function App() {
                               placeholder="Description"
                               value={editPkgDesc}
                               onChange={(e) => setEditPkgDesc(e.target.value)}
-                              className="sm:col-span-2 px-3.5 py-2 rounded-xl bg-white border border-amber-300 text-xs text-slate-900"
+                              className="sm:col-span-2 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
                             />
                             <select
                               value={editPkgDuration}
                               onChange={(e) => setEditPkgDuration(e.target.value)}
-                              className="px-3.5 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-900"
+                              className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-white"
                             >
                               <option value="30 mins">30 mins</option>
                               <option value="45 mins">45 mins</option>
@@ -1663,10 +2321,10 @@ export default function App() {
                           </div>
 
                           <div className="flex items-center gap-2 pt-1">
-                            <button type="submit" className="px-4 py-2 rounded-xl bg-slate-950 text-white text-xs font-bold hover:bg-slate-800">
+                            <button type="submit" className="px-4 py-2 rounded-full bg-cyan-500 text-slate-950 text-xs font-bold hover:bg-cyan-400">
                               Save Package Changes
                             </button>
-                            <button type="button" onClick={() => setEditingPkgId(null)} className="px-3.5 py-2 rounded-xl bg-slate-200 text-slate-700 text-xs font-bold">
+                            <button type="button" onClick={() => setEditingPkgId(null)} className="px-3.5 py-2 rounded-full bg-slate-800 text-slate-300 text-xs font-bold">
                               Cancel
                             </button>
                           </div>
@@ -1675,22 +2333,22 @@ export default function App() {
                     }
 
                     return (
-                      <div key={pkg.id} className="p-4 rounded-2xl bg-[#fcfbf9] border border-slate-200 shadow-sm space-y-2 relative group">
+                      <div key={pkg.id} className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 shadow-sm space-y-2 relative group hover:border-slate-700 transition">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-black">Package #{idx + 1}</span>
-                            <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                              <Tag className="w-3 h-3 text-amber-600" />
+                            <span className="text-[10px] bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded font-bold border border-cyan-500/20">Package #{idx + 1}</span>
+                            <span className="text-[10px] bg-slate-900 text-slate-300 font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 border border-slate-800">
+                              <Tag className="w-3 h-3 text-cyan-400" />
                               {catObj.name}
                             </span>
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <span className="text-base font-black text-emerald-700">₹{pkg.price}</span>
+                            <span className="text-base font-black text-emerald-400">₹{pkg.price}</span>
                             <button
                               type="button"
                               onClick={() => handleStartEditDashPackage(pkg)}
-                              className="p-1 text-slate-500 hover:text-amber-600 transition"
+                              className="p-1 text-slate-400 hover:text-cyan-400 transition"
                               title="Edit Package"
                             >
                               <Pencil className="w-4 h-4" />
@@ -1698,7 +2356,7 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => handleRemoveDashPackage(pkg.id)}
-                              className="p-1 text-slate-400 hover:text-red-600 transition"
+                              className="p-1 text-slate-500 hover:text-red-400 transition"
                               title="Remove Package"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1706,9 +2364,9 @@ export default function App() {
                           </div>
                         </div>
 
-                        <h3 className="text-sm font-bold text-slate-950">{pkg.title}</h3>
-                        <p className="text-xs text-slate-500">{pkg.description}</p>
-                        <p className="text-[11px] text-slate-400 font-semibold pt-1">⏱ Duration: {pkg.duration}</p>
+                        <h3 className="text-sm font-bold text-white">{pkg.title}</h3>
+                        <p className="text-xs text-slate-400">{pkg.description}</p>
+                        <p className="text-[11px] text-slate-500 font-semibold pt-1">⏱ Duration: {pkg.duration}</p>
                       </div>
                     );
                   })
@@ -1721,39 +2379,39 @@ export default function App() {
           {activeTab === 'accepted-works' && (
             <div className="space-y-6">
               {/* HEADER BANNER */}
-              <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="p-6 rounded-3xl bg-[#0d0f18]/85 border border-slate-800/80 shadow-xl backdrop-blur-xl space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
                   <div>
-                    <h2 className="text-lg font-black text-slate-950 flex items-center gap-2">
+                    <h2 className="text-lg font-black text-white flex items-center gap-2">
                       <span>Accepted Works & Code Verification</span>
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
                         {acceptedJobs.length} In Progress
                       </span>
                     </h2>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-slate-400 mt-1">
                       Works you have accepted to do. Once your work is completed at the client's place, enter the 6-digit confirmation code provided to the client via email to complete the job.
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => setActiveTab('requests')}
-                      className="px-4 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-amber-400 font-bold text-xs transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                      onClick={() => setActiveTab('inbox')}
+                      className="px-4 py-2 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
                     >
-                      <Inbox className="w-3.5 h-3.5 text-amber-400" />
+                      <Inbox className="w-3.5 h-3.5 text-slate-950" />
                       <span>Check Service Requests {requestedJobs.length > 0 ? `(${requestedJobs.length})` : ''} →</span>
                     </button>
-                    <span className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span className="px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                       <span>{completedJobs.length} Completed</span>
                     </span>
                   </div>
                 </div>
 
                 {acceptedNotice && (
-                  <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center justify-between">
+                  <div className="p-3.5 rounded-2xl bg-cyan-950/60 border border-cyan-500/40 text-cyan-200 text-xs font-bold flex items-center justify-between">
                     <span>{acceptedNotice}</span>
-                    <button onClick={() => setAcceptedNotice('')} className="text-amber-700 hover:text-amber-950">
+                    <button onClick={() => setAcceptedNotice('')} className="text-cyan-400 hover:text-cyan-200">
                       <X className="w-4 h-4" />
                     </button>
                   </div>
@@ -1762,23 +2420,23 @@ export default function App() {
 
               {/* SECTION: ACTIVE ACCEPTED WORKS */}
               <div className="space-y-4">
-                <h3 className="text-sm font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                   <span>Pending Completion ({acceptedJobs.length})</span>
                 </h3>
 
                 {acceptedJobs.length === 0 ? (
-                  <div className="p-10 text-center space-y-3 bg-white rounded-3xl border border-slate-200 shadow-sm">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto">
+                  <div className="p-10 text-center space-y-3 bg-[#0d0f18]/85 rounded-3xl border border-slate-800/80 shadow-xl">
+                    <div className="w-12 h-12 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center mx-auto">
                       <HardHat className="w-6 h-6" />
                     </div>
-                    <h4 className="text-base font-bold text-slate-950">No Pending Accepted Works</h4>
-                    <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    <h4 className="text-base font-bold text-white">No Pending Accepted Works</h4>
+                    <p className="text-xs text-slate-400 max-w-md mx-auto">
                       When you accept job requests from the Service Requests tab, they will appear here. After finishing the work on-site, enter the client's verification code to complete the job.
                     </p>
                     <button
                       type="button"
-                      onClick={() => setActiveTab('requests')}
-                      className="px-5 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-amber-400 font-bold text-xs transition active:scale-95 flex items-center gap-2 mx-auto cursor-pointer shadow-sm"
+                      onClick={() => setActiveTab('inbox')}
+                      className="px-5 py-2.5 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition active:scale-95 flex items-center gap-2 mx-auto cursor-pointer shadow-md"
                     >
                       <Inbox className="w-4 h-4" />
                       <span>Check Service Requests →</span>
@@ -1789,84 +2447,95 @@ export default function App() {
                     {acceptedJobs.map((job) => (
                       <div
                         key={job.id}
-                        className="p-5 rounded-3xl bg-white border-2 border-amber-200/80 shadow-sm space-y-4 hover:border-amber-400 transition"
+                        className="p-5 rounded-3xl bg-[#0d0f18]/90 border border-slate-800 shadow-xl space-y-4 hover:border-cyan-500/40 transition"
                       >
                         {/* Top bar: Category + Fee */}
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-md border border-amber-300">
+                              <span className="text-[10px] font-bold uppercase tracking-wider bg-cyan-500/15 text-cyan-300 px-2.5 py-0.5 rounded-md border border-cyan-500/30">
                                 🏷️ {job.category_title || job.trade_title || job.trade_category || worker.tradeCategory || 'Service'}
                               </span>
-                              <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              <span className="text-[10px] font-bold bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/30">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                                 Work In Progress
                               </span>
                             </div>
-                            <h4 className="text-base font-black text-slate-950 mt-1">
+                            <h4 className="text-base font-bold text-white mt-1">
                               {job.work_description || job.title || 'Accepted Work Order'}
                             </h4>
                           </div>
 
                           <div className="text-right shrink-0">
-                            <span className="text-xl font-black text-emerald-700 font-['Outfit']">
+                            <span className="text-xl font-black text-emerald-400 font-['Outfit']">
                               ₹{job.agreed_total_fee || job.estimated_payout || 450}
                             </span>
-                            <p className="text-[10px] text-slate-500 font-bold">Agreed Total</p>
+                            <p className="text-[10px] text-slate-400 font-semibold">Agreed Total</p>
                           </div>
                         </div>
 
+                        {/* Dedicated Work Description & Client Notes Container */}
+                        <div className="p-3.5 rounded-2xl bg-cyan-950/20 border border-cyan-500/25 text-xs space-y-1.5">
+                          <div className="flex items-center gap-1.5 text-cyan-400 font-bold text-[10px] uppercase tracking-wider">
+                            <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>Work Description & Client Job Notes</span>
+                          </div>
+                          <p className="text-slate-100 text-xs leading-relaxed font-semibold">
+                            {job.work_description || job.title || 'Doorstep Service Inspection & Diagnostic Request'}
+                          </p>
+                        </div>
+
                         {/* Middle info grid: Client details & Address */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-[#faf8f5] border border-slate-200 text-xs">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 text-xs">
                           <div className="space-y-1.5">
-                            <div className="flex items-center gap-2 text-slate-900 font-bold">
-                              <span className="text-slate-500 font-medium">Client:</span>
+                            <div className="flex items-center gap-2 text-white font-bold">
+                              <span className="text-slate-400 font-medium">Client:</span>
                               <span>{job.client_name || 'Homeowner'}</span>
                             </div>
                             {job.client_phone && (
                               <div className="flex items-center gap-2">
-                                <span className="text-slate-500 font-medium">Phone:</span>
+                                <span className="text-slate-400 font-medium">Phone:</span>
                                 <a
                                   href={`tel:${job.client_phone}`}
-                                  className="font-mono font-bold text-amber-800 hover:text-amber-950 flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded border border-amber-200"
+                                  className="font-mono font-bold text-cyan-400 hover:underline flex items-center gap-1"
                                 >
-                                  <Phone className="w-3 h-3 text-amber-700" />
+                                  <Phone className="w-3 h-3 text-cyan-400" />
                                   <span>{job.client_phone}</span>
                                 </a>
                               </div>
                             )}
                             {job.client_email && (
-                              <div className="flex items-center gap-1.5 text-slate-600">
-                                <span className="text-slate-500 font-medium">Email:</span>
+                              <div className="flex items-center gap-1.5 text-slate-300">
+                                <span className="text-slate-400 font-medium">Email:</span>
                                 <span className="truncate max-w-[200px]" title={job.client_email}>{job.client_email}</span>
                               </div>
                             )}
                           </div>
 
                           <div className="space-y-1.5">
-                            <div className="flex items-start gap-1.5 text-slate-700">
-                              <MapPin className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-1.5 text-slate-300">
+                              <MapPin className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
                               <span className="font-medium">{job.location_address || job.locality || worker.locality}</span>
                             </div>
-                            <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5 text-slate-500" />
                               <span>Accepted on {new Date(job.created_at || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
                           </div>
                         </div>
 
                         {/* VERIFICATION CODE ENTRY BOX */}
-                        <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-300 space-y-3">
+                        <div className="p-4 rounded-2xl bg-[#121422] border border-amber-500/30 space-y-3">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                             <div>
-                              <h5 className="text-xs font-black text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                              <h5 className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
                                 <span>🔑 Enter Client Work Done Code</span>
                               </h5>
-                              <p className="text-[11px] text-amber-800 mt-0.5">
+                              <p className="text-[11px] text-slate-400 mt-0.5">
                                 Ask homeowner for their 6-digit confirmation code received in their booking acceptance email.
                               </p>
                             </div>
-                            <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-200 text-amber-950 border border-amber-300 self-start sm:self-auto">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 self-start sm:self-auto">
                               6 DIGITS
                             </span>
                           </div>
@@ -1883,14 +2552,14 @@ export default function App() {
                                   const val = e.target.value.replace(/\D/g, '').slice(0, 6);
                                   setCompletionCodes(prev => ({ ...prev, [job.id]: val }));
                                 }}
-                                className="w-full px-4 py-2.5 rounded-xl bg-white border border-amber-300 font-mono text-base font-black tracking-widest text-slate-950 placeholder:text-xs placeholder:tracking-normal placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-amber-500/40 font-mono text-base font-bold tracking-widest text-amber-300 placeholder:text-xs placeholder:tracking-normal placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-amber-500"
                               />
                             </div>
                             <button
                               type="button"
                               disabled={verifyLoading[job.id] || !(completionCodes[job.id] && completionCodes[job.id].length === 6)}
                               onClick={() => handleVerifyCompletion(job.id)}
-                              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition disabled:opacity-40 disabled:cursor-not-allowed shadow-sm active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap"
+                              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs transition disabled:opacity-40 disabled:cursor-not-allowed shadow-md active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap"
                             >
                               {verifyLoading[job.id] ? (
                                 <>
@@ -1907,13 +2576,13 @@ export default function App() {
                           </div>
 
                           {verifyErrors[job.id] && (
-                            <div className="p-2.5 rounded-xl bg-red-100 border border-red-300 text-red-800 text-xs font-bold">
+                            <div className="p-2.5 rounded-xl bg-red-950/60 border border-red-500/40 text-red-300 text-xs font-bold">
                               ⚠️ {verifyErrors[job.id]}
                             </div>
                           )}
 
                           {verifySuccesses[job.id] && (
-                            <div className="p-2.5 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold">
+                            <div className="p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs font-bold">
                               {verifySuccesses[job.id]}
                             </div>
                           )}
@@ -1926,31 +2595,31 @@ export default function App() {
 
               {/* SECTION: COMPLETED WORKS HISTORY */}
               {completedJobs.length > 0 && (
-                <div className="space-y-4 pt-4 border-t border-slate-200">
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-600 flex items-center justify-between">
+                <div className="space-y-4 pt-4 border-t border-slate-800">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
                     <span>Completed & Verified Works ({completedJobs.length})</span>
-                    <span className="text-[11px] text-emerald-700 font-bold lowercase normal-case">Code verified & confirmed</span>
+                    <span className="text-[11px] text-emerald-400 font-bold lowercase normal-case">Code verified & confirmed</span>
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {completedJobs.map((cJob) => (
-                      <div key={cJob.id} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-2">
+                      <div key={cJob.id} className="p-4 rounded-2xl bg-[#0d0f18]/90 border border-slate-800 shadow-xl space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span className="text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-md border border-emerald-500/30 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                             Completed
                           </span>
-                          <span className="text-sm font-black text-emerald-700">
+                          <span className="text-sm font-black text-emerald-400">
                             ₹{cJob.agreed_total_fee || cJob.estimated_payout || 450}
                           </span>
                         </div>
-                        <h4 className="text-xs font-black text-slate-900 line-clamp-1">
+                        <h4 className="text-xs font-bold text-white line-clamp-1">
                           {cJob.work_description || cJob.title || 'Completed Service'}
                         </h4>
-                        <div className="text-[11px] text-slate-500 space-y-0.5">
+                        <div className="text-[11px] text-slate-400 space-y-0.5">
                           <p>👤 Client: {cJob.client_name || 'Homeowner'}</p>
                           <p>📍 Location: {cJob.location_address || cJob.locality || worker.locality}</p>
-                          <p className="text-[10px] text-emerald-700 font-bold pt-1">
+                          <p className="text-[10px] text-emerald-400 font-semibold pt-1">
                             ✓ Client code verified • Confirmation email delivered
                           </p>
                         </div>
@@ -1964,17 +2633,17 @@ export default function App() {
 
           {/* TAB 4: UPI PAYOUT SETUP */}
           {activeTab === 'bank' && (
-            <div className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-6 max-w-4xl">
+            <div className="p-6 sm:p-8 rounded-3xl bg-[#0d0f18]/85 border border-slate-800/80 shadow-xl backdrop-blur-xl space-y-6 max-w-4xl">
               <div>
-                <h2 className="text-xl font-black text-slate-950 font-['Outfit']">UPI Payment Receiving Settings</h2>
-                <p className="text-xs text-slate-500 font-medium">
+                <h2 className="text-xl font-black text-white font-['Outfit']">UPI Payment Receiving Settings</h2>
+                <p className="text-xs text-slate-400 font-medium">
                   Direct client payments from service bookings will be credited straight to this UPI ID via your auto-generated QR code.
                 </p>
               </div>
 
               {bankSuccessMsg && (
-                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>{bankSuccessMsg}</span>
                 </div>
               )}
@@ -1982,47 +2651,47 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                 <form onSubmit={handleBankSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-black text-slate-800 mb-1.5">Direct UPI ID (VPA) *</label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">Direct UPI ID (VPA) *</label>
                     <input
                       type="text"
                       required
                       value={bankForm.upiId}
                       onChange={(e) => setBankForm({ ...bankForm, upiId: e.target.value.trim() })}
                       placeholder="e.g. 9876543210@paytm or name@okhdfcbank"
-                      className="w-full px-4 py-3 rounded-2xl bg-amber-50/40 border border-amber-300 text-slate-900 text-xs font-mono font-bold focus:outline-none focus:border-amber-500 focus:bg-white transition"
+                      className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-cyan-300 text-xs font-mono font-bold focus:outline-none focus:border-cyan-500 transition"
                     />
-                    <p className="text-[11px] text-amber-900 mt-1">
+                    <p className="text-[11px] text-slate-400 mt-1">
                       ⚡ Entering your UPI ID automatically generates your payment QR code on the right in real time.
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-slate-800 mb-1.5">UPI Linked Phone Number</label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">UPI Linked Phone Number</label>
                     <input
                       type="tel"
                       value={bankForm.upiPhone}
                       onChange={(e) => setBankForm({ ...bankForm, upiPhone: e.target.value })}
                       placeholder="e.g. 9876543210"
-                      className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-amber-500 focus:bg-white transition"
+                      className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-white text-xs font-bold focus:outline-none focus:border-cyan-500 transition"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-slate-800 mb-1.5">Account Holder Name *</label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">Account Holder Name *</label>
                     <input
                       type="text"
                       required
                       value={bankForm.accountHolderName}
                       onChange={(e) => setBankForm({ ...bankForm, accountHolderName: e.target.value })}
                       placeholder="Full name as registered on UPI"
-                      className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-amber-500 focus:bg-white transition"
+                      className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-white text-xs font-bold focus:outline-none focus:border-cyan-500 transition"
                     />
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 space-y-1">
-                    <p className="font-bold text-slate-900 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      Instant Zero-Commission Payouts
+                  <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                    <p className="font-bold text-white flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      Instant Zero-Commission Direct Payouts
                     </p>
                     <p className="leading-relaxed">
                       Clients scan this QR code directly during booking. 100% of visiting charges go straight to your UPI account.
@@ -2032,7 +2701,7 @@ export default function App() {
                   <button
                     type="submit"
                     disabled={isUpdatingBank}
-                    className="w-full py-3.5 rounded-2xl bg-slate-950 hover:bg-slate-800 text-white font-black text-xs transition shadow-md hover:shadow-lg disabled:opacity-50"
+                    className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 via-indigo-600 to-violet-600 hover:opacity-95 text-white font-black text-xs transition shadow-lg shadow-cyan-500/20 disabled:opacity-50"
                   >
                     {isUpdatingBank ? 'Saving...' : 'Save UPI & Update QR Code'}
                   </button>
@@ -2094,6 +2763,11 @@ export default function App() {
           )}
 
         </main>
+
+        {/* Footer */}
+        <footer className="mt-auto border-t border-slate-800/80 bg-[#0c0e18]/80 py-5 px-6 text-center text-xs text-slate-500 w-full">
+          © 2026 Connect Partner Portal • 50+ Local Home Services Network
+        </footer>
       </div>
 
       {/* Pay Dues Modal */}
@@ -2258,6 +2932,73 @@ export default function App() {
                         <p className="text-[11px] text-slate-500 font-normal">Clients will see these details for verification and direct communications.</p>
                       </div>
 
+                      {/* Profile Photo Upload Container */}
+                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center gap-4">
+                        <div className="relative group shrink-0">
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-slate-900 border-2 border-amber-400 overflow-hidden shadow-md flex items-center justify-center">
+                            {editProfileForm.photo ? (
+                              <img
+                                src={editProfileForm.photo}
+                                alt="Partner Profile"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center text-amber-400">
+                                <User className="w-8 h-8 stroke-[1.5]" />
+                                <span className="text-[9px] font-bold mt-1">No Photo</span>
+                              </div>
+                            )}
+                          </div>
+                          {editProfileForm.photo && (
+                            <button
+                              type="button"
+                              onClick={() => setEditProfileForm({ ...editProfileForm, photo: '' })}
+                              className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-md hover:bg-rose-700 transition cursor-pointer"
+                              title="Remove photo"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex-1 space-y-2 text-center sm:text-left w-full">
+                          <div>
+                            <div className="flex items-center justify-center sm:justify-start gap-2">
+                              <h5 className="text-xs font-black text-slate-900 uppercase tracking-wider">Partner Profile Photo</h5>
+                              <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full border border-amber-300">
+                                Shown on Client Card
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5 font-normal">
+                              Upload your professional photo. It will appear at the top of your profile container on the customer site.
+                            </p>
+                          </div>
+
+                          <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+                            <label className="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-xs transition active:scale-95">
+                              <Camera className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>{editProfileForm.photo ? 'Change Profile Photo' : 'Upload Profile Photo'}</span>
+                              <input
+                                type="file"
+                                accept="image/png, image/jpeg, image/jpg, image/webp"
+                                className="hidden"
+                                onChange={handleProfilePhotoUpload}
+                              />
+                            </label>
+                            
+                            {editProfileForm.photo && (
+                              <button
+                                type="button"
+                                onClick={() => setEditProfileForm({ ...editProfileForm, photo: '' })}
+                                className="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition cursor-pointer"
+                              >
+                                Revert to Default
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block mb-1">Partner Full Name / Business Name *</label>
@@ -2371,7 +3112,7 @@ export default function App() {
                             className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-amber-500 font-bold"
                           >
                             {SERVICE_CATEGORIES_50.map(cat => (
-                              <option key={cat.id} value={cat.id}>{cat.name} ({cat.hindi})</option>
+                              <option key={cat.id} value={cat.id}>{cat.name} ({cat.group})</option>
                             ))}
                           </select>
                         </div>
@@ -2817,7 +3558,7 @@ export default function App() {
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-amber-500 font-bold"
                 >
                   {SERVICE_CATEGORIES_50.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name} ({cat.hindi})</option>
+                    <option key={cat.id} value={cat.id}>{cat.name} ({cat.group})</option>
                   ))}
                 </select>
               </div>
@@ -2905,11 +3646,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white p-6 text-center text-xs text-slate-500">
-        © 2026 Connect Partner Portal • 50+ Local Home Services Network
-      </footer>
     </div>
   );
 }
