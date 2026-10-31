@@ -40,6 +40,9 @@ export const bookingSchema = new mongoose.Schema({
     index: true
   },
   completionCode: { type: String, default: '' },
+  isReviewed: { type: Boolean, default: false },
+  reviewRating: { type: Number },
+  reviewComment: { type: String },
   completedAt: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

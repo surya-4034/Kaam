@@ -10,6 +10,7 @@ import {
   submitBankKyc,
   addPortfolioImage,
   deletePortfolioImage,
+  getWorkerReviews,
 } from '../controllers/workerController.js';
 import { authRequired, requireRole } from '../middleware/auth.js';
 
@@ -20,6 +21,7 @@ router.get('/', getWorkers);
 router.get('/search', searchWorkers);
 router.get('/partner-id/:partnerId', getPartnerByPartnerId);
 router.get('/by-user/:userId', getWorkerByUserId);
+router.get('/:id/reviews', getWorkerReviews);
 router.get('/:id', getWorkerById);
 
 // Profile Updates, Availability, Bank KYC & Portfolio

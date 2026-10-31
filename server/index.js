@@ -19,23 +19,26 @@ const PORT = process.env.PORT || 5050;
 
 async function startServer() {
   try {
-    // 1. Connect to MongoDB Atlas (kaam_db)
-    await connectMongoDB();
-    await seedSamplePartners();
-
-    // 2. Initialize Local SQLite & Schema (Dual-sync engine)
+    // 1. Initialize Local SQLite & Schema (Dual-sync engine)
     await initDb();
     console.log('[Connect Backend] Database engine initialized successfully.');
 
-    // 3. Start Automated Database Auto-Update Monitor & 36-Hour Dues Monitor
-    startAutoSync();
-    startDuesScheduler();
-
-    // 4. Start Express HTTP Server
+    // 2. Start Express HTTP Server immediately
     app.listen(PORT, () => {
       console.log(`[Connect Backend] Production API Server running on port ${PORT}`);
       console.log(`[Connect Backend] Health check: http://localhost:${PORT}/api/health`);
     });
+
+    // 3. Connect to MongoDB Atlas (kaam_db) in background so API is never delayed
+    connectMongoDB()
+      .then(() => seedSamplePartners())
+      .catch((err) => {
+        console.warn('⚠️ [Connect Backend] MongoDB Atlas background connection notice:', err.message);
+      });
+
+    // 4. Start Automated Database Auto-Update Monitor & 36-Hour Dues Monitor
+    startAutoSync();
+    startDuesScheduler();
   } catch (err) {
     console.error('[Connect Backend Initialization Failed]', err);
     process.exit(1);

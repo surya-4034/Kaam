@@ -37,6 +37,7 @@ export const initDb = () => {
           is_active INTEGER DEFAULT 1,
           latitude REAL,
           longitude REAL,
+          photo_url TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(email, role)
         )
@@ -68,13 +69,14 @@ export const initDb = () => {
                   is_active INTEGER DEFAULT 1,
                   latitude REAL,
                   longitude REAL,
+                  photo_url TEXT,
                   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                   UNIQUE(email, role)
                 )
               `);
               db.run(`
                 INSERT OR IGNORE INTO users_v2 
-                SELECT id, phone, email, password_hash, role, full_name, secondary_phone, locality, landmark, state, pincode, address, onboarding_completed, is_active, latitude, longitude, created_at 
+                SELECT id, phone, email, password_hash, role, full_name, secondary_phone, locality, landmark, state, pincode, address, onboarding_completed, is_active, latitude, longitude, photo_url, created_at 
                 FROM users
               `);
               db.run('DROP TABLE IF EXISTS users');
@@ -175,6 +177,9 @@ export const initDb = () => {
           worker_upi TEXT,
           worker_upi_phone TEXT,
           worker_upi_holder TEXT,
+          is_reviewed INTEGER DEFAULT 0,
+          review_rating INTEGER,
+          review_comment TEXT,
           completed_at DATETIME,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -194,6 +199,22 @@ export const initDb = () => {
         )
       `);
 
+      // 7. Customer Reviews & Ratings Table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS reviews (
+          id TEXT PRIMARY KEY,
+          job_id TEXT NOT NULL UNIQUE,
+          worker_id TEXT NOT NULL,
+          client_id TEXT NOT NULL,
+          client_name TEXT NOT NULL,
+          rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+          comment TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY(job_id) REFERENCES job_requests(id),
+          FOREIGN KEY(worker_id) REFERENCES worker_profiles(id)
+        )
+      `);
+
       // Safe migrations for legacy databases (Runs after all tables exist)
       db.run(`ALTER TABLE users ADD COLUMN secondary_phone TEXT`, () => {});
       db.run(`ALTER TABLE users ADD COLUMN locality TEXT`, () => {});
@@ -204,6 +225,8 @@ export const initDb = () => {
       db.run(`ALTER TABLE users ADD COLUMN onboarding_completed INTEGER DEFAULT 0`, () => {});
       db.run(`ALTER TABLE users ADD COLUMN latitude REAL`, () => {});
       db.run(`ALTER TABLE users ADD COLUMN longitude REAL`, () => {});
+      db.run(`ALTER TABLE users ADD COLUMN photo_url TEXT`, () => {});
+      db.run(`ALTER TABLE worker_profiles ADD COLUMN photo TEXT`, () => {});
       db.run(`ALTER TABLE worker_profiles ADD COLUMN latitude REAL`, () => {});
       db.run(`ALTER TABLE worker_profiles ADD COLUMN longitude REAL`, () => {});
       db.run(`ALTER TABLE worker_profiles ADD COLUMN packages_json TEXT`, () => {});
@@ -223,6 +246,9 @@ export const initDb = () => {
       db.run(`ALTER TABLE job_requests ADD COLUMN worker_upi TEXT`, () => {});
       db.run(`ALTER TABLE job_requests ADD COLUMN worker_upi_phone TEXT`, () => {});
       db.run(`ALTER TABLE job_requests ADD COLUMN worker_upi_holder TEXT`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN is_reviewed INTEGER DEFAULT 0`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN review_rating INTEGER`, () => {});
+      db.run(`ALTER TABLE job_requests ADD COLUMN review_comment TEXT`, () => {});
 
       db.run(`ALTER TABLE job_requests ADD COLUMN updated_at DATETIME`, () => {});
 

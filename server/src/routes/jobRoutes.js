@@ -5,8 +5,10 @@ import {
   createJobPublic,
   acceptJob,
   rejectJob,
+  cancelJob,
   completeJob,
   verifyAndCompleteJob,
+  submitJobReview,
 } from '../controllers/jobController.js';
 
 const router = express.Router();
@@ -26,10 +28,15 @@ router.put('/:id/accept', acceptJob);
 router.post('/:id/reject', rejectJob);
 router.put('/:id/reject', rejectJob);
 
+router.post('/:id/cancel', cancelJob);
+router.put('/:id/cancel', cancelJob);
+
 router.post('/:id/verify-complete', verifyAndCompleteJob);
 router.put('/:id/verify-complete', verifyAndCompleteJob);
 
 router.post('/:id/complete', completeJob);
 router.put('/:id/complete', completeJob);
+
+router.post('/:id/review', submitJobReview);
 
 export default router;

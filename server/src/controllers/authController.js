@@ -1212,7 +1212,18 @@ export const updateUserProfile = (req, res) => {
 
   if (!targetId) return res.status(400).json({ error: 'User ID is required.' });
 
-  const fullAddr = address || `${locality || ''}, near ${landmark || ''}, ${state || ''} - ${pincode || ''}`;
+  const cleanLandmark = (landmark || '').replace(/noida/gi, '').trim();
+  const landmarkStr = cleanLandmark ? `, near ${cleanLandmark}` : '';
+  const cleanState = (state || 'Maharashtra').replace(/noida/gi, 'Maharashtra').trim();
+  const cleanPincode = (pincode || '').replace('201301', '400001').trim();
+  const rawAddr = address || `${locality || ''}${landmarkStr}, ${cleanState}${cleanPincode ? ` - ${cleanPincode}` : ''}`;
+  const fullAddr = rawAddr
+    .replace(/,\s*near\s+noida\b/gi, '')
+    .replace(/\bnear\s+noida,?\s*/gi, '')
+    .replace(/201301/g, '400001')
+    .replace(/,\s*,/g, ',')
+    .replace(/\s+/g, ' ')
+    .trim();
 
   db.run(
     `UPDATE users 
@@ -1226,7 +1237,7 @@ export const updateUserProfile = (req, res) => {
          address = COALESCE(?, address),
          onboarding_completed = 1
      WHERE id = ?`,
-    [fullName, phone, secondaryPhone, locality, landmark, state, pincode, fullAddr, targetId],
+    [fullName, phone, secondaryPhone, locality, cleanLandmark, cleanState, cleanPincode, fullAddr, targetId],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
 

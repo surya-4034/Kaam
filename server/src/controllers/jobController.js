@@ -1,5 +1,5 @@
 import db from '../config/database.js';
-import { sendJobStatusEmail, sendPartnerNewJobRequestEmail } from '../services/emailOtpService.js';
+import { sendJobStatusEmail, sendPartnerNewJobRequestEmail, sendPartnerJobCancellationEmail } from '../services/emailOtpService.js';
 import { isPartnerDbConnected, getMongoDb, upsertBookingToMongo, upsertDuesToMongo, upsertClientToMongo } from '../config/mongoose.js';
 import { getPartnerModel } from '../models/PartnerModel.js';
 import { isWithinMumbaiRange } from '../services/redisSpatialService.js';
@@ -730,6 +730,61 @@ export const rejectJob = (req, res) => {
   );
 };
 
+// Customer Cancels Job Request
+export const cancelJob = (req, res) => {
+  const { id } = req.params;
+
+  db.get(
+    `SELECT j.*, 
+            COALESCE(j.category_title, wp.trade_title, 'Home Service') as trade_title, 
+            COALESCE(j.worker_name, u_worker.full_name, 'Verified Service Partner') as worker_name, 
+            COALESCE(j.worker_phone, u_worker.phone, 'Available on App') as worker_phone,
+            COALESCE(u_worker.email, '') as worker_email
+     FROM job_requests j
+     LEFT JOIN worker_profiles wp ON (j.worker_id = wp.id OR j.worker_id = wp.user_id)
+     LEFT JOIN users u_worker ON (wp.user_id = u_worker.id OR j.worker_id = u_worker.id)
+     WHERE j.id = ?`,
+    [id],
+    (err, job) => {
+      if (err || !job) {
+        return res.status(404).json({ error: 'Booking request not found.' });
+      }
+
+      db.run(`UPDATE job_requests SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [id], function (uErr) {
+        if (uErr) return res.status(500).json({ error: uErr.message });
+
+        // Dual-sync to MongoDB Atlas
+        upsertBookingToMongo({
+          id,
+          status: 'CANCELLED'
+        });
+
+        // 1. Send cancellation confirmation email to client
+        resolveClientEmailAndDispatch(job, 'CANCELLED');
+
+        // 2. Send cancellation notification email to partner
+        let targetWorkerEmail = job.worker_email;
+        if (targetWorkerEmail && targetWorkerEmail.includes('@')) {
+          sendPartnerJobCancellationEmail(targetWorkerEmail, job).catch(e => console.warn('[Partner cancellation email error]:', e));
+        } else {
+          db.get(`SELECT email FROM users WHERE id = ? OR id = ?`, [job.worker_id, (job.worker_id || '').replace(/^w-/, '')], (wErr, wUser) => {
+            if (wUser?.email) {
+              sendPartnerJobCancellationEmail(wUser.email, job).catch(e => console.warn('[Partner cancellation email error]:', e));
+            }
+          });
+        }
+
+        res.json({
+          success: true,
+          message: 'Booking request cancelled successfully. Notification emails sent to both client and partner.',
+          jobId: id,
+          status: 'CANCELLED'
+        });
+      });
+    }
+  );
+};
+
 // Worker Verifies Code & Completes Job
 export const verifyAndCompleteJob = (req, res) => {
   const { id } = req.params;
@@ -891,4 +946,121 @@ export const completeJob = (req, res) => {
       }
     );
   });
+};
+
+// Client Submits Review & Rating for Completed Job
+export const submitJobReview = (req, res) => {
+  const { id } = req.params;
+  const { rating, comment, clientName } = req.body;
+
+  const parsedRating = Math.round(Number(rating));
+  if (!parsedRating || parsedRating < 1 || parsedRating > 5) {
+    return res.status(400).json({ error: 'Please provide a valid rating between 1 and 5 stars.' });
+  }
+
+  const cleanComment = String(comment || '').trim();
+
+  db.get(
+    `SELECT j.*, 
+            COALESCE(j.client_name, u_client.full_name, 'Homeowner') as resolved_client_name,
+            COALESCE(wp.id, j.worker_id) as target_worker_id
+     FROM job_requests j
+     LEFT JOIN users u_client ON j.client_id = u_client.id
+     LEFT JOIN worker_profiles wp ON (j.worker_id = wp.id OR j.worker_id = wp.user_id)
+     WHERE j.id = ?`,
+    [id],
+    (err, job) => {
+      if (err || !job) return res.status(404).json({ error: 'Job request not found.' });
+
+      if (job.status !== 'COMPLETED') {
+        return res.status(400).json({
+          error: 'Review can only be submitted after the partner finishes the work and verifies completion with the 6-digit code.'
+        });
+      }
+
+      if (job.is_reviewed === 1) {
+        return res.status(400).json({
+          error: 'You have already submitted a review for this completed service.'
+        });
+      }
+
+      const reviewId = `rev-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const finalClientName = (clientName || job.resolved_client_name || job.client_name || 'Homeowner').trim();
+
+      db.run('PRAGMA foreign_keys = OFF;');
+      db.run(
+        `INSERT INTO reviews (id, job_id, worker_id, client_id, client_name, rating, comment, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [reviewId, job.id, job.worker_id, job.client_id || 'client-guest', finalClientName, parsedRating, cleanComment],
+        function (rErr) {
+          if (rErr) {
+            return res.status(500).json({ error: 'Failed to record review: ' + rErr.message });
+          }
+
+          // Mark job as reviewed
+          db.run(
+            `UPDATE job_requests SET is_reviewed = 1, review_rating = ?, review_comment = ? WHERE id = ?`,
+            [parsedRating, cleanComment, job.id]
+          );
+
+          // Recalculate average rating for this partner
+          db.get(
+            `SELECT AVG(rating) as avg_rating, COUNT(*) as review_count 
+             FROM reviews 
+             WHERE worker_id = ? 
+                OR worker_id IN (SELECT id FROM worker_profiles WHERE id = ? OR user_id = ?)
+                OR worker_id IN (SELECT user_id FROM worker_profiles WHERE id = ? OR user_id = ?)`,
+            [job.worker_id, job.worker_id, job.worker_id, job.worker_id, job.worker_id],
+            (sErr, stats) => {
+              const rawAvg = stats && stats.avg_rating ? Number(stats.avg_rating) : parsedRating;
+              const roundedAvg = Math.round(rawAvg * 10) / 10;
+              const reviewCount = stats && stats.review_count ? Number(stats.review_count) : 1;
+
+              // Update worker profile in SQLite
+              db.run(
+                `UPDATE worker_profiles SET rating_average = ? WHERE id = ? OR user_id = ?`,
+                [roundedAvg, job.worker_id, job.worker_id]
+              );
+
+              // Dual sync to MongoDB
+              upsertBookingToMongo({
+                id: job.id,
+                isReviewed: true,
+                reviewRating: parsedRating,
+                reviewComment: cleanComment
+              });
+
+              if (isPartnerDbConnected()) {
+                try {
+                  const Partner = getPartnerModel();
+                  Partner.updateOne(
+                    { $or: [{ id: job.worker_id }, { partnerId: job.worker_id }, { userId: job.worker_id }] },
+                    { $set: { ratingAverage: roundedAvg, reviewCount: reviewCount } }
+                  ).catch(mErr => console.warn('[Mongo Partner rating sync notice]:', mErr.message));
+                } catch (mErr) {
+                  console.warn('[Mongo Partner sync catch]:', mErr.message);
+                }
+              }
+
+              res.json({
+                success: true,
+                message: 'Review and rating submitted successfully! Thank you for supporting our verified partner.',
+                ratingAverage: roundedAvg,
+                reviewCount,
+                review: {
+                  id: reviewId,
+                  jobId: job.id,
+                  workerId: job.worker_id,
+                  clientName: finalClientName,
+                  rating: parsedRating,
+                  comment: cleanComment,
+                  createdAt: new Date().toISOString()
+                }
+              });
+            }
+          );
+        }
+      );
+    }
+  );
 };

@@ -8,12 +8,15 @@ import { CANONICAL_VERIFIED_PARTNERS, ensureVerifiedPartnersSeeded } from '../co
 
 // Get list of active partners
 export const getWorkers = async (req, res) => {
-  const { category, maxBudget, search } = req.query;
+  const { category, maxBudget, search, includeOffline } = req.query;
 
   if (isPartnerDbConnected()) {
     try {
       const Partner = getPartnerModel();
       const query = { isAccountLocked: { $ne: true } };
+      if (includeOffline !== 'true') {
+        query.isAvailable = { $ne: false };
+      }
 
       if (category && category !== 'all') {
         const catRegex = new RegExp(`^${category}$`, 'i');
@@ -63,11 +66,15 @@ export const getWorkers = async (req, res) => {
 
   // SQLite Fallback
   let sql = `
-    SELECT wp.*, COALESCE(u.full_name, 'Partner') as name, COALESCE(u.phone, '') as phone, COALESCE(u.email, '') as email 
+    SELECT wp.*, COALESCE(u.full_name, 'Partner') as name, COALESCE(u.phone, '') as phone, COALESCE(u.email, '') as email, COALESCE(wp.photo, u.photo_url) as photo,
+           (SELECT COUNT(*) FROM reviews WHERE reviews.worker_id = wp.id OR reviews.worker_id = wp.user_id) as review_count
     FROM worker_profiles wp
     LEFT JOIN users u ON wp.user_id = u.id
     WHERE (wp.is_account_locked = 0 OR wp.is_account_locked IS NULL)
   `;
+  if (includeOffline !== 'true') {
+    sql += ` AND (wp.is_available = 1 OR wp.is_available IS NULL)`;
+  }
   const params = [];
 
   if (category && category !== 'all') {
@@ -102,7 +109,8 @@ export const getWorkers = async (req, res) => {
         dailyRate: r.daily_rate,
         hourlyRate: r.hourly_rate,
         visitingCharge: r.visiting_charge || 149,
-        ratingAverage: r.rating_average,
+        ratingAverage: r.rating_average !== undefined && r.rating_average !== null ? r.rating_average : 5.0,
+        reviewCount: r.review_count || 0,
         completedJobsCount: r.completed_jobs_count,
         isAvailable: Boolean(r.is_available),
         locality: r.locality || 'Andheri West, Mumbai',
@@ -117,6 +125,9 @@ export const getWorkers = async (req, res) => {
       ensureVerifiedPartnersSeeded(db).catch(() => {});
 
       let fallbackList = CANONICAL_VERIFIED_PARTNERS;
+      if (includeOffline !== 'true') {
+        fallbackList = fallbackList.filter(p => p.isAvailable !== false);
+      }
       if (category && category !== 'all') {
         fallbackList = fallbackList.filter(p => 
           p.tradeCategory?.toLowerCase() === category.toLowerCase() ||
@@ -141,7 +152,7 @@ export const getWorkers = async (req, res) => {
 // 4. Faceted Filtering (Category, Locality, Max Budget, Rating)
 // 5. Relevance Scoring & Ranking (Availability, Rating Average, Completed Jobs)
 export const searchWorkers = async (req, res) => {
-  const { category, q, locality, city, maxBudget, minRating, lat, lng, maxDistanceKm } = req.query;
+  const { category, q, locality, city, maxBudget, minRating, lat, lng, maxDistanceKm, includeOffline } = req.query;
 
   // 1. Mumbai Whole-City Geographic Range Check
   let clientLatToUse = Number(lat);
@@ -217,6 +228,9 @@ export const searchWorkers = async (req, res) => {
     try {
       const Partner = getPartnerModel();
       const query = { isAccountLocked: { $ne: true } };
+      if (includeOffline !== 'true') {
+        query.isAvailable = { $ne: false };
+      }
       const conditions = [];
 
       // Category Facet Filter
@@ -327,11 +341,15 @@ export const searchWorkers = async (req, res) => {
 
   // SQLite Fallback Search Engine
   let sql = `
-    SELECT wp.*, COALESCE(u.full_name, 'Partner') as name, COALESCE(u.phone, '') as phone, COALESCE(u.email, '') as email 
+    SELECT wp.*, COALESCE(u.full_name, 'Partner') as name, COALESCE(u.phone, '') as phone, COALESCE(u.email, '') as email, COALESCE(wp.photo, u.photo_url) as photo,
+           (SELECT COUNT(*) FROM reviews WHERE reviews.worker_id = wp.id OR reviews.worker_id = wp.user_id) as review_count
     FROM worker_profiles wp
     LEFT JOIN users u ON wp.user_id = u.id
     WHERE (wp.is_account_locked = 0 OR wp.is_account_locked IS NULL)
   `;
+  if (includeOffline !== 'true') {
+    sql += ` AND (wp.is_available = 1 OR wp.is_available IS NULL)`;
+  }
   const params = [];
 
   if (selCat !== 'all') {
@@ -408,7 +426,8 @@ export const searchWorkers = async (req, res) => {
         dailyRate: r.daily_rate,
         hourlyRate: r.hourly_rate,
         visitingCharge: r.visiting_charge || 149,
-        ratingAverage: r.rating_average,
+        ratingAverage: r.rating_average !== undefined && r.rating_average !== null ? r.rating_average : 5.0,
+        reviewCount: r.review_count || 0,
         completedJobsCount: r.completed_jobs_count,
         isAvailable: Boolean(r.is_available),
         experienceYears: r.experience_years,
@@ -467,6 +486,9 @@ export const searchWorkers = async (req, res) => {
         if (resultsToReturn.length === 0) {
           ensureVerifiedPartnersSeeded(db).catch(() => {});
           let fallbackList = CANONICAL_VERIFIED_PARTNERS;
+          if (includeOffline !== 'true') {
+            fallbackList = fallbackList.filter(p => p.isAvailable !== false);
+          }
           if (selCat && selCat !== 'all') {
             fallbackList = fallbackList.filter(p => 
               p.tradeCategory?.toLowerCase() === selCat ||
@@ -528,7 +550,7 @@ export const getPartnerByPartnerId = async (req, res) => {
   const targetPartnerId = partnerId.toUpperCase().startsWith('KP-') ? partnerId.toUpperCase() : `KP-${1000 + (parseInt((partnerId || '1').replace(/\D/g, '')) || 1)}`;
 
   db.get(
-    `SELECT wp.*, u.full_name as name, u.phone, u.email 
+    `SELECT wp.*, u.full_name as name, u.phone, u.email, COALESCE(wp.photo, u.photo_url) as photo
      FROM worker_profiles wp
      JOIN users u ON wp.user_id = u.id
      WHERE wp.id = ? OR wp.user_id = ? OR wp.id = ?`,
@@ -597,7 +619,7 @@ export const getWorkerByUserId = async (req, res) => {
 
   // SQLite Fallback
   db.get(
-    `SELECT wp.*, u.full_name as name, u.phone, u.email 
+    `SELECT wp.*, u.full_name as name, u.phone, u.email, COALESCE(wp.photo, u.photo_url) as photo
      FROM worker_profiles wp
      JOIN users u ON wp.user_id = u.id
      WHERE wp.user_id = ? OR wp.id = ?`,
@@ -738,6 +760,7 @@ export const updateWorkerProfile = async (req, res) => {
 
       if (packages) updateData.packages = packages;
       if (bank) updateData.bank = bank;
+      if (req.body.photo) updateData.photo = req.body.photo;
 
       const savedPartner = await Partner.findOneAndUpdate(
         mongoLookup,
@@ -752,11 +775,11 @@ export const updateWorkerProfile = async (req, res) => {
   }
 
   // Dual-sync to SQLite (Insert if new, Update if existing)
-  // 1. Sync Name, Phone, and Email to users table if provided
-  if (targetUserId && (req.body.name || req.body.phone || req.body.email)) {
+  // 1. Sync Name, Phone, Email, and Photo to users table if provided
+  if (targetUserId && (req.body.name || req.body.phone || req.body.email || req.body.photo)) {
     db.run(
-      `UPDATE users SET full_name = COALESCE(?, full_name), phone = COALESCE(?, phone), email = COALESCE(?, email) WHERE id = ?`,
-      [req.body.name || null, req.body.phone || null, req.body.email || null, targetUserId],
+      `UPDATE users SET full_name = COALESCE(?, full_name), phone = COALESCE(?, phone), email = COALESCE(?, email), photo_url = COALESCE(?, photo_url) WHERE id = ?`,
+      [req.body.name || null, req.body.phone || null, req.body.email || null, req.body.photo || null, targetUserId],
       (uErr) => {
         if (uErr) console.warn('User table update warning:', uErr.message);
       }
@@ -807,6 +830,7 @@ export const updateWorkerProfile = async (req, res) => {
              experience_years = COALESCE(?, experience_years),
              packages_json = COALESCE(?, packages_json),
              categories_json = COALESCE(?, categories_json),
+             photo = COALESCE(?, photo),
              latitude = ?,
              longitude = ?,
              is_available = 1,
@@ -823,6 +847,7 @@ export const updateWorkerProfile = async (req, res) => {
           experienceYears ? Number(experienceYears) : null,
           pkgJson,
           catJson,
+          req.body.photo || null,
           wLat,
           wLng,
           existingRow.id
@@ -841,8 +866,8 @@ export const updateWorkerProfile = async (req, res) => {
       );
     } else {
       db.run(
-        `INSERT INTO worker_profiles (id, user_id, trade_category, trade_title, experience_years, daily_rate, hourly_rate, visiting_charge, locality, city, bio, is_available, is_account_locked, kyc_status, rating_average, completed_jobs_count, packages_json, categories_json, latitude, longitude)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Mumbai', ?, 1, 0, 'VERIFIED', 5.0, 0, ?, ?, ?, ?)`,
+        `INSERT INTO worker_profiles (id, user_id, trade_category, trade_title, experience_years, daily_rate, hourly_rate, visiting_charge, locality, city, bio, photo, is_available, is_account_locked, kyc_status, rating_average, completed_jobs_count, packages_json, categories_json, latitude, longitude)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Mumbai', ?, ?, 1, 0, 'VERIFIED', 5.0, 0, ?, ?, ?, ?)`,
         [
           targetWorkerId,
           targetUserId,
@@ -854,6 +879,7 @@ export const updateWorkerProfile = async (req, res) => {
           Number(visitingCharge || 149),
           locality || 'Andheri West, Mumbai',
           bio || 'Verified Mumbai skilled tradesperson on kaam.',
+          req.body.photo || null,
           pkgJson,
           catJson,
           wLat,
@@ -1045,4 +1071,51 @@ export const deletePortfolioImage = async (req, res) => {
       id
     });
   });
+};
+
+// Get Reviews and Rating Summary for a Partner
+export const getWorkerReviews = (req, res) => {
+  const { id } = req.params;
+  if (!id) return res.status(400).json({ error: 'Partner or Worker ID is required.' });
+
+  // Resolve matching worker profile and user IDs
+  db.get(
+    `SELECT wp.id, wp.user_id, wp.rating_average, wp.completed_jobs_count
+     FROM worker_profiles wp
+     WHERE wp.id = ? OR wp.user_id = ?`,
+    [id, id],
+    (err, worker) => {
+      const workerId = worker?.id || id;
+      const userId = worker?.user_id || id;
+
+      db.all(
+        `SELECT r.id, r.job_id as jobId, r.worker_id as workerId, r.client_name as clientName, 
+                r.rating, r.comment, r.created_at as createdAt
+         FROM reviews r
+         WHERE r.worker_id = ? OR r.worker_id = ? OR r.worker_id = ?
+         ORDER BY r.created_at DESC`,
+        [id, workerId, userId],
+        (rErr, reviewsList) => {
+          if (rErr) return res.status(500).json({ error: rErr.message });
+
+          const reviews = reviewsList || [];
+          let ratingAverage = worker?.rating_average !== undefined && worker?.rating_average !== null ? worker.rating_average : 5.0;
+          let reviewCount = reviews.length;
+
+          if (reviewCount > 0) {
+            const sum = reviews.reduce((acc, curr) => acc + (Number(curr.rating) || 5), 0);
+            ratingAverage = Math.round((sum / reviewCount) * 10) / 10;
+          }
+
+          res.json({
+            success: true,
+            workerId: id,
+            ratingAverage,
+            reviewCount,
+            reviews
+          });
+        }
+      );
+    }
+  );
 };

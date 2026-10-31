@@ -30,6 +30,8 @@ tests/
 server/tests/
 server/demo.html
 create_word_doc.py
+build_final_cis_notebook.py
+cis-practicals.html
 *.docx
 *.zip
 *.backup*

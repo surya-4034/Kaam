@@ -64,6 +64,14 @@ const getResendClient = () => {
   return new Resend(getActiveResendKey());
 };
 
+export const getClientBaseUrl = () => {
+  return (process.env.CLIENT_URL || process.env.CLIENT_APP_URL || 'http://localhost:5174').replace(/\/$/, '');
+};
+
+export const getPartnerBaseUrl = () => {
+  return (process.env.PARTNER_URL || process.env.WORKER_URL || process.env.WORKER_APP_URL || 'http://localhost:5175').replace(/\/$/, '');
+};
+
 // In-memory Log for Dispatched Emails
 export const emailDispatchLogs = [];
 
@@ -689,9 +697,11 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
     return { success: false, error: 'Invalid client email' };
   }
 
+  const clientBaseUrl = getClientBaseUrl();
   const isAccepted = status === 'ACCEPTED';
   const isRequested = status === 'REQUESTED';
   const isCompleted = status === 'COMPLETED';
+  const isCancelled = status === 'CANCELLED';
 
   const partnerName = job.worker_name || 'Service Partner';
   const partnerPhone = job.worker_phone || 'Available on Connect App';
@@ -709,13 +719,15 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
     subjectText = `Booking Request Placed: Waiting for Partner Confirmation | Connect`;
   } else if (isCompleted) {
     subjectText = `Work Completed: Service Order Finished by ${partnerName} | Connect`;
+  } else if (isCancelled) {
+    subjectText = `Booking Cancelled: Order #${job.id || ''} | Connect`;
   }
 
   let plainTextBody = '';
   let htmlBody = '';
 
   if (isRequested) {
-    plainTextBody = `Hello ${clientName},\n\nYour booking request for "${categoryTitle}" has been placed and sent to ${partnerName}'s desk.\n\nStatus: ⏳ Waiting for confirmation\n\n📌 Request Summary:\n- Service Partner: ${partnerName}\n- Service Category: ${categoryTitle}\n- Total Agreed Fee: ${agreedFee}\n- Service Address: ${location}\n- Work Details: ${description}\n\nYou will receive an immediate confirmation email as soon as ${partnerName} confirms your booking!\n\nTrack your booking in real time: https://kaam-client.yors.online\n\nConnect Support Team`;
+    plainTextBody = `Hello ${clientName},\n\nYour booking request for "${categoryTitle}" has been placed and sent to ${partnerName}'s desk.\n\nStatus: ⏳ Waiting for confirmation\n\n📌 Request Summary:\n- Service Partner: ${partnerName}\n- Service Category: ${categoryTitle}\n- Total Agreed Fee: ${agreedFee}\n- Service Address: ${location}\n- Work Details: ${description}\n\nYou will receive an immediate confirmation email as soon as ${partnerName} confirms your booking!\n\nTrack your booking in real time: ${clientBaseUrl}\n\nConnect Support Team`;
 
     htmlBody = `
       <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
@@ -742,7 +754,7 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
         </div>
 
         <div style="text-align: center; margin-bottom: 20px;">
-          <a href="https://kaam-client.yors.online" style="background-color: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
+          <a href="${clientBaseUrl}" style="background-color: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
             Track in My Requests ➔
           </a>
         </div>
@@ -795,7 +807,7 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
         </div>
 
         <div style="text-align: center; margin-bottom: 20px;">
-          <a href="https://kaam-client.yors.online" style="background-color: #059669; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
+          <a href="${clientBaseUrl}" style="background-color: #059669; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
             Open Connect Client Desk ➔
           </a>
         </div>
@@ -837,7 +849,7 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
         </p>
 
         <div style="text-align: center; margin-bottom: 20px;">
-          <a href="https://kaam-client.yors.online" style="background-color: #15803d; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
+          <a href="${clientBaseUrl}" style="background-color: #15803d; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
             Book Another Service on Connect ➔
           </a>
         </div>
@@ -846,8 +858,44 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
         <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">Connect Automated Service Dispatch • Support Email: kaam@yors.online</p>
       </div>
     `;
+  } else if (isCancelled) {
+    plainTextBody = `Hello ${clientName},\n\nYour booking request #${job.id || ''} for "${categoryTitle}" with ${partnerName} has been CANCELLED.\n\n📌 Cancellation Details:\n- Service: ${categoryTitle}\n- Partner: ${partnerName}\n- Status: 🔴 CANCELLED\n\nNo payment was captured. You can explore services and book whenever you need on Connect.\nVisit ${clientBaseUrl}\n\nConnect Support Team`;
+
+    htmlBody = `
+      <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
+        <div style="background-color: #dc2626; padding: 16px 20px; border-radius: 12px; color: #ffffff; text-align: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: bold;">🔴 Booking Request Cancelled</h2>
+          <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.95;">Order #${job.id || ''} has been cancelled</p>
+        </div>
+
+        <p style="font-size: 14px; margin-bottom: 16px;">Hello <strong>${clientName}</strong>,</p>
+        <p style="font-size: 14px; margin-bottom: 16px; line-height: 1.5;">
+          Your service booking for <strong style="color: #dc2626;">${categoryTitle}</strong> with <strong>${partnerName}</strong> has been cancelled.
+        </p>
+
+        <div style="background-color: #fee2e2; border: 1px solid #fecaca; padding: 12px 16px; border-radius: 10px; margin-bottom: 18px;">
+          <span style="font-size: 14px; font-weight: bold; color: #991b1b;">🔴 Status: Cancelled by Client</span>
+        </div>
+
+        <div style="background-color: #ffffff; padding: 16px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 13px; line-height: 1.7; margin-bottom: 20px;">
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Booking ID:</strong> <span style="font-family: monospace; font-weight: bold;">${job.id || '—'}</span></p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Service:</strong> ${categoryTitle}</p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Partner:</strong> ${partnerName}</p>
+          <p style="margin: 4px 0;"><strong style="color: #475569;">Scheduled Slot:</strong> ${job.time_slot || 'Standard'}</p>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 20px;">
+          <a href="${clientBaseUrl}" style="background-color: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
+            Browse Other Services ➔
+          </a>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">Connect Automated Service Dispatch • Support Email: kaam@yors.online</p>
+      </div>
+    `;
   } else {
-    plainTextBody = `Hello ${clientName},\n\nWe regret to inform you that your request for "${categoryTitle}" was DECLINED by ${partnerName} as they are currently unavailable for this schedule.\n\n📌 Request Details:\n- Category: ${categoryTitle}\n- Partner: ${partnerName}\n- Fee: ${agreedFee}\n\nYou can easily select another top-rated service partner on Connect.\nVisit https://kaam-client.yors.online to rebook.\n\nConnect Support Team`;
+    plainTextBody = `Hello ${clientName},\n\nWe regret to inform you that your request for "${categoryTitle}" was DECLINED by ${partnerName} as they are currently unavailable for this schedule.\n\n📌 Request Details:\n- Category: ${categoryTitle}\n- Partner: ${partnerName}\n- Fee: ${agreedFee}\n\nYou can easily select another top-rated service partner on Connect.\nVisit ${clientBaseUrl} to rebook.\n\nConnect Support Team`;
 
     htmlBody = `
       <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
@@ -872,7 +920,7 @@ export const sendJobStatusEmail = async (clientEmail, status, job = {}) => {
         </div>
 
         <div style="text-align: center; margin-bottom: 20px;">
-          <a href="https://kaam-client.yors.online" style="background-color: #0284c7; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
+          <a href="${clientBaseUrl}" style="background-color: #0284c7; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
             Choose Another Service Partner ➔
           </a>
         </div>
@@ -909,6 +957,7 @@ export const sendPartnerNewJobRequestEmail = async (partnerEmail, job = {}) => {
     return { success: false, error: 'Invalid partner email' };
   }
 
+  const partnerBaseUrl = getPartnerBaseUrl();
   const partnerName = job.worker_name || 'Service Partner';
   const clientName = job.client_name || 'Homeowner';
   const clientPhone = job.client_phone || 'Available on Connect App';
@@ -920,7 +969,7 @@ export const sendPartnerNewJobRequestEmail = async (partnerEmail, job = {}) => {
 
   const subjectText = `🔔 New Booking Request from ${clientName} (${categoryTitle}) | Connect Partner`;
 
-  const plainTextBody = `Hello ${partnerName},\n\nYou have received a new booking request on Connect!\n\n📌 Request Summary:\n- Customer: ${clientName}\n- Contact: ${clientPhone}\n- Service Category: ${categoryTitle}\n- Total Agreed Fee: ${agreedFee}\n- Service Location: ${location}\n- Work Scope: ${description}${timeSlot}\n\nPlease open your partner desk now to ACCEPT or DECLINE this request:\nhttps://kaam-partner.yors.online\n\nConnect Partner Support Team`;
+  const plainTextBody = `Hello ${partnerName},\n\nYou have received a new booking request on Connect!\n\n📌 Request Summary:\n- Customer: ${clientName}\n- Contact: ${clientPhone}\n- Service Category: ${categoryTitle}\n- Total Agreed Fee: ${agreedFee}\n- Service Location: ${location}\n- Work Scope: ${description}${timeSlot}\n\nPlease open your partner desk now to ACCEPT or DECLINE this request:\n${partnerBaseUrl}\n\nConnect Partner Support Team`;
 
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
@@ -948,13 +997,81 @@ export const sendPartnerNewJobRequestEmail = async (partnerEmail, job = {}) => {
       </div>
 
       <div style="text-align: center; margin-bottom: 20px;">
-        <a href="https://kaam-partner.yors.online" style="background-color: #f59e0b; color: #0f172a; padding: 13px 28px; border-radius: 10px; text-decoration: none; font-weight: 900; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
+        <a href="${partnerBaseUrl}" style="background-color: #f59e0b; color: #0f172a; padding: 13px 28px; border-radius: 10px; text-decoration: none; font-weight: 900; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
           Open Partner Desk & Accept Request ➔
         </a>
       </div>
 
       <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
       <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">Connect Automated Service Dispatch • Support Email: kaam@yors.online</p>
+    </div>
+  `;
+
+  return dispatchEmail({
+    to: cleanEmail,
+    subject: subjectText,
+    text: plainTextBody,
+    html: htmlBody,
+    senderName: 'Connect Partner Dispatch'
+  });
+};
+
+/**
+ * Send Automated Email Notification to Partner when Customer Cancels Job Request
+ */
+export const sendPartnerJobCancellationEmail = async (partnerEmail, job = {}) => {
+  const cleanEmail = (partnerEmail || '').toLowerCase().trim();
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    console.warn('⚠️ [PARTNER JOB CANCELLATION EMAIL]: Invalid partner email provided:', partnerEmail);
+    return { success: false, error: 'Invalid partner email' };
+  }
+
+  const partnerBaseUrl = getPartnerBaseUrl();
+  const partnerName = job.worker_name || 'Service Partner';
+  const clientName = job.client_name || 'Homeowner';
+  const categoryTitle = job.category_title || job.trade_title || 'Home Service';
+  const location = job.location_address || 'Mumbai';
+  const timeSlot = job.time_slot ? ` (${job.time_slot})` : '';
+
+  const subjectText = `⚠️ Booking Request Cancelled by Customer (${categoryTitle}) | Connect Partner`;
+
+  const plainTextBody = `Hello ${partnerName},\n\nThe customer (${clientName}) has cancelled booking request #${job.id || ''} for "${categoryTitle}".\n\nStatus: 🔴 CANCELLED\n\nThis request has been automatically removed from your active schedule and partner desk. No further action is required.\n\nOpen Partner Dashboard: ${partnerBaseUrl}\n\nConnect Partner Support Team`;
+
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 24px; border-radius: 16px; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0;">
+      <div style="background-color: #dc2626; padding: 16px 20px; border-radius: 12px; color: #ffffff; text-align: center; margin-bottom: 20px;">
+        <h2 style="margin: 0; font-size: 20px; font-weight: bold;">⚠️ Customer Cancelled Request</h2>
+        <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.95;">Booking #${job.id || ''} has been cancelled</p>
+      </div>
+
+      <p style="font-size: 14px; margin-bottom: 12px;">Hello <strong>${partnerName}</strong>,</p>
+      <p style="font-size: 14px; margin-bottom: 16px; line-height: 1.5;">
+        Customer <strong>${clientName}</strong> has cancelled their service request for <strong style="color: #dc2626;">${categoryTitle}</strong>${timeSlot}.
+      </p>
+
+      <div style="background-color: #fee2e2; border: 1px solid #fecaca; padding: 12px 16px; border-radius: 10px; margin-bottom: 18px;">
+        <span style="font-size: 14px; font-weight: bold; color: #991b1b;">🔴 Status: Request Cancelled • Removed from your desk</span>
+      </div>
+
+      <div style="background-color: #ffffff; padding: 16px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 13px; line-height: 1.7; margin-bottom: 20px;">
+        <p style="margin: 4px 0;"><strong style="color: #475569;">Booking ID:</strong> <span style="font-family: monospace; font-weight: bold;">${job.id || '—'}</span></p>
+        <p style="margin: 4px 0;"><strong style="color: #475569;">Customer Name:</strong> ${clientName}</p>
+        <p style="margin: 4px 0;"><strong style="color: #475569;">Service:</strong> ${categoryTitle}</p>
+        <p style="margin: 4px 0;"><strong style="color: #475569;">Address:</strong> ${location}</p>
+      </div>
+
+      <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 20px;">
+        This request has been automatically removed from your incoming requests and active schedule. You remain available for new customer bookings.
+      </p>
+
+      <div style="text-align: center; margin-bottom: 20px;">
+        <a href="${partnerBaseUrl}" style="background-color: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
+          Open Partner Dashboard ➔
+        </a>
+      </div>
+
+      <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+      <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">Connect Partner Support • Email: kaam@yors.online</p>
     </div>
   `;
 
